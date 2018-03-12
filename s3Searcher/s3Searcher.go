@@ -54,18 +54,23 @@ func (s3Searcher S3Searcher) ListBuckets() string {
 	return *listBuckets.Buckets[result].Name
 }
 func (s3Searcher S3Searcher) ListObjects(bucket string) string {
-	listObjects, err := s3Searcher.Svc.ListObjects(&s3.ListObjectsInput{Bucket: aws.String(bucket)})
+	Items := []ListItems{}
+	key := 0
+	err := s3Searcher.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
+			for _, item := range listObjects.Contents {
+				if strings.HasSuffix(*item.Key, "/") == false {
+					Items = append(Items, ListItems{Key: key, Val: *item.Key, LastModified: *item.LastModified})
+					key++
+				}
+			}
+			return !lastPage
+		})
 	if err != nil {
 		awsErrorPrint(err)
 	}
-	Items := []ListItems{}
-	for key, item := range listObjects.Contents {
-		if strings.HasSuffix(*item.Key, "/") == false {
-			Items = append(Items, ListItems{Key: key, Val: *item.Key, LastModified: *item.LastModified})
-		}
-	}
 	result := Run("どのファイルを取得しますか？", Items)
-	return *listObjects.Contents[result].Key
+	return Items[result].Val
 }
 
 func (s3Searcher S3Searcher) CheckLocalExists(objectKey string) {
