@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/seike460/s3Searcher/s3Searcher"
 )
 
