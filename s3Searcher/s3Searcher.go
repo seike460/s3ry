@@ -10,6 +10,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -69,6 +70,9 @@ func (s3Searcher S3Searcher) ListObjects(bucket string) string {
 	if err != nil {
 		awsErrorPrint(err)
 	}
+	sort.Slice(Items, func(i, j int) bool {
+		return Items[i].LastModified.After(Items[j].LastModified)
+	})
 	result := Run("どのファイルを取得しますか？", Items)
 	return Items[result].Val
 }
