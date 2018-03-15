@@ -93,7 +93,7 @@ func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
 	if err != nil {
-		fmt.Errorf("failed to create file %q, %v", filename, err)
+		fmt.Fprintf(os.Stderr, "")
 		os.Exit(1)
 	}
 	inputGet := &s3.GetObjectInput{
@@ -107,6 +107,7 @@ func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
 	}
 	fmt.Printf("ファイルをダウンロードしました, %s, %d bytes\n", filename, result)
 }
+
 func awsErrorPrint(err error) {
 	if aerr, ok := err.(awserr.Error); ok {
 		fmt.Println(aerr.Error())
