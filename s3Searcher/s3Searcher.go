@@ -20,19 +20,18 @@ type S3Searcher struct {
 	Svc  *s3.S3
 }
 
-type ListItems struct {
+type PromptItems struct {
 	Key          int
 	Val          string
 	LastModified time.Time
+	Tag          string
 }
 
 func NewS3Searcher() *S3Searcher {
-	sess, err := session.NewSession(&aws.Config{
+	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
-	)
-	if err != nil {
-		awsErrorPrint(err)
-	}
+	))
+
 	svc := s3.New(sess)
 	S3Searcher := &S3Searcher{
 		Sess: sess,
@@ -47,21 +46,21 @@ func (s3Searcher S3Searcher) ListBuckets() string {
 	if err != nil {
 		awsErrorPrint(err)
 	}
-	Items := []ListItems{}
+	Items := []PromptItems{}
 	for key, val := range listBuckets.Buckets {
-		Items = append(Items, ListItems{Key: key, Val: *val.Name})
+		Items = append(Items, PromptItems{Key: key, Val: *val.Name, Tag: "Bucket"})
 	}
 	result := Run("どのBucketsを利用しますか？", Items)
 	return *listBuckets.Buckets[result].Name
 }
 func (s3Searcher S3Searcher) ListObjects(bucket string) string {
-	Items := []ListItems{}
+	Items := []PromptItems{}
 	key := 0
 	err := s3Searcher.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
-					Items = append(Items, ListItems{Key: key, Val: *item.Key, LastModified: *item.LastModified})
+					Items = append(Items, PromptItems{Key: key, Val: *item.Key, LastModified: *item.LastModified, Tag: "Object"})
 					key++
 				}
 			}
@@ -118,11 +117,11 @@ func awsErrorPrint(err error) {
 	os.Exit(1)
 }
 
-func Run(label string, items []ListItems) int {
+func Run(label string, items []PromptItems) int {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
 `
-	if items[0].LastModified.After(time.Date(1900, 1, 1, 1, 0, 0, 123456789, time.Local)) {
+	if items[0].Tag == "Object" {
 		detail = `
 {{ "選択値:" | faint }} {{ .Val }}
 {{ "最終更新日:" | faint }} {{ .LastModified }}
