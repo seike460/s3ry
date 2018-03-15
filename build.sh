@@ -1,15 +1,16 @@
 #!/bin/sh
 
-if [ $# != 1 ]; then
-    echo "Usage: $0 [binary name]"
-    exit 0
-fi
+echo "start build s3Searcher"
 
-GOOS=linux GOARCH=amd64 go build -o ./bin/linux64/$1
-GOOS=linux GOARCH=386 go build -o ./bin/linux386/$1
+name=s3Searcher
 
-GOOS=windows GOARCH=386 go build -o ./bin/windows386/$1.exe
-GOOS=windows GOARCH=amd64 go build -o ./bin/windows64/$1.exe
+GOOS=linux GOARCH=amd64 go build -o ./bin/linux64/$name
+GOOS=linux GOARCH=386 go build -o ./bin/linux386/$name
 
-GOOS=darwin GOARCH=386 go build -o ./bin/darwin386/$1
-GOOS=darwin GOARCH=amd64 go build -o ./bin/darwin64/$1
+GOOS=windows GOARCH=386 go build -o ./bin/windows386/$name.exe
+GOOS=windows GOARCH=amd64 go build -o ./bin/windows64/$name.exe
+
+GOOS=darwin GOARCH=386 go build -o ./bin/darwin386/$name
+GOOS=darwin GOARCH=amd64 go build -o ./bin/darwin64/$name
+
+echo "end build s3Searcher"
