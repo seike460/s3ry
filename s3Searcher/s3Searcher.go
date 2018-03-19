@@ -2,18 +2,31 @@ package s3Searcher
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/manifoldco/promptui"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/briandowns/spinner"
+	"github.com/manifoldco/promptui"
 )
+
+var sp = spinner.New(spinner.CharSets[34], 100*time.Millisecond)
+
+func spS(label string) {
+	fmt.Println(label)
+	sp.Start()
+}
+
+func spE() {
+	sp.Stop()
+}
 
 type S3Searcher struct {
 	Sess *session.Session
@@ -41,6 +54,7 @@ func NewS3Searcher() *S3Searcher {
 }
 
 func (s3Searcher S3Searcher) ListBuckets() string {
+	spS("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
 	listBuckets, err := s3Searcher.Svc.ListBuckets(input)
 	if err != nil {
@@ -50,10 +64,12 @@ func (s3Searcher S3Searcher) ListBuckets() string {
 	for key, val := range listBuckets.Buckets {
 		Items = append(Items, PromptItems{Key: key, Val: *val.Name, Tag: "Bucket"})
 	}
-	result := Run("どのBucketsを利用しますか？", Items)
+	spE()
+	result := Run("どのバケットを利用しますか？", Items)
 	return *listBuckets.Buckets[result].Name
 }
 func (s3Searcher S3Searcher) ListObjects(bucket string) string {
+	spS("オブジェクトの検索中です...")
 	Items := []PromptItems{}
 	key := 0
 	err := s3Searcher.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
@@ -72,6 +88,7 @@ func (s3Searcher S3Searcher) ListObjects(bucket string) string {
 	sort.Slice(Items, func(i, j int) bool {
 		return Items[i].LastModified.After(Items[j].LastModified)
 	})
+	spE()
 	result := Run("どのファイルを取得しますか？", Items)
 	return Items[result].Val
 }
@@ -90,6 +107,7 @@ func (s3Searcher S3Searcher) CheckLocalExists(objectKey string) {
 }
 
 func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
+	spS("オブジェクトのダウンロード中です...")
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
 	if err != nil {
@@ -105,6 +123,7 @@ func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
 	if err != nil {
 		awsErrorPrint(err)
 	}
+	spE()
 	fmt.Printf("ファイルをダウンロードしました, %s, %d bytes\n", filename, result)
 }
 
@@ -155,7 +174,7 @@ func Run(label string, items []PromptItems) int {
 	i, _, err := prompt.Run()
 
 	if err != nil {
-		fmt.Printf("プロンプトの選択に失敗しました、終了します %v\n", err)
+		fmt.Printf("選択に失敗しました。終了します %v\n", err)
 		os.Exit(1)
 	}
 	return i
