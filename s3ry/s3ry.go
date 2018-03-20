@@ -1,4 +1,4 @@
-package s3Searcher
+package s3ry
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ func spE() {
 	sp.Stop()
 }
 
-type S3Searcher struct {
+type s3ry struct {
 	Sess *session.Session
 	Svc  *s3.S3
 }
@@ -41,23 +41,23 @@ type PromptItems struct {
 	Tag          string
 }
 
-func NewS3Searcher() *S3Searcher {
+func NewS3ry() *s3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
 	))
 
 	svc := s3.New(sess)
-	S3Searcher := &S3Searcher{
+	s3ry := &s3ry{
 		Sess: sess,
 		Svc:  svc,
 	}
-	return S3Searcher
+	return s3ry
 }
 
-func (s3Searcher S3Searcher) ListBuckets() string {
+func (s3ry s3ry) ListBuckets() string {
 	spS("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
-	listBuckets, err := s3Searcher.Svc.ListBuckets(input)
+	listBuckets, err := s3ry.Svc.ListBuckets(input)
 	if err != nil {
 		awsErrorPrint(err)
 	}
@@ -69,11 +69,11 @@ func (s3Searcher S3Searcher) ListBuckets() string {
 	result := Run("どのバケットを利用しますか?", Items)
 	return *listBuckets.Buckets[result].Name
 }
-func (s3Searcher S3Searcher) ListObjects(bucket string) string {
+func (s3ry s3ry) ListObjects(bucket string) string {
 	spS("オブジェクトの検索中です...")
 	Items := []PromptItems{}
 	key := 0
-	err := s3Searcher.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+	err := s3ry.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
@@ -94,7 +94,7 @@ func (s3Searcher S3Searcher) ListObjects(bucket string) string {
 	return Items[result].Val
 }
 
-func (s3Searcher S3Searcher) CheckLocalExists(objectKey string) {
+func (s3ry s3ry) CheckLocalExists(objectKey string) {
 	filename := filepath.Base(objectKey)
 	_, err := os.Stat(filename)
 	if err == nil {
@@ -108,7 +108,7 @@ func (s3Searcher S3Searcher) CheckLocalExists(objectKey string) {
 	}
 }
 
-func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
+func (s3ry s3ry) GetObject(bucket string, objectKey string) {
 	spS("オブジェクトのダウンロード中です...")
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
@@ -120,7 +120,7 @@ func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(objectKey),
 	}
-	downloader := s3manager.NewDownloader(s3Searcher.Sess)
+	downloader := s3manager.NewDownloader(s3ry.Sess)
 	result, err := downloader.Download(file, inputGet)
 	if err != nil {
 		awsErrorPrint(err)
@@ -129,7 +129,7 @@ func (s3Searcher S3Searcher) GetObject(bucket string, objectKey string) {
 	fmt.Printf("ファイルをダウンロードしました, %s, %d bytes\n", filename, result)
 }
 
-func (s3Searcher S3Searcher) UploadObject(bucket string) {
+func (s3ry s3ry) UploadObject(bucket string) {
 
 	dir := dirwalk()
 	Items := []PromptItems{}
@@ -140,7 +140,7 @@ func (s3Searcher S3Searcher) UploadObject(bucket string) {
 
 	spS("オブジェクトのアップロード中です...")
 	uploadObject := Items[selected].Val
-	uploader := s3manager.NewUploader(s3Searcher.Sess)
+	uploader := s3manager.NewUploader(s3ry.Sess)
 	f, err := os.Open(uploadObject)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "")
