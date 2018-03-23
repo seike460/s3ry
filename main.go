@@ -5,13 +5,13 @@ import (
 )
 
 func main() {
-	s3ry := s3ry.NewS3ry()
+	s := s3ry.NewS3ry()
 	// show Bucket List & select
-	selectBucket := s3ry.ListBuckets()
+	selectBucket := s.ListBuckets()
 	// show Object List & select
-	selectObject := s3ry.ListObjects(selectBucket)
+	selectObject := s.ListObjects(selectBucket)
 	// check File
 	s3ry.CheckLocalExists(selectObject)
 	// GetObject
-	s3ry.GetObject(selectBucket, selectObject)
+	s.GetObject(selectBucket, selectObject)
 }

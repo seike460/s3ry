@@ -1,5 +1,5 @@
-# s3Searcher
-AWS S3 Object Searcher
+# s3ry
+AWS S3 Object
 
 ## build
 
