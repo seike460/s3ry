@@ -13,7 +13,7 @@ func main() {
 	switch selectOperation {
 	case "アップロード":
 		s.UploadObject(selectBucket)
-	case "リスト":
+	case "オブジェクトリスト":
 		s.SaveObjectList(selectBucket)
 	default:
 		// show Object List & select
