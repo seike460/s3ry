@@ -59,13 +59,15 @@ func Run(label string, items []PromptItems) string {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
 `
-	if items[0].Tag == "Object" {
-		detail = `
+	for _, item := range items {
+		if item.Tag == "Object" {
+			detail = `
 {{ "選択値:" | faint }} {{ .Val }}
 {{ "最終更新日:" | faint }} {{ .LastModified }}
 `
+		}
+		break
 	}
-
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "->{{ .Val | red }}",
