@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -31,6 +33,16 @@ func NewS3ry() *s3ry {
 	return s
 }
 
+func (s s3ry) SelectOperation() string {
+	items := []PromptItems{
+		{Key: 0, Val: "ダウンロード"},
+		{Key: 1, Val: "アップロード"},
+		{Key: 2, Val: "オブジェクトリスト"},
+	}
+	result := run("何をしますか？", items)
+	return result
+}
+
 func (s s3ry) ListBuckets() string {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
@@ -43,13 +55,14 @@ func (s s3ry) ListBuckets() string {
 		items = append(items, PromptItems{Key: key, Val: *val.Name, Tag: "Bucket"})
 	}
 	spe()
-	result := Run("どのバケットを利用しますか?", items)
+	result := run("どのバケットを利用しますか?", items)
 	return result
 }
 
 func (s s3ry) ListObjects(bucket string) string {
 	sps("オブジェクトの検索中です...")
 	items := []PromptItems{}
+	// @todo- start 共通化
 	key := 0
 	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
@@ -67,8 +80,12 @@ func (s s3ry) ListObjects(bucket string) string {
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].LastModified.After(items[j].LastModified)
 	})
+	// @todo-end
+
 	spe()
-	result := Run("どのファイルを取得しますか?", items)
+
+	fmt.Println("オブジェクト数：", len(items))
+	result := run("どのファイルを取得しますか?", items)
 	return result
 }
 
@@ -99,7 +116,7 @@ func (s s3ry) UploadObject(bucket string) {
 	for key, val := range dir {
 		items = append(items, PromptItems{Key: key, Val: val, Tag: "Bucket"})
 	}
-	selected := Run("どのファイルをアップロードしますか?", items)
+	selected := run("どのファイルをアップロードしますか?", items)
 
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selected
@@ -120,4 +137,41 @@ func (s s3ry) UploadObject(bucket string) {
 	}
 	spe()
 	fmt.Printf("ファイルをアップロードしました, %s \n", uploadObject)
+}
+
+func (s s3ry) SaveObjectList(bucket string) {
+	sps("オブジェクトの検索中です...")
+	// @todo- start 共通化
+	items := []PromptItems{}
+	key := 0
+	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
+			for _, item := range listObjects.Contents {
+				if strings.HasSuffix(*item.Key, "/") == false {
+					items = append(items, PromptItems{Key: key, Val: *item.Key, Size: *item.Size, LastModified: *item.LastModified, Tag: "Object"})
+					key++
+				}
+			}
+			return !lastPage
+		})
+	if err != nil {
+		awsErrorPrint(err)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].LastModified.After(items[j].LastModified)
+	})
+	if err != nil {
+		awsErrorPrint(err)
+	}
+	// @todo-end
+	spe()
+	t := time.Now()
+	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
+	file, err := os.Create(ObjectListFileName)
+
+	for _, item := range items {
+		file.Write(([]byte)(item.Val + "," + strconv.FormatInt(item.Size, 10) + "\n"))
+	}
+	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
+	os.Exit(0)
 }

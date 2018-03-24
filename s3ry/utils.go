@@ -27,6 +27,7 @@ func spe() {
 type PromptItems struct {
 	Key          int
 	Val          string
+	Size         int64
 	LastModified time.Time
 	Tag          string
 }
@@ -55,17 +56,19 @@ func awsErrorPrint(err error) {
 	os.Exit(1)
 }
 
-func Run(label string, items []PromptItems) string {
+func run(label string, items []PromptItems) string {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
 `
-	if items[0].Tag == "Object" {
-		detail = `
+	for _, item := range items {
+		if item.Tag == "Object" {
+			detail = `
 {{ "選択値:" | faint }} {{ .Val }}
 {{ "最終更新日:" | faint }} {{ .LastModified }}
 `
+		}
+		break
 	}
-
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "->{{ .Val | red }}",
