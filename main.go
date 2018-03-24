@@ -14,7 +14,7 @@ func main() {
 	case "アップロード":
 		s.UploadObject(selectBucket)
 	case "リスト":
-		s.UploadObject(selectBucket)
+		s.SaveObjectList(selectBucket)
 	default:
 		// show Object List & select
 		selectObject := s.ListObjects(selectBucket)

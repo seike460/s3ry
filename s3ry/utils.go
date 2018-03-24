@@ -27,6 +27,7 @@ func spe() {
 type PromptItems struct {
 	Key          int
 	Val          string
+	Size         int64
 	LastModified time.Time
 	Tag          string
 }
