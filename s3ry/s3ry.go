@@ -31,6 +31,16 @@ func NewS3ry() *s3ry {
 	return s
 }
 
+func (s s3ry) SelectOperation() string {
+	items := []PromptItems{
+		{Key: 0, Val: "ダウンロード"},
+		{Key: 1, Val: "アップロード"},
+		{Key: 2, Val: "リスト"},
+	}
+	result := run("何をしますか？", items)
+	return result
+}
+
 func (s s3ry) ListBuckets() string {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
@@ -43,7 +53,7 @@ func (s s3ry) ListBuckets() string {
 		items = append(items, PromptItems{Key: key, Val: *val.Name, Tag: "Bucket"})
 	}
 	spe()
-	result := Run("どのバケットを利用しますか?", items)
+	result := run("どのバケットを利用しますか?", items)
 	return result
 }
 
@@ -67,8 +77,11 @@ func (s s3ry) ListObjects(bucket string) string {
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].LastModified.After(items[j].LastModified)
 	})
+
 	spe()
-	result := Run("どのファイルを取得しますか?", items)
+
+	fmt.Println("オブジェクト数：", len(items))
+	result := run("どのファイルを取得しますか?", items)
 	return result
 }
 
@@ -99,7 +112,7 @@ func (s s3ry) UploadObject(bucket string) {
 	for key, val := range dir {
 		items = append(items, PromptItems{Key: key, Val: val, Tag: "Bucket"})
 	}
-	selected := Run("どのファイルをアップロードしますか?", items)
+	selected := run("どのファイルをアップロードしますか?", items)
 
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selected

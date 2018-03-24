@@ -55,7 +55,7 @@ func awsErrorPrint(err error) {
 	os.Exit(1)
 }
 
-func Run(label string, items []PromptItems) string {
+func run(label string, items []PromptItems) string {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
 `
