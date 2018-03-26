@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
+// @todo 構造体自体は、公開、メンバー変数はプライベートが良いのでは
 type s3ry struct {
 	Sess *session.Session
 	Svc  *s3.S3
@@ -77,6 +78,7 @@ func (s s3ry) ListObjects(bucket string) string {
 	if err != nil {
 		awsErrorPrint(err)
 	}
+	// @todo 並び替えオプションをフラグをグローバルにもたせて、KeyでもSort出来るようにする
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].LastModified.After(items[j].LastModified)
 	})
@@ -103,7 +105,9 @@ func (s s3ry) GetObject(bucket string, objectKey string) {
 	}
 	downloader := s3manager.NewDownloader(s.Sess)
 	result, err := downloader.Download(file, inputGet)
+	// @todo fileのクローズしていない！
 	if err != nil {
+		// @todo file消したほうが良い
 		awsErrorPrint(err)
 	}
 	spe()
@@ -114,6 +118,7 @@ func (s s3ry) UploadObject(bucket string) {
 	dir := dirwalk()
 	items := []PromptItems{}
 	for key, val := range dir {
+		// @todo Bucketってなんだ
 		items = append(items, PromptItems{Key: key, Val: val, Tag: "Bucket"})
 	}
 	selected := run("どのファイルをアップロードしますか?", items)
@@ -133,6 +138,7 @@ func (s s3ry) UploadObject(bucket string) {
 		Body:   f,
 	})
 	if err != nil {
+		// @todo fileをクローズするか否かを検討
 		awsErrorPrint(err)
 	}
 	spe()
@@ -166,12 +172,17 @@ func (s s3ry) SaveObjectList(bucket string) {
 	// @todo-end
 	spe()
 	t := time.Now()
+	// @todo strftimeに変更した方が良い https://github.com/lestrrat-go/strftime
 	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
 	file, err := os.Create(ObjectListFileName)
-
 	for _, item := range items {
-		file.Write(([]byte)(item.Val + "," + strconv.FormatInt(item.Size, 10) + "\n"))
+		_, err = file.Write(([]byte)("./" + item.Val + "," + strconv.FormatInt(item.Size, 10) + "\n"))
+		if err != nil {
+			fmt.Println("書き込みエラーです", err)
+			os.Exit(1)
+		}
 	}
+	// @todo fileのクローズしていない！
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
 	os.Exit(0)
 }

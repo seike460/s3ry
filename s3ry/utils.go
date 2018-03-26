@@ -101,6 +101,7 @@ func run(label string, items []PromptItems) string {
 	return items[i].Val
 }
 
+// @todo ディレクトリ構造を全て再帰的に持ってきてアップロード出来たほうが使いやすい
 func dirwalk() []string {
 	dir, _ := os.Getwd()
 	files, _ := ioutil.ReadDir(dir)
