@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/seike460/s3ry.svg?style=svg)](https://circleci.com/gh/seike460/s3ry)
+
 # s3ry
 AWS S3 Object
 
