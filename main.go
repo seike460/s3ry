@@ -15,6 +15,8 @@ func main() {
 		s.UploadObject(selectBucket)
 	case "オブジェクトリスト":
 		s.SaveObjectList(selectBucket)
+	case "オブジェクト削除":
+		s.DeleteObject(selectBucket)
 	default:
 		// show Object List & select
 		selectObject := s.ListObjects(selectBucket)
