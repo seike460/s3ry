@@ -3,10 +3,19 @@ package s3ry
 import (
 	"testing"
 
+	"github.com/seike460/s3ry/s3ry"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestS3ry(t *testing.T) {
+	s := s3ry.NewS3ry()
+	assert.Equal(t, s, s, "they should be equal")
+	assert.NotEqual(t, s, 456, "they should not be equal")
+	assert.Nil(t, nil)
+	assert.NotNil(t, s)
+}
+
+func TestExample(t *testing.T) {
 	// assert equality
 	assert.Equal(t, 123, 123, "they should be equal")
 	// assert inequality
