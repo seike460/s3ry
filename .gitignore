@@ -5,7 +5,7 @@
 *.dylib
 bin/*
 vendor/*
-artifacts/*
+coverage.out
 
 # Test binary, build with `go test -c`
 *.test
