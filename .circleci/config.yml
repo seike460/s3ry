@@ -2,6 +2,9 @@
 #
 # Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
+general:
+  artifacts:
+    - "coverage.out"
 jobs:
   build:
     docker:
@@ -25,8 +28,4 @@ jobs:
       - run: go get -u github.com/golang/dep/cmd/dep
       - run: go get -u github.com/haya14busa/goverage
       - run: dep ensure
-      - run: go test -v ./...
       - run: goverage -v -coverprofile=coverage.out ./...
-general:
-  artifacts:
-    - "coverage.out"
