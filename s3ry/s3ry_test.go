@@ -3,12 +3,11 @@ package s3ry
 import (
 	"testing"
 
-	"github.com/seike460/s3ry/s3ry"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestS3ry(t *testing.T) {
-	s := s3ry.NewS3ry()
+func TestNewS3ry(t *testing.T) {
+	s := NewS3ry()
 	assert.Equal(t, s, s, "they should be equal")
 	assert.NotEqual(t, s, 456, "they should not be equal")
 	assert.Nil(t, nil)
