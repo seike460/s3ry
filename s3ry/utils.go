@@ -24,6 +24,9 @@ func spe() {
 	sp.Stop()
 }
 
+/*
+PromptItems Create promptuiItems
+*/
 type PromptItems struct {
 	Key          int
 	Val          string
@@ -32,6 +35,9 @@ type PromptItems struct {
 	Tag          string
 }
 
+/*
+CheckLocalExists check localFile
+*/
 func CheckLocalExists(objectKey string) {
 	filename := filepath.Base(objectKey)
 	_, err := os.Stat(filename)

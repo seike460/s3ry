@@ -21,7 +21,7 @@ type s3ry struct {
 }
 
 /*
-s3ry
+NewS3ry Create type
 */
 func NewS3ry() *s3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
