@@ -52,7 +52,6 @@ func awsErrorPrint(err error) {
 	} else {
 		fmt.Println(err.Error())
 	}
-	fmt.Println(os.Stderr)
 	os.Exit(1)
 }
 
