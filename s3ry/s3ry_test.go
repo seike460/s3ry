@@ -7,9 +7,9 @@ import (
 )
 
 func TestNewS3ry(t *testing.T) {
-	//s := NewS3ry()
+	s := NewS3ry()
 	assert.Equal(t, s, s, "they should be equal")
-	assert.NotEqual(t, s, 456, "they should not be equal")
+	assert.NotEqual(t, s, 460, "they should not be equal")
 	assert.Nil(t, nil)
 	assert.NotNil(t, s)
 }
