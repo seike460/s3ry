@@ -21,11 +21,8 @@ type s3ry struct {
 }
 
 /*
-
 s3ry
-
 */
-
 func NewS3ry() *s3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
@@ -65,10 +62,9 @@ func (s s3ry) ListBuckets() string {
 	return result
 }
 
-func (s s3ry) ListObjects(bucket string) string {
+func (s s3ry) ListObjectsPages(bucket string) []PromptItems {
 	sps("オブジェクトの検索中です...")
 	items := []PromptItems{}
-	// @todo- start 共通化
 	key := 0
 	err := s.svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
@@ -87,10 +83,12 @@ func (s s3ry) ListObjects(bucket string) string {
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].LastModified.After(items[j].LastModified)
 	})
-	// @todo-end
-
 	spe()
+	return items
+}
 
+func (s s3ry) ListObjects(bucket string) string {
+	items := s3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
 	result := run("どのファイルを取得しますか?", items)
 	return result
@@ -104,15 +102,17 @@ func (s s3ry) GetObject(bucket string, objectKey string) {
 		fmt.Fprintf(os.Stderr, "")
 		os.Exit(1)
 	}
+	defer file.Close()
 	inputGet := &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(objectKey),
 	}
 	downloader := s3manager.NewDownloader(s.sess)
 	result, err := downloader.Download(file, inputGet)
-	// @todo fileのクローズしていない！
 	if err != nil {
-		// @todo file消したほうが良い
+		if err := os.Remove(filename); err != nil {
+			fmt.Println(err)
+		}
 		awsErrorPrint(err)
 	}
 	spe()
@@ -136,6 +136,7 @@ func (s s3ry) UploadObject(bucket string) {
 		fmt.Fprintf(os.Stderr, "")
 		os.Exit(1)
 	}
+	defer f.Close()
 
 	_, err = uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(bucket),
@@ -143,7 +144,6 @@ func (s s3ry) UploadObject(bucket string) {
 		Body:   f,
 	})
 	if err != nil {
-		// @todo fileをクローズするか否かを検討
 		awsErrorPrint(err)
 	}
 	spe()
@@ -152,34 +152,15 @@ func (s s3ry) UploadObject(bucket string) {
 
 func (s s3ry) SaveObjectList(bucket string) {
 	sps("オブジェクトの検索中です...")
-	// @todo- start 共通化
-	items := []PromptItems{}
-	key := 0
-	err := s.svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
-		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
-			for _, item := range listObjects.Contents {
-				if strings.HasSuffix(*item.Key, "/") == false {
-					items = append(items, PromptItems{Key: key, Val: *item.Key, Size: *item.Size, LastModified: *item.LastModified, Tag: "Object"})
-					key++
-				}
-			}
-			return !lastPage
-		})
-	if err != nil {
-		awsErrorPrint(err)
-	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].LastModified.After(items[j].LastModified)
-	})
-	if err != nil {
-		awsErrorPrint(err)
-	}
-	// @todo-end
-	spe()
+	items := s3ry.ListObjectsPages(s, bucket)
 	t := time.Now()
-	// @todo strftimeに変更した方が良い https://github.com/lestrrat-go/strftime
 	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
 	file, err := os.Create(ObjectListFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "")
+		os.Exit(1)
+	}
+	defer file.Close()
 	for _, item := range items {
 		_, err = file.Write(([]byte)("./" + item.Val + "," + strconv.FormatInt(item.Size, 10) + "\n"))
 		if err != nil {
@@ -187,7 +168,6 @@ func (s s3ry) SaveObjectList(bucket string) {
 			os.Exit(1)
 		}
 	}
-	// @todo fileのクローズしていない！
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
 	os.Exit(0)
 }
