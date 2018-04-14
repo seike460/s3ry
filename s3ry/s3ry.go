@@ -15,11 +15,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-// @todo 構造体自体は、公開、メンバー変数はプライベートが良いのでは
 type s3ry struct {
-	Sess *session.Session
-	Svc  *s3.S3
+	sess *session.Session
+	svc  *s3.S3
 }
+
+/*
+
+s3ry
+
+*/
 
 func NewS3ry() *s3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
@@ -28,8 +33,8 @@ func NewS3ry() *s3ry {
 
 	svc := s3.New(sess)
 	s := &s3ry{
-		Sess: sess,
-		Svc:  svc,
+		sess: sess,
+		svc:  svc,
 	}
 	return s
 }
@@ -47,7 +52,7 @@ func (s s3ry) SelectOperation() string {
 func (s s3ry) ListBuckets() string {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
-	listBuckets, err := s.Svc.ListBuckets(input)
+	listBuckets, err := s.svc.ListBuckets(input)
 	if err != nil {
 		awsErrorPrint(err)
 	}
@@ -65,7 +70,7 @@ func (s s3ry) ListObjects(bucket string) string {
 	items := []PromptItems{}
 	// @todo- start 共通化
 	key := 0
-	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+	err := s.svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
@@ -103,7 +108,7 @@ func (s s3ry) GetObject(bucket string, objectKey string) {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(objectKey),
 	}
-	downloader := s3manager.NewDownloader(s.Sess)
+	downloader := s3manager.NewDownloader(s.sess)
 	result, err := downloader.Download(file, inputGet)
 	// @todo fileのクローズしていない！
 	if err != nil {
@@ -125,7 +130,7 @@ func (s s3ry) UploadObject(bucket string) {
 
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selected
-	uploader := s3manager.NewUploader(s.Sess)
+	uploader := s3manager.NewUploader(s.sess)
 	f, err := os.Open(uploadObject)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "")
@@ -150,7 +155,7 @@ func (s s3ry) SaveObjectList(bucket string) {
 	// @todo- start 共通化
 	items := []PromptItems{}
 	key := 0
-	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+	err := s.svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
