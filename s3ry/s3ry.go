@@ -15,28 +15,34 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-type s3ry struct {
+/*
+S3ry operate s3
+*/
+type S3ry struct {
 	sess *session.Session
 	svc  *s3.S3
 }
 
 /*
-s3ry
+NewS3ry Create type
 */
-func NewS3ry() *s3ry {
+func NewS3ry() *S3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
 	))
 
 	svc := s3.New(sess)
-	s := &s3ry{
+	s := &S3ry{
 		sess: sess,
 		svc:  svc,
 	}
 	return s
 }
 
-func (s s3ry) SelectOperation() string {
+/*
+SelectOperation SelectOperation
+*/
+func (s S3ry) SelectOperation() string {
 	items := []PromptItems{
 		{Key: 0, Val: "ダウンロード"},
 		{Key: 1, Val: "アップロード"},
@@ -46,7 +52,10 @@ func (s s3ry) SelectOperation() string {
 	return result
 }
 
-func (s s3ry) ListBuckets() string {
+/*
+ListBuckets ListBuckets
+*/
+func (s S3ry) ListBuckets() string {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
 	listBuckets, err := s.svc.ListBuckets(input)
@@ -62,7 +71,10 @@ func (s s3ry) ListBuckets() string {
 	return result
 }
 
-func (s s3ry) ListObjectsPages(bucket string) []PromptItems {
+/*
+ListObjectsPages ListObjectsPages
+*/
+func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 	sps("オブジェクトの検索中です...")
 	items := []PromptItems{}
 	key := 0
@@ -87,14 +99,20 @@ func (s s3ry) ListObjectsPages(bucket string) []PromptItems {
 	return items
 }
 
-func (s s3ry) ListObjects(bucket string) string {
-	items := s3ry.ListObjectsPages(s, bucket)
+/*
+ListObjects ListObjects
+*/
+func (s S3ry) ListObjects(bucket string) string {
+	items := S3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
 	result := run("どのファイルを取得しますか?", items)
 	return result
 }
 
-func (s s3ry) GetObject(bucket string, objectKey string) {
+/*
+GetObject GetObject
+*/
+func (s S3ry) GetObject(bucket string, objectKey string) {
 	sps("オブジェクトのダウンロード中です...")
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
@@ -119,7 +137,10 @@ func (s s3ry) GetObject(bucket string, objectKey string) {
 	fmt.Printf("ファイルをダウンロードしました, %s, %d bytes\n", filename, result)
 }
 
-func (s s3ry) UploadObject(bucket string) {
+/*
+UploadObject UploadObject
+*/
+func (s S3ry) UploadObject(bucket string) {
 	dir := dirwalk()
 	items := []PromptItems{}
 	for key, val := range dir {
@@ -150,9 +171,12 @@ func (s s3ry) UploadObject(bucket string) {
 	fmt.Printf("ファイルをアップロードしました, %s \n", uploadObject)
 }
 
-func (s s3ry) SaveObjectList(bucket string) {
+/*
+SaveObjectList save Object
+*/
+func (s S3ry) SaveObjectList(bucket string) {
 	sps("オブジェクトの検索中です...")
-	items := s3ry.ListObjectsPages(s, bucket)
+	items := S3ry.ListObjectsPages(s, bucket)
 	t := time.Now()
 	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
 	file, err := os.Create(ObjectListFileName)
