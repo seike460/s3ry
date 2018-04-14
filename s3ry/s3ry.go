@@ -46,7 +46,8 @@ func (s S3ry) SelectOperation() string {
 	items := []PromptItems{
 		{Key: 0, Val: "ダウンロード"},
 		{Key: 1, Val: "アップロード"},
-		{Key: 2, Val: "オブジェクトリスト"},
+		{Key: 2, Val: "オブジェクト削除"},
+		{Key: 3, Val: "オブジェクトリスト"},
 	}
 	result := run("何をしますか？", items)
 	return result
@@ -172,10 +173,27 @@ func (s S3ry) UploadObject(bucket string) {
 }
 
 /*
+DeleteObject delete Object
+*/
+func (s S3ry) DeleteObject(bucket string) {
+	items := S3ry.ListObjectsPages(s, bucket)
+	item := run("どのファイルを削除しますか?", items)
+	input := &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(item),
+	}
+	_, err := s.svc.DeleteObject(input)
+	if err != nil {
+		awsErrorPrint(err)
+	}
+	fmt.Printf("ファイルを削除しました")
+	os.Exit(0)
+}
+
+/*
 SaveObjectList save Object
 */
 func (s S3ry) SaveObjectList(bucket string) {
-	sps("オブジェクトの検索中です...")
 	items := S3ry.ListObjectsPages(s, bucket)
 	t := time.Now()
 	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
