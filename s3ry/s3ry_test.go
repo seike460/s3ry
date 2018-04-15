@@ -12,5 +12,5 @@ func TestNewS3ry(t *testing.T) {
 	assert.NotEqual(t, s, 460, "they should not be equal")
 	assert.NotNil(t, s)
 	CheckLocalExists("main.go")
-	ListObjectsPages("seike460")
+	s.ListObjectsPages("seike460")
 }
