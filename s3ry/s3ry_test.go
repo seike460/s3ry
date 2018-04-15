@@ -27,7 +27,7 @@ func TestNewS3ry(t *testing.T) {
 		// show Object List & select
 		selectObject := s.ListObjects(selectBucket)
 		// check File
-		s3ry.CheckLocalExists(selectObject)
+		CheckLocalExists(selectObject)
 		// GetObject
 		s.GetObject(selectBucket, selectObject)
 	}
