@@ -10,40 +10,7 @@ func TestNewS3ry(t *testing.T) {
 	s := NewS3ry()
 	assert.Equal(t, s, s, "they should be equal")
 	assert.NotEqual(t, s, 460, "they should not be equal")
-	assert.Nil(t, nil)
 	assert.NotNil(t, s)
-	// show Bucket List & select
-	selectOperation := s.SelectOperation()
-	// show Bucket List & select
-	selectBucket := s.ListBuckets()
-	switch selectOperation {
-	case "アップロード":
-		s.UploadObject(selectBucket)
-	case "オブジェクトリスト":
-		s.SaveObjectList(selectBucket)
-	case "オブジェクト削除":
-		s.DeleteObject(selectBucket)
-	default:
-		// show Object List & select
-		selectObject := s.ListObjects(selectBucket)
-		// check File
-		CheckLocalExists(selectObject)
-		// GetObject
-		s.GetObject(selectBucket, selectObject)
-	}
-}
-
-func TestExample(t *testing.T) {
-	// assert equality
-	assert.Equal(t, 123, 123, "they should be equal")
-	// assert inequality
-	assert.NotEqual(t, 123, 456, "they should not be equal")
-	// assert for nil (good for errors)
-	//assert.Nil(t, object)
-	// assert for not nil (good when you expect something)
-	//if assert.NotNil(t, object) {
-	// now we know that object isn't nil, we are safe to make
-	// further assertions without causing any errors
-	//assert.Equal(t, "Something", object.Value)
-	//}
+	CheckLocalExists("main.go")
+	ListObjectsPages("seike460")
 }

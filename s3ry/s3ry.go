@@ -145,8 +145,7 @@ func (s S3ry) UploadObject(bucket string) {
 	dir := dirwalk()
 	items := []PromptItems{}
 	for key, val := range dir {
-		// @todo Bucketってなんだ
-		items = append(items, PromptItems{Key: key, Val: val, Tag: "Bucket"})
+		items = append(items, PromptItems{Key: key, Val: val, Tag: "Upload"})
 	}
 	selected := run("どのファイルをアップロードしますか?", items)
 
