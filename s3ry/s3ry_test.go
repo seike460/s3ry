@@ -12,6 +12,25 @@ func TestNewS3ry(t *testing.T) {
 	assert.NotEqual(t, s, 460, "they should not be equal")
 	assert.Nil(t, nil)
 	assert.NotNil(t, s)
+	// show Bucket List & select
+	selectOperation := s.SelectOperation()
+	// show Bucket List & select
+	selectBucket := s.ListBuckets()
+	switch selectOperation {
+	case "アップロード":
+		s.UploadObject(selectBucket)
+	case "オブジェクトリスト":
+		s.SaveObjectList(selectBucket)
+	case "オブジェクト削除":
+		s.DeleteObject(selectBucket)
+	default:
+		// show Object List & select
+		selectObject := s.ListObjects(selectBucket)
+		// check File
+		s3ry.CheckLocalExists(selectObject)
+		// GetObject
+		s.GetObject(selectBucket, selectObject)
+	}
 }
 
 func TestExample(t *testing.T) {
