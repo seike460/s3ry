@@ -32,3 +32,7 @@ jobs:
       - store_artifacts:
           path: coverage.out
           destination: coverage.out
+      - run: go tool cover -html coverage.out -o coverage.html
+      - store_artifacts:
+          path: coverage.html
+          destination: coverage.html
