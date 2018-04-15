@@ -30,5 +30,5 @@ jobs:
       - run: dep ensure
       - run: goverage -v -coverprofile=coverage.out ./...
       - store_artifacts:
-        path: coverage.out
-        destination: coverage
+          path: coverage.out
+          destination: coverage.out
