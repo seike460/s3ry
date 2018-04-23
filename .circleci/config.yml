@@ -28,6 +28,14 @@ jobs:
       - run: go get -u github.com/golang/dep/cmd/dep
       - run: go get -u github.com/haya14busa/goverage
       - run: dep ensure
+      - run:
+          name: Setup AWS credentials
+          command: |
+          mkdir ~/.aws
+          printf "[default]\naws_access_key_id = ${AWS_ACCESS_KEY_ID}\naws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}\n" > ~/.aws/credentials
+          printf "[default]\naws_access_key_id = ${AWS_ACCESS_KEY_ID}\naws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}\n" > ~/.aws/config
+          cat aws-config-assume-role >> ~/.aws/config
+          chmod 600 ~/.aws/*
       - run: goverage -v -coverprofile=coverage.out ./...
       - store_artifacts:
           path: coverage.out

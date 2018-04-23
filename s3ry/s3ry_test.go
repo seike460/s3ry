@@ -8,9 +8,17 @@ import (
 
 func TestNewS3ry(t *testing.T) {
 	s := NewS3ry()
-	assert.Equal(t, s, s, "they should be equal")
-	assert.NotEqual(t, s, 460, "they should not be equal")
-	assert.NotNil(t, s)
+	operations := s.ListOperation()
+	buckets := s.ListBuckets()
+	uploadItem := s.ListUpload("seike460")
+	s.SaveObjectList("seike460")
+	items := s.ListObjectsPages("seike460")
+	selectObject := s.ListObjects("seike460")
+	assert.NotNil(t, operations)
+	assert.NotNil(t, buckets)
+	assert.NotNil(t, uploadItem)
+	assert.NotNil(t, items)
+	assert.NotNil(t, selectObject)
 	CheckLocalExists("main.go")
 	//s.ListObjectsPages("seike460")
 }
