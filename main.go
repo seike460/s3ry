@@ -7,16 +7,23 @@ import (
 func main() {
 	s := s3ry.NewS3ry()
 	// show Bucket List & select
-	selectOperation := s.SelectOperation()
+	operations := s.ListOperation()
+	selectOperation := s.SelectItem("何をしますか？", operations)
 	// show Bucket List & select
-	selectBucket := s.ListBuckets()
+	buckets := s.ListBuckets()
+	selectBucket := s.SelectItem("どのバケットを利用しますか?", buckets)
+
 	switch selectOperation {
 	case "アップロード":
-		s.UploadObject(selectBucket)
+		uploadItem := s.ListUpload(selectBucket)
+		selectUpload := s.SelectItem("どのファイルをアップロードしますか?", uploadItem)
+		s.UploadObject(selectBucket, selectUpload)
 	case "オブジェクトリスト":
 		s.SaveObjectList(selectBucket)
 	case "オブジェクト削除":
-		s.DeleteObject(selectBucket)
+		items := s.ListObjectsPages(selectBucket)
+		item := s.SelectItem("どのファイルを削除しますか?", items)
+		s.DeleteObject(selectBucket, item)
 	default:
 		// show Object List & select
 		selectObject := s.ListObjects(selectBucket)

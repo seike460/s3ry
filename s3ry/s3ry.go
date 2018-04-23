@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/manifoldco/promptui"
 )
 
 /*
@@ -40,23 +41,22 @@ func NewS3ry() *S3ry {
 }
 
 /*
-SelectOperation SelectOperation
+ListOperation  list Operation
 */
-func (s S3ry) SelectOperation() string {
+func (s S3ry) ListOperation() []PromptItems {
 	items := []PromptItems{
 		{Key: 0, Val: "ダウンロード"},
 		{Key: 1, Val: "アップロード"},
 		{Key: 2, Val: "オブジェクト削除"},
 		{Key: 3, Val: "オブジェクトリスト"},
 	}
-	result := run("何をしますか？", items)
-	return result
+	return items
 }
 
 /*
 ListBuckets ListBuckets
 */
-func (s S3ry) ListBuckets() string {
+func (s S3ry) ListBuckets() []PromptItems {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
 	listBuckets, err := s.svc.ListBuckets(input)
@@ -68,8 +68,7 @@ func (s S3ry) ListBuckets() string {
 		items = append(items, PromptItems{Key: key, Val: *val.Name, Tag: "Bucket"})
 	}
 	spe()
-	result := run("どのバケットを利用しますか?", items)
-	return result
+	return items
 }
 
 /*
@@ -106,7 +105,7 @@ ListObjects ListObjects
 func (s S3ry) ListObjects(bucket string) string {
 	items := S3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
-	result := run("どのファイルを取得しますか?", items)
+	result := s.SelectItem("どのファイルを取得しますか?", items)
 	return result
 }
 
@@ -141,16 +140,18 @@ func (s S3ry) GetObject(bucket string, objectKey string) {
 /*
 UploadObject UploadObject
 */
-func (s S3ry) UploadObject(bucket string) {
+func (s S3ry) ListUpload(bucket string) []PromptItems {
 	dir := dirwalk()
 	items := []PromptItems{}
 	for key, val := range dir {
 		items = append(items, PromptItems{Key: key, Val: val, Tag: "Upload"})
 	}
-	selected := run("どのファイルをアップロードしますか?", items)
+	return items
+}
 
+func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	sps("オブジェクトのアップロード中です...")
-	uploadObject := selected
+	uploadObject := selectUpload
 	uploader := s3manager.NewUploader(s.sess)
 	f, err := os.Open(uploadObject)
 	if err != nil {
@@ -171,12 +172,55 @@ func (s S3ry) UploadObject(bucket string) {
 	fmt.Printf("ファイルをアップロードしました, %s \n", uploadObject)
 }
 
+func (s S3ry) SelectItem(label string, items []PromptItems) string {
+	detail := `
+{{ "選択値:" | faint }} {{ .Val }}
+`
+	for _, item := range items {
+		if item.Tag == "Object" {
+			detail = `
+{{ "選択値:" | faint }} {{ .Val }}
+{{ "最終更新日:" | faint }} {{ .LastModified }}
+`
+		}
+		break
+	}
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}",
+		Active:   "->{{ .Val | red }}",
+		Inactive: "{{ .Val | cyan }}",
+		Selected: "選択値 {{ .Val | red | cyan }}",
+		Details:  detail,
+	}
+
+	searcher := func(input string, index int) bool {
+		item := items[index]
+		name := strings.Replace(strings.ToLower(item.Val), " ", "", -1)
+		input = strings.Replace(strings.ToLower(input), " ", "", -1)
+		return strings.Contains(name, input)
+	}
+
+	prompt := promptui.Select{
+		Label:     label,
+		Items:     items,
+		Templates: templates,
+		Size:      20,
+		Searcher:  searcher,
+	}
+
+	i, _, err := prompt.Run()
+
+	if err != nil {
+		fmt.Printf("選択に失敗しました。終了します %v\n", err)
+		os.Exit(1)
+	}
+	return items[i].Val
+}
+
 /*
 DeleteObject delete Object
 */
-func (s S3ry) DeleteObject(bucket string) {
-	items := S3ry.ListObjectsPages(s, bucket)
-	item := run("どのファイルを削除しますか?", items)
+func (s S3ry) DeleteObject(bucket string, item string) {
 	input := &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(item),
