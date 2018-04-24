@@ -22,7 +22,7 @@ jobs:
     steps:
       - checkout
       # specify any bash command here prefixed with `run: `
-      - run: go get github.com/golang/lint/golint
+      - run: go get -u github.com/golang/lint
       - run: golint ./...
       - run: go vet ./...
       - run: go get -u github.com/golang/dep/cmd/dep
