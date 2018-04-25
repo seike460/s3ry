@@ -102,7 +102,7 @@ func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 /*
 ListObjects ListObjects
 */
-func (s S3ry) ListObjects(bucket string) string {
+func (s S3ry) ListObjects(bucket string) []PromptItems {
 	items := S3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
 	return items
