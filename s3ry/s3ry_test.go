@@ -11,6 +11,7 @@ func TestNewS3ry(t *testing.T) {
 	operations := s.ListOperation()
 	buckets := s.ListBuckets()
 	s.UploadObject("seike460-gotest", "testUploadFile")
+	s.GetObject("seike460-gotest", "testUploadFile")
 	uploadItem := s.ListUpload("seike460-gotest")
 	s.SaveObjectList("seike460-gotest")
 	items := s.ListObjectsPages("seike460-gotest")
