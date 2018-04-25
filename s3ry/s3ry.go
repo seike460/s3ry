@@ -154,6 +154,7 @@ func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	uploader := s3manager.NewUploader(s.sess)
 	f, err := os.Open(uploadObject)
 	if err != nil {
+		fmt.Println(err)
 		fmt.Fprintf(os.Stderr, "")
 		os.Exit(1)
 	}

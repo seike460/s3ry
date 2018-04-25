@@ -28,7 +28,7 @@ jobs:
       - run: go get -u github.com/golang/dep/cmd/dep
       - run: go get -u github.com/haya14busa/goverage
       - run: dep ensure
-      - run: touch testUploadFile
+      - run: touch s3ry/testUploadFile
       - run: goverage -v -coverprofile=coverage.out ./...
       - store_artifacts:
           path: coverage.out
