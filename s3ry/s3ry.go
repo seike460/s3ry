@@ -212,7 +212,7 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 
 	if err != nil {
 		fmt.Printf("選択に失敗しました。終了します %v\n", err)
-		os.Exit(1)
+		os.Exit(0)
 	}
 	return items[i].Val
 }
