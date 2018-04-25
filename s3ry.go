@@ -137,7 +137,7 @@ func (s S3ry) GetObject(bucket string, objectKey string) {
 }
 
 /*
-UploadObject UploadObject
+ListUpload ListUpload
 */
 func (s S3ry) ListUpload(bucket string) []PromptItems {
 	dir := dirwalk()
@@ -148,6 +148,9 @@ func (s S3ry) ListUpload(bucket string) []PromptItems {
 	return items
 }
 
+/*
+UploadObject UploadObject
+*/
 func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selectUpload
@@ -172,6 +175,9 @@ func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	fmt.Printf("ファイルをアップロードしました, %s \n", uploadObject)
 }
 
+/*
+SelectItem SelectItem
+*/
 func (s S3ry) SelectItem(label string, items []PromptItems) string {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
