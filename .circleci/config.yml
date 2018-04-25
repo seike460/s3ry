@@ -22,12 +22,13 @@ jobs:
     steps:
       - checkout
       # specify any bash command here prefixed with `run: `
-      - run: go get github.com/golang/lint/golint
+      - run: go get -u golang.org/x/lint/golint
       - run: golint ./...
       - run: go vet ./...
       - run: go get -u github.com/golang/dep/cmd/dep
       - run: go get -u github.com/haya14busa/goverage
       - run: dep ensure
+      - run: touch s3ry/testUploadFile
       - run: goverage -v -coverprofile=coverage.out ./...
       - store_artifacts:
           path: coverage.out
