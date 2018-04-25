@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/seike460/s3ry/s3ry"
+	"github.com/seike460/s3ry"
 )
 
 func main() {
