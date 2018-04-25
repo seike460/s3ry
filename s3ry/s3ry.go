@@ -230,7 +230,6 @@ func (s S3ry) DeleteObject(bucket string, item string) {
 		awsErrorPrint(err)
 	}
 	fmt.Printf("ファイルを削除しました")
-	os.Exit(0)
 }
 
 /*
@@ -254,5 +253,4 @@ func (s S3ry) SaveObjectList(bucket string) {
 		}
 	}
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
-	os.Exit(0)
 }
