@@ -105,8 +105,7 @@ ListObjects ListObjects
 func (s S3ry) ListObjects(bucket string) string {
 	items := S3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
-	result := s.SelectItem("どのファイルを取得しますか?", items)
-	return result
+	return items
 }
 
 /*

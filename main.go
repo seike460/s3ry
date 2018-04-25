@@ -26,7 +26,8 @@ func main() {
 		s.DeleteObject(selectBucket, item)
 	default:
 		// show Object List & select
-		selectObject := s.ListObjects(selectBucket)
+		items := s.ListObjects(selectBucket)
+		selectObject := s.SelectItem("どのファイルを取得しますか?", items)
 		// check File
 		s3ry.CheckLocalExists(selectObject)
 		// GetObject
