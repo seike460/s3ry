@@ -3,7 +3,7 @@
 *.dll
 *.so
 *.dylib
-bin/*
+dist/*
 vendor/*
 coverage.out
 

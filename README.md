@@ -4,23 +4,11 @@
 [![Code Intelligence Status](https://scrutinizer-ci.com/g/seike460/s3ry/badges/code-intelligence.svg?b=master)](https://scrutinizer-ci.com/code-intelligence)
 
 # s3ry
-AWS S3 Object
+s3ry is Amazon S3 CLI Tool by using promptui.
 
-## build
+## godoc
+https://godoc.org/github.com/seike460/s3ry
 
-sh build.sh
-
-### linux
-
-- linux64  bin/linux64/s3ry
-- linux386 bin/linux386/s3ry
-
-### windows
-
-- windows386 bin/windows386/s3ry.exe
-- windows64  bin/windows64/s3ry.exe
-
-### mac
-
-- darwin386 bin/darwin386/s3ry
-- darwin64  bin/darwin64/s3ry
+## release
+Pre-release
+    https://github.com/seike460/s3ry/releases/tag/0.1
