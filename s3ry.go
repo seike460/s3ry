@@ -16,17 +16,15 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-/*
-S3ry operate s3
-*/
+// TYPES
+
+// S3ry Service Client Operator
 type S3ry struct {
 	sess *session.Session
 	svc  *s3.S3
 }
 
-/*
-NewS3ry Create type
-*/
+// NewS3ry Create New S3ry struct
 func NewS3ry() *S3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
@@ -37,12 +35,11 @@ func NewS3ry() *S3ry {
 		sess: sess,
 		svc:  svc,
 	}
+
 	return s
 }
 
-/*
-ListOperation  list Operation
-*/
+// ListOperation return ListOperation for PromptItems
 func (s S3ry) ListOperation() []PromptItems {
 	items := []PromptItems{
 		{Key: 0, Val: "ダウンロード"},
@@ -53,9 +50,7 @@ func (s S3ry) ListOperation() []PromptItems {
 	return items
 }
 
-/*
-ListBuckets ListBuckets
-*/
+// ListBuckets return ListBuckets for PromptItems
 func (s S3ry) ListBuckets() []PromptItems {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
@@ -71,9 +66,7 @@ func (s S3ry) ListBuckets() []PromptItems {
 	return items
 }
 
-/*
-ListObjectsPages ListObjectsPages
-*/
+// ListObjectsPages return ListObjectsPages for PromptItems
 func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 	sps("オブジェクトの検索中です...")
 	items := []PromptItems{}
@@ -99,18 +92,14 @@ func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 	return items
 }
 
-/*
-ListObjects ListObjects
-*/
+// ListObjects return ListObjects for PromptItems
 func (s S3ry) ListObjects(bucket string) []PromptItems {
 	items := S3ry.ListObjectsPages(s, bucket)
 	fmt.Println("オブジェクト数：", len(items))
 	return items
 }
 
-/*
-GetObject GetObject
-*/
+// GetObject get Object from S3 bucket
 func (s S3ry) GetObject(bucket string, objectKey string) {
 	sps("オブジェクトのダウンロード中です...")
 	filename := filepath.Base(objectKey)
@@ -136,11 +125,9 @@ func (s S3ry) GetObject(bucket string, objectKey string) {
 	fmt.Printf("ファイルをダウンロードしました, %s, %d bytes\n", filename, result)
 }
 
-/*
-ListUpload ListUpload
-*/
+// ListUpload return ListUpload for PromptItems
 func (s S3ry) ListUpload(bucket string) []PromptItems {
-	dir := dirwalk()
+	dir := dirwalk("")
 	items := []PromptItems{}
 	for key, val := range dir {
 		items = append(items, PromptItems{Key: key, Val: val, Tag: "Upload"})
@@ -148,9 +135,7 @@ func (s S3ry) ListUpload(bucket string) []PromptItems {
 	return items
 }
 
-/*
-UploadObject UploadObject
-*/
+// UploadObject put Object in S3 bucket
 func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selectUpload
@@ -175,9 +160,7 @@ func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	fmt.Printf("ファイルをアップロードしました, %s \n", uploadObject)
 }
 
-/*
-SelectItem SelectItem
-*/
+// SelectItem select PromptItems using promptui
 func (s S3ry) SelectItem(label string, items []PromptItems) string {
 	detail := `
 {{ "選択値:" | faint }} {{ .Val }}
@@ -224,7 +207,7 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 }
 
 /*
-DeleteObject delete Object
+DeleteObject delete Object from S3 bucket
 */
 func (s S3ry) DeleteObject(bucket string, item string) {
 	input := &s3.DeleteObjectInput{
@@ -239,7 +222,7 @@ func (s S3ry) DeleteObject(bucket string, item string) {
 }
 
 /*
-SaveObjectList save Object
+SaveObjectList create S3 ObjectList And SaveList
 */
 func (s S3ry) SaveObjectList(bucket string) {
 	items := S3ry.ListObjectsPages(s, bucket)
