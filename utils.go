@@ -11,20 +11,7 @@ import (
 	"github.com/briandowns/spinner"
 )
 
-var sp = spinner.New(spinner.CharSets[34], 100*time.Millisecond)
-
-func sps(label string) {
-	fmt.Println(label)
-	sp.Start()
-}
-
-func spe() {
-	sp.Stop()
-}
-
-/*
-PromptItems Create promptuiItems
-*/
+// PromptItems struct for promptui
 type PromptItems struct {
 	Key          int
 	Val          string
@@ -33,9 +20,21 @@ type PromptItems struct {
 	Tag          string
 }
 
-/*
-CheckLocalExists check localFile
-*/
+// spinner var
+var sp = spinner.New(spinner.CharSets[34], 100*time.Millisecond)
+
+// sps Starts spinner
+func sps(label string) {
+	fmt.Println(label)
+	sp.Start()
+}
+
+// spe end spinner
+func spe() {
+	sp.Stop()
+}
+
+// CheckLocalExists check localFile
 func CheckLocalExists(objectKey string) {
 	filename := filepath.Base(objectKey)
 	_, err := os.Stat(filename)
@@ -50,6 +49,7 @@ func CheckLocalExists(objectKey string) {
 	}
 }
 
+// awsErrorPrint print Error for aws
 func awsErrorPrint(err error) {
 	if aerr, ok := err.(awserr.Error); ok {
 		fmt.Println(aerr.Error())
@@ -59,15 +59,24 @@ func awsErrorPrint(err error) {
 	os.Exit(1)
 }
 
-// @todo ディレクトリ構造を全て再帰的に持ってきてアップロード出来たほうが使いやすい
-func dirwalk() []string {
-	dir, _ := os.Getwd()
-	files, _ := ioutil.ReadDir(dir)
+// dirwalk get fileList
+func dirwalk(dir string) []string {
+	if dir == "" {
+		dir = "./"
+	}
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		panic(err)
+	}
+
 	var paths []string
 	for _, file := range files {
-		if !file.IsDir() {
-			paths = append(paths, file.Name())
+		if file.IsDir() {
+			paths = append(paths, dirwalk(filepath.Join(dir, file.Name()))...)
+			continue
 		}
+		paths = append(paths, filepath.Join(dir, file.Name()))
 	}
+
 	return paths
 }
