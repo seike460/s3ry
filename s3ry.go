@@ -206,9 +206,7 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 	return items[i].Val
 }
 
-/*
-DeleteObject delete Object from S3 bucket
-*/
+// DeleteObject delete Object from S3 bucket
 func (s S3ry) DeleteObject(bucket string, item string) {
 	input := &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),
@@ -221,9 +219,7 @@ func (s S3ry) DeleteObject(bucket string, item string) {
 	fmt.Printf("ファイルを削除しました")
 }
 
-/*
-SaveObjectList create S3 ObjectList And SaveList
-*/
+// SaveObjectList create S3 ObjectList And SaveList
 func (s S3ry) SaveObjectList(bucket string) {
 	items := S3ry.ListObjectsPages(s, bucket)
 	t := time.Now()
