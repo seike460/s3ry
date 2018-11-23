@@ -5,6 +5,12 @@
 # s3ry
 s3ry is Amazon S3 CLI Tool by using promptui.
 
+## demo
+
+[![Code Intelligence Status](https://user-images.githubusercontent.com/8141624/48947264-db0add80-ef73-11e8-85ae-d1fbfb56cb20.gif)](https://user-images.githubusercontent.com/8141624/48947264-db0add80-ef73-11e8-85ae-d1fbfb56cb20.gif
+)
+
+
 ## godoc
 https://godoc.org/github.com/seike460/s3ry
 
