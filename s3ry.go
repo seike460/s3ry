@@ -1,6 +1,7 @@
 package s3ry
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,21 +21,49 @@ import (
 
 // S3ry Service Client Operator
 type S3ry struct {
-	sess *session.Session
-	svc  *s3.S3
+	sess   *session.Session
+	svc    *s3.S3
+	bucket string
 }
 
 // NewS3ry Create New S3ry struct
 func NewS3ry() *S3ry {
-	sess := session.Must(session.NewSession(&aws.Config{
+
+	// for Bucket Search
+	tempSess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("ap-northeast-1")},
+	))
+	tempSvc := s3.New(tempSess)
+	tempS3ry := &S3ry{
+		sess: tempSess,
+		svc:  tempSvc,
+	}
+
+	// show Bucket List & select
+	buckets := tempS3ry.ListBuckets()
+	selectBucket := tempS3ry.SelectItem("どのバケットを利用しますか?", buckets)
+	ctx := context.Background()
+
+	region, err := s3manager.GetBucketRegion(ctx, tempSess, selectBucket, "ap-northeast-1")
+	if err != nil {
+		awsErrorPrint(err)
+	}
+
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region: aws.String(region)},
 	))
 
 	svc := s3.New(sess)
+
 	s := &S3ry{
-		sess: sess,
-		svc:  svc,
+		sess:   sess,
+		svc:    svc,
+		bucket: selectBucket,
 	}
+
+	tempSess = nil
+	tempSvc = nil
+	tempS3ry = nil
 
 	return s
 }
@@ -238,4 +267,33 @@ func (s S3ry) SaveObjectList(bucket string) {
 		}
 	}
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
+}
+
+// S3ryOperations for Another package
+func S3ryOperations() {
+	s := NewS3ry()
+	// show Bucket List & select
+	operations := s.ListOperation()
+	selectOperation := s.SelectItem("何をしますか？", operations)
+
+	switch selectOperation {
+	case "アップロード":
+		uploadItem := s.ListUpload(s.bucket)
+		selectUpload := s.SelectItem("どのファイルをアップロードしますか?", uploadItem)
+		s.UploadObject(s.bucket, selectUpload)
+	case "オブジェクトリスト":
+		s.SaveObjectList(s.bucket)
+	case "オブジェクト削除":
+		items := s.ListObjectsPages(s.bucket)
+		item := s.SelectItem("どのファイルを削除しますか?", items)
+		s.DeleteObject(s.bucket, item)
+	default:
+		// show Object List & select
+		items := s.ListObjects(s.bucket)
+		selectObject := s.SelectItem("どのファイルを取得しますか?", items)
+		// check File
+		CheckLocalExists(selectObject)
+		// GetObject
+		s.GetObject(s.bucket, selectObject)
+	}
 }
