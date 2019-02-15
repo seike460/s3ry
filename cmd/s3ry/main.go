@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	s3ry.S3ryOperations()
+	s3ry.Operations()
 }
