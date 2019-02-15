@@ -269,8 +269,8 @@ func (s S3ry) SaveObjectList(bucket string) {
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
 }
 
-// S3ryOperations for Another package
-func S3ryOperations() {
+// Operations for Another package
+func Operations() {
 	s := NewS3ry()
 	// show Bucket List & select
 	operations := s.ListOperation()
