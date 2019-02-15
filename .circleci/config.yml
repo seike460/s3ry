@@ -24,6 +24,7 @@ jobs:
     steps:
       - checkout
       # specify any bash command here prefixed with `run: `
+      - run: go mod download
       - run: go get -u golang.org/x/lint/golint
       - run: golint ./...
       - run: go vet ./...
