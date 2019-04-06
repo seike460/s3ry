@@ -8,9 +8,9 @@ import (
 
 func TestNewS3ry(t *testing.T) {
 	s := NewS3ry()
-	operations := s.ListOperation()
+	//operations := s.ListOperation()
 	//selectOperation := s.SelectItem("testNow", operations)
-	buckets := s.ListBuckets()
+	//buckets := s.ListBuckets()
 	s.UploadObject("seike460-gotest", "testUploadFile")
 	s.GetObject("seike460-gotest", "testUploadFile")
 	uploadItem := s.ListUpload("seike460-gotest")
@@ -19,9 +19,9 @@ func TestNewS3ry(t *testing.T) {
 	selectObject := s.ListObjects("seike460-gotest")
 	s.DeleteObject("seike460-gotest", "testUploadFile")
 	CheckLocalExists("testNothingsFile")
-	assert.NotNil(t, operations)
+	//assert.NotNil(t, operations)
 	//assert.NotNil(t, selectOperation)
-	assert.NotNil(t, buckets)
+	//assert.NotNil(t, buckets)
 	assert.NotNil(t, uploadItem)
 	assert.NotNil(t, items)
 	assert.NotNil(t, selectObject)
