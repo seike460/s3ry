@@ -25,7 +25,6 @@ jobs:
       - store_artifacts:
           path: coverage.html
           destination: coverage.html
-      version: 2.1
       - codecov/upload:
           file: coverage.out
       - run: bash <(curl -s https://codecov.io/bash)
