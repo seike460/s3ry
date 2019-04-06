@@ -1,7 +1,7 @@
 version: 2
 general:
   artifacts:
-    - "coverage.out"
+    - "coverage.txt"
 orbs:
   codecov: codecov/codecov@1.0.2
 jobs:
@@ -17,14 +17,12 @@ jobs:
       - run: golint ./...
       - run: go vet ./...
       - run: touch testUploadFile
-      - run: goverage -v -coverprofile=coverage.out ./...
+      - run: goverage -v -coverprofile=coverage.txt ./...
       - store_artifacts:
-          path: coverage.out
-          destination: coverage.out
-      - run: go tool cover -html coverage.out -o coverage.html
+          path: coverage.txt
+          destination: coverage.txt
+      - run: go tool cover -html coverage.txt -o coverage.html
       - store_artifacts:
           path: coverage.html
           destination: coverage.html
-      - codecov/upload:
-          file: coverage.out
       - run: bash <(curl -s https://codecov.io/bash)
