@@ -3,12 +3,18 @@
 [![Code Intelligence Status](https://scrutinizer-ci.com/g/seike460/s3ry/badges/code-intelligence.svg?b=master)](https://scrutinizer-ci.com/code-intelligence)
 [![codecov](https://codecov.io/gh/seike460/s3ry/branch/master/graph/badge.svg)](https://codecov.io/gh/seike460/s3ry)
 
-![S3ry.png](doc/S3ry.png)
-
-<span style="font-size: xx-small;">The Gopher character is based on the Go mascot designed by <a href="http://reneefrench.blogspot.jp/" target="_blank" class="external">Renée French</a>.</span>
-
 # s3ry
 s3ry is Amazon S3 CLI Tool by using promptui.
+
+- download
+- upload
+- delete
+- list
+
+![S3ry.png](doc/S3ry.png)
+
+<span style="font-size: 6px;">The Gopher character is based on the Go mascot designed by <a href="http://reneefrench.blogspot.jp/" target="_blank" class="external">Renée French</a>.</span>
+
 
 ## demo
 
