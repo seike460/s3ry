@@ -13,8 +13,7 @@ s3ry is Amazon S3 CLI Tool by using promptui.
 
 ![S3ry.png](doc/S3ry.png)
 
-<span style="font-size: 6px;">The Gopher character is based on the Go mascot designed by <a href="http://reneefrench.blogspot.jp/" target="_blank" class="external">Renée French</a>.</span>
-
+The Gopher character is based on the Go mascot designed by <a href="http://reneefrench.blogspot.jp/" target="_blank">Renée French</a>.
 
 ## demo
 
