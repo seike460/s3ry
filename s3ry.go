@@ -39,6 +39,16 @@ func NewS3ry() *S3ry {
 		svc:  tempSvc,
 	}
 
+	// for Bucket Search
+	tempSess = session.Must(session.NewSession(&aws.Config{
+		Region: aws.String("ap-northeast-1")},
+	))
+	tempSvc = s3.New(tempSess)
+	tempS3ry = &S3ry{
+		sess: tempSess,
+		svc:  tempSvc,
+	}
+
 	// show Bucket List & select
 	buckets := tempS3ry.ListBuckets()
 	selectBucket := tempS3ry.SelectItem("どのバケットを利用しますか?", buckets)
