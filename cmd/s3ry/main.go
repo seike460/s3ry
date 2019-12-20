@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
-	s3ry.Operations()
+	region, selectBucket := s3ry.SelectBucketAndRegion()
+	s3ry.Operations(region, selectBucket)
 }
