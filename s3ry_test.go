@@ -7,9 +7,8 @@ import (
 )
 
 func TestNewS3ry(t *testing.T) {
-	s := NewS3ry()
+	s := NewS3ry(ApNortheastOne)
 	operations := s.ListOperation()
-	//selectOperation := s.SelectItem("testNow", operations)
 	buckets := s.ListBuckets()
 	s.UploadObject("seike460-gotest", "testUploadFile")
 	s.GetObject("seike460-gotest", "testUploadFile")
@@ -18,9 +17,8 @@ func TestNewS3ry(t *testing.T) {
 	items := s.ListObjectsPages("seike460-gotest")
 	selectObject := s.ListObjects("seike460-gotest")
 	s.DeleteObject("seike460-gotest", "testUploadFile")
-	CheckLocalExists("testNothingsFile")
+	checkLocalExists("testNothingsFile")
 	assert.NotNil(t, operations)
-	//assert.NotNil(t, selectOperation)
 	assert.NotNil(t, buckets)
 	assert.NotNil(t, uploadItem)
 	assert.NotNil(t, items)

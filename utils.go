@@ -3,6 +3,7 @@ package s3ry
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -34,8 +35,8 @@ func spe() {
 	sp.Stop()
 }
 
-// CheckLocalExists check localFile
-func CheckLocalExists(objectKey string) {
+// checkLocalExists check localFile
+func checkLocalExists(objectKey string) {
 	filename := filepath.Base(objectKey)
 	_, err := os.Stat(filename)
 	if err == nil {
@@ -43,20 +44,17 @@ func CheckLocalExists(objectKey string) {
 		fmt.Printf("そのファイルは存在します。上書きしますか ファイル名:%s, [Yy]/[Nn])\n", filename)
 		fmt.Scan(&overlide)
 		if overlide != "y" && overlide != "Y" {
-			fmt.Println("終了します")
-			os.Exit(0)
+			log.Fatal("処理を終了します")
 		}
 	}
 }
 
-// awsErrorPrint print Error for aws
+// awsErrorPrint print Error for AWS
 func awsErrorPrint(err error) {
 	if aerr, ok := err.(awserr.Error); ok {
-		fmt.Println(aerr.Error())
-	} else {
-		fmt.Println(err.Error())
+		log.Fatal(aerr.Error())
 	}
-	os.Exit(1)
+	log.Fatal(err.Error())
 }
 
 // dirwalk get fileList
@@ -66,9 +64,8 @@ func dirwalk(dir string) []string {
 	}
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		panic(err)
+		log.Fatal(err.Error())
 	}
-
 	var paths []string
 	for _, file := range files {
 		if file.IsDir() {
@@ -77,6 +74,5 @@ func dirwalk(dir string) []string {
 		}
 		paths = append(paths, filepath.Join(dir, file.Name()))
 	}
-
 	return paths
 }

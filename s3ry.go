@@ -17,54 +17,42 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-// TYPES
-
 // S3ry Service Client Operator
 type S3ry struct {
-	sess   *session.Session
-	svc    *s3.S3
-	bucket string
+	Sess   *session.Session
+	Svc    *s3.S3
+	Bucket string
 }
 
-// NewS3ry Create New S3ry struct
-func NewS3ry() *S3ry {
+// ApNortheastOne Japan Region String
+const ApNortheastOne = "ap-northeast-1"
 
+// SelectBucketAndRegion get Region and Bucket
+func SelectBucketAndRegion() (string, string) {
 	// for Bucket Search
-	tempSess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String("ap-northeast-1")},
-	))
-	tempSvc := s3.New(tempSess)
-	tempS3ry := &S3ry{
-		sess: tempSess,
-		svc:  tempSvc,
-	}
-
+	s3ry := NewS3ry(ApNortheastOne)
 	// show Bucket List & select
-	buckets := tempS3ry.ListBuckets()
-	selectBucket := tempS3ry.SelectItem("どのバケットを利用しますか?", buckets)
+	buckets := s3ry.ListBuckets()
+	selectBucket := s3ry.SelectItem("どのバケットを利用しますか?", buckets)
 	ctx := context.Background()
-
-	region, err := s3manager.GetBucketRegion(ctx, tempSess, selectBucket, "ap-northeast-1")
+	// Get bucket's region
+	region, err := s3manager.GetBucketRegion(ctx, s3ry.Sess, selectBucket, ApNortheastOne)
 	if err != nil {
 		awsErrorPrint(err)
 	}
+	return region, selectBucket
+}
 
+// NewS3ry Create New S3ry struct
+func NewS3ry(region string) *S3ry {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(region)},
 	))
-
 	svc := s3.New(sess)
-
 	s := &S3ry{
-		sess:   sess,
-		svc:    svc,
-		bucket: selectBucket,
+		Sess: sess,
+		Svc:  svc,
 	}
-
-	tempSess = nil
-	tempSvc = nil
-	tempS3ry = nil
-
 	return s
 }
 
@@ -83,7 +71,7 @@ func (s S3ry) ListOperation() []PromptItems {
 func (s S3ry) ListBuckets() []PromptItems {
 	sps("バケットの検索中です...")
 	input := &s3.ListBucketsInput{}
-	listBuckets, err := s.svc.ListBuckets(input)
+	listBuckets, err := s.Svc.ListBuckets(input)
 	if err != nil {
 		awsErrorPrint(err)
 	}
@@ -100,7 +88,7 @@ func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 	sps("オブジェクトの検索中です...")
 	items := []PromptItems{}
 	key := 0
-	err := s.svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
@@ -134,20 +122,16 @@ func (s S3ry) GetObject(bucket string, objectKey string) {
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "")
-		os.Exit(1)
+		awsErrorPrint(err)
 	}
 	defer file.Close()
 	inputGet := &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(objectKey),
 	}
-	downloader := s3manager.NewDownloader(s.sess)
+	downloader := s3manager.NewDownloader(s.Sess)
 	result, err := downloader.Download(file, inputGet)
 	if err != nil {
-		if err := os.Remove(filename); err != nil {
-			fmt.Println(err)
-		}
 		awsErrorPrint(err)
 	}
 	spe()
@@ -168,12 +152,10 @@ func (s S3ry) ListUpload(bucket string) []PromptItems {
 func (s S3ry) UploadObject(bucket string, selectUpload string) {
 	sps("オブジェクトのアップロード中です...")
 	uploadObject := selectUpload
-	uploader := s3manager.NewUploader(s.sess)
+	uploader := s3manager.NewUploader(s.Sess)
 	f, err := os.Open(uploadObject)
 	if err != nil {
-		fmt.Println(err)
-		fmt.Fprintf(os.Stderr, "")
-		os.Exit(1)
+		awsErrorPrint(err)
 	}
 	defer f.Close()
 
@@ -229,8 +211,7 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 	i, _, err := prompt.Run()
 
 	if err != nil {
-		fmt.Printf("選択に失敗しました。終了します %v\n", err)
-		os.Exit(0)
+		awsErrorPrint(err)
 	}
 	return items[i].Val
 }
@@ -241,7 +222,7 @@ func (s S3ry) DeleteObject(bucket string, item string) {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(item),
 	}
-	_, err := s.svc.DeleteObject(input)
+	_, err := s.Svc.DeleteObject(input)
 	if err != nil {
 		awsErrorPrint(err)
 	}
@@ -255,45 +236,44 @@ func (s S3ry) SaveObjectList(bucket string) {
 	ObjectListFileName := "ObjectList-" + t.Format("2006-01-02-15-04-05") + ".txt"
 	file, err := os.Create(ObjectListFileName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "")
-		os.Exit(1)
+		awsErrorPrint(err)
 	}
 	defer file.Close()
 	for _, item := range items {
 		_, err = file.Write(([]byte)("./" + item.Val + "," + strconv.FormatInt(item.Size, 10) + "\n"))
 		if err != nil {
-			fmt.Println("書き込みエラーです", err)
-			os.Exit(1)
+			awsErrorPrint(err)
 		}
 	}
 	fmt.Println("オブジェクトリストを作成しました:" + ObjectListFileName)
 }
 
 // Operations for Another package
-func Operations() {
-	s := NewS3ry()
+func Operations(region string, bucket string) {
+	s := NewS3ry(region)
+	s.Bucket = bucket
 	// show Bucket List & select
 	operations := s.ListOperation()
 	selectOperation := s.SelectItem("何をしますか？", operations)
 
 	switch selectOperation {
 	case "アップロード":
-		uploadItem := s.ListUpload(s.bucket)
+		uploadItem := s.ListUpload(s.Bucket)
 		selectUpload := s.SelectItem("どのファイルをアップロードしますか?", uploadItem)
-		s.UploadObject(s.bucket, selectUpload)
+		s.UploadObject(s.Bucket, selectUpload)
 	case "オブジェクトリスト":
-		s.SaveObjectList(s.bucket)
+		s.SaveObjectList(s.Bucket)
 	case "オブジェクト削除":
-		items := s.ListObjectsPages(s.bucket)
+		items := s.ListObjectsPages(s.Bucket)
 		item := s.SelectItem("どのファイルを削除しますか?", items)
-		s.DeleteObject(s.bucket, item)
+		s.DeleteObject(s.Bucket, item)
 	default:
 		// show Object List & select
-		items := s.ListObjects(s.bucket)
+		items := s.ListObjects(s.Bucket)
 		selectObject := s.SelectItem("どのファイルを取得しますか?", items)
 		// check File
-		CheckLocalExists(selectObject)
+		checkLocalExists(selectObject)
 		// GetObject
-		s.GetObject(s.bucket, selectObject)
+		s.GetObject(s.Bucket, selectObject)
 	}
 }
