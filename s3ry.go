@@ -34,7 +34,7 @@ func SelectBucketAndRegion() (string, string) {
 	s3ry := NewS3ry(ApNortheastOne)
 	// show Bucket List & select
 	buckets := s3ry.ListBuckets()
-	selectBucket := s3ry.SelectItem(I18nPrinter.Sprintf("Which bucket do you use?"), buckets)
+	selectBucket := s3ry.SelectItem(i18nPrinter.Sprintf("Which bucket do you use?"), buckets)
 	ctx := context.Background()
 	// Get bucket's region
 	region, err := s3manager.GetBucketRegion(ctx, s3ry.Sess, selectBucket, ApNortheastOne)
@@ -60,17 +60,17 @@ func NewS3ry(region string) *S3ry {
 // ListOperation return ListOperation for PromptItems
 func (s S3ry) ListOperation() []PromptItems {
 	items := []PromptItems{
-		{Key: 0, Val: I18nPrinter.Sprintf("download")},
-		{Key: 1, Val: I18nPrinter.Sprintf("upload")},
-		{Key: 2, Val: I18nPrinter.Sprintf("delete object")},
-		{Key: 3, Val: I18nPrinter.Sprintf("create object list")},
+		{Key: 0, Val: i18nPrinter.Sprintf("download")},
+		{Key: 1, Val: i18nPrinter.Sprintf("upload")},
+		{Key: 2, Val: i18nPrinter.Sprintf("delete object")},
+		{Key: 3, Val: i18nPrinter.Sprintf("create object list")},
 	}
 	return items
 }
 
 // ListBuckets return ListBuckets for PromptItems
 func (s S3ry) ListBuckets() []PromptItems {
-	sps(I18nPrinter.Sprintf("Searching for buckets ..."))
+	sps(i18nPrinter.Sprintf("Searching for buckets ..."))
 	input := &s3.ListBucketsInput{}
 	listBuckets, err := s.Svc.ListBuckets(input)
 	if err != nil {
@@ -86,7 +86,7 @@ func (s S3ry) ListBuckets() []PromptItems {
 
 // ListObjectsPages return ListObjectsPages for PromptItems
 func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
-	sps(I18nPrinter.Sprintf("Searching for objects ..."))
+	sps(i18nPrinter.Sprintf("Searching for objects ..."))
 	items := []PromptItems{}
 	key := 0
 	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
@@ -113,13 +113,13 @@ func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
 // ListObjects return ListObjects for PromptItems
 func (s S3ry) ListObjects(bucket string) []PromptItems {
 	items := S3ry.ListObjectsPages(s, bucket)
-	fmt.Println(I18nPrinter.Sprintf("Number of objects: "), len(items))
+	fmt.Println(i18nPrinter.Sprintf("Number of objects: "), len(items))
 	return items
 }
 
 // GetObject get Object from S3 bucket
 func (s S3ry) GetObject(bucket string, objectKey string) {
-	sps(I18nPrinter.Sprintf("Downloading object ..."))
+	sps(i18nPrinter.Sprintf("Downloading object ..."))
 	filename := filepath.Base(objectKey)
 	file, err := os.Create(filename)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s S3ry) GetObject(bucket string, objectKey string) {
 		awsErrorPrint(err)
 	}
 	spe()
-	fmt.Println(I18nPrinter.Sprintf("File downloaded,% s,% d bytes", filename, result))
+	fmt.Println(i18nPrinter.Sprintf("File downloaded,% s,% d bytes", filename, result))
 }
 
 // ListUpload return ListUpload for PromptItems
@@ -151,7 +151,7 @@ func (s S3ry) ListUpload(bucket string) []PromptItems {
 
 // UploadObject put Object in S3 bucket
 func (s S3ry) UploadObject(bucket string, selectUpload string) {
-	sps(I18nPrinter.Sprintf("Uploading object ..."))
+	sps(i18nPrinter.Sprintf("Uploading object ..."))
 	uploadObject := selectUpload
 	uploader := s3manager.NewUploader(s.Sess)
 	f, err := os.Open(uploadObject)
@@ -169,7 +169,7 @@ func (s S3ry) UploadObject(bucket string, selectUpload string) {
 		awsErrorPrint(err)
 	}
 	spe()
-	fmt.Println(I18nPrinter.Sprintf("Uploaded file,% s", uploadObject))
+	fmt.Println(i18nPrinter.Sprintf("Uploaded file,% s", uploadObject))
 }
 
 // SelectItem select PromptItems using promptui
@@ -186,7 +186,7 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 		Label:    "{{ . }}",
 		Active:   "->{{ .Val | red }}",
 		Inactive: "{{ .Val | cyan }}",
-		Selected: I18nPrinter.Sprintf("\"Selection Value:\" {{ .Val | red | cyan }}"),
+		Selected: i18nPrinter.Sprintf("\"Selection Value:\" {{ .Val | red | cyan }}"),
 		Details:  detail,
 	}
 
@@ -242,7 +242,7 @@ func (s S3ry) SaveObjectList(bucket string) {
 			awsErrorPrint(err)
 		}
 	}
-	fmt.Println(I18nPrinter.Sprintf("Object list created:") + ObjectListFileName)
+	fmt.Println(i18nPrinter.Sprintf("Object list created:") + ObjectListFileName)
 }
 
 // Operations for Another package
@@ -251,23 +251,23 @@ func Operations(region string, bucket string) {
 	s.Bucket = bucket
 	// show Bucket List & select
 	operations := s.ListOperation()
-	selectOperation := s.SelectItem(I18nPrinter.Sprintf("What are you doing?"), operations)
+	selectOperation := s.SelectItem(i18nPrinter.Sprintf("What are you doing?"), operations)
 
 	switch selectOperation {
-	case I18nPrinter.Sprintf("upload"):
+	case i18nPrinter.Sprintf("upload"):
 		uploadItem := s.ListUpload(s.Bucket)
-		selectUpload := s.SelectItem(I18nPrinter.Sprintf("Which file do you upload?"), uploadItem)
+		selectUpload := s.SelectItem(i18nPrinter.Sprintf("Which file do you upload?"), uploadItem)
 		s.UploadObject(s.Bucket, selectUpload)
-	case I18nPrinter.Sprintf("create object list"):
+	case i18nPrinter.Sprintf("create object list"):
 		s.SaveObjectList(s.Bucket)
-	case I18nPrinter.Sprintf("delete object"):
+	case i18nPrinter.Sprintf("delete object"):
 		items := s.ListObjectsPages(s.Bucket)
-		item := s.SelectItem(I18nPrinter.Sprintf("Which files do you want to delete?"), items)
+		item := s.SelectItem(i18nPrinter.Sprintf("Which files do you want to delete?"), items)
 		s.DeleteObject(s.Bucket, item)
 	default:
 		// show Object List & select
 		items := s.ListObjects(s.Bucket)
-		selectObject := s.SelectItem(I18nPrinter.Sprintf("Which file do you want to download?"), items)
+		selectObject := s.SelectItem(i18nPrinter.Sprintf("Which file do you want to download?"), items)
 		// check File
 		checkLocalExists(selectObject)
 		// GetObject
