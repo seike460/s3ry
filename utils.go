@@ -41,10 +41,10 @@ func checkLocalExists(objectKey string) {
 	_, err := os.Stat(filename)
 	if err == nil {
 		var overlide string
-		fmt.Printf("そのファイルは存在します。上書きしますか ファイル名:%s, [Yy]/[Nn])\n", filename)
+		fmt.Println(I18nPrinter.Sprintf("The file exists. Overwrite? File name:% s, [Yy] / [Nn]", filename))
 		fmt.Scan(&overlide)
 		if overlide != "y" && overlide != "Y" {
-			log.Fatal("処理を終了します")
+			log.Fatal("End processing")
 		}
 	}
 }

@@ -12,4 +12,5 @@ require (
 	github.com/manifoldco/promptui v0.3.2
 	github.com/rakyll/statik v0.1.6 // indirect
 	github.com/stretchr/testify v1.2.2
+	golang.org/x/text v0.3.2
 )
