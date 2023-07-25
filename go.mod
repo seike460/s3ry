@@ -7,5 +7,5 @@ require (
 	github.com/briandowns/spinner v1.8.0
 	github.com/manifoldco/promptui v0.6.0
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/text v0.3.2
+	golang.org/x/text v0.3.8 // indirect
 )
