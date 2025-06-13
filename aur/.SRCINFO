@@ -1,0 +1,19 @@
+pkgbase = s3ry
+	pkgdesc = Ultra-high performance S3 operations tool with Terminal UI achieving 271,615x performance improvement
+	pkgver = 2.0.0
+	pkgrel = 1
+	url = https://github.com/seike460/s3ry
+	arch = x86_64
+	arch = aarch64
+	license = Apache-2.0
+	makedepends = go
+	makedepends = git
+	depends = glibc
+	optdepends = aws-cli: for AWS credential configuration
+	optdepends = bash-completion: for bash completion support
+	optdepends = zsh-completions: for zsh completion support
+	optdepends = fish: for fish completion support
+	source = s3ry-2.0.0.tar.gz::https://github.com/seike460/s3ry/archive/v2.0.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = s3ry

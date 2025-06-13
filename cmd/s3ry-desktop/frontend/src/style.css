@@ -1,0 +1,253 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom CSS for S3ry Desktop */
+
+@layer base {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+    overflow: hidden;
+  }
+  
+  * {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+}
+
+@layer components {
+  /* Card styles */
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700;
+  }
+  
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 focus:ring-gray-500;
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
+  }
+  
+  .btn-success {
+    @apply bg-green-600 hover:bg-green-700 text-white focus:ring-green-500;
+  }
+  
+  /* Input styles */
+  .input {
+    @apply block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  
+  /* Table styles */
+  .table {
+    @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
+  }
+  
+  .table thead {
+    @apply bg-gray-50 dark:bg-gray-800;
+  }
+  
+  .table th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
+  }
+  
+  .table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100;
+  }
+  
+  .table tbody tr:hover {
+    @apply bg-gray-50 dark:bg-gray-700;
+  }
+  
+  /* Loading spinner */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+  }
+  
+  /* Notification styles */
+  .notification {
+    @apply fixed top-4 right-4 max-w-sm bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 border-l-4 z-50;
+  }
+  
+  .notification-success {
+    @apply border-green-500;
+  }
+  
+  .notification-error {
+    @apply border-red-500;
+  }
+  
+  .notification-warning {
+    @apply border-yellow-500;
+  }
+  
+  .notification-info {
+    @apply border-blue-500;
+  }
+  
+  /* Progress bar */
+  .progress {
+    @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2;
+  }
+  
+  .progress-bar {
+    @apply bg-blue-600 h-2 rounded-full transition-all duration-300;
+  }
+  
+  /* Modal styles */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center;
+  }
+  
+  .modal {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300;
+  }
+  
+  /* Scrollbar styles */
+  .scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175) transparent;
+  }
+  
+  .scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(156 163 175);
+    border-radius: 3px;
+  }
+  
+  .scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
+}
+
+@layer utilities {
+  /* Custom animations */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+  
+  /* Gradient backgrounds */
+  .gradient-blue {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .gradient-purple {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .gradient-green {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  }
+  
+  /* Text gradients */
+  .text-gradient-blue {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Shadows */
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+  }
+  
+  .shadow-glow-green {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  
+  .shadow-glow-red {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  
+  /* Draggable elements */
+  .draggable {
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+  
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+/* Dark mode improvements */
+@media (prefers-color-scheme: dark) {
+  .dark-auto {
+    color-scheme: dark;
+  }
+}
+
+/* Performance optimizations */
+* {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Focus styles for accessibility */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn {
+    @apply border-2 border-current;
+  }
+  
+  .card {
+    @apply border-2;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

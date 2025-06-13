@@ -1,0 +1,131 @@
+{{- if .Values.job.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "s3ry.fullname" . }}
+  labels:
+    {{- include "s3ry.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.job.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.job.backoffLimit }}
+      {{- if .Values.job.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+      {{- end }}
+      {{- if .Values.job.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+      {{- end }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "s3ry.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: {{ .Values.job.restartPolicy }}
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "s3ry.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: {{ .Chart.Name }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                {{- toYaml .Values.job.command | nindent 16 }}
+              {{- if .Values.job.args }}
+              args:
+                {{- toYaml .Values.job.args | nindent 16 }}
+              {{- end }}
+              env:
+                - name: AWS_REGION
+                  value: {{ .Values.aws.region | quote }}
+                {{- if not .Values.aws.useServiceAccount }}
+                {{- if .Values.aws.existingSecret }}
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.aws.existingSecret }}
+                      key: {{ .Values.aws.existingSecretAccessKeyKey }}
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.aws.existingSecret }}
+                      key: {{ .Values.aws.existingSecretSecretKeyKey }}
+                {{- else if .Values.aws.accessKey }}
+                - name: AWS_ACCESS_KEY_ID
+                  value: {{ .Values.aws.accessKey | quote }}
+                - name: AWS_SECRET_ACCESS_KEY
+                  value: {{ .Values.aws.secretKey | quote }}
+                {{- end }}
+                {{- end }}
+                {{- if .Values.s3.endpoint }}
+                - name: S3_ENDPOINT
+                  value: {{ .Values.s3.endpoint | quote }}
+                {{- end }}
+                - name: S3_USE_SSL
+                  value: {{ .Values.s3.useSSL | quote }}
+                - name: S3_PATH_STYLE
+                  value: {{ .Values.s3.pathStyle | quote }}
+                - name: S3RY_WORKER_POOL_SIZE
+                  value: {{ .Values.performance.workerPoolSize | quote }}
+                - name: S3RY_CHUNK_SIZE
+                  value: {{ .Values.performance.chunkSize | quote }}
+                - name: S3RY_TIMEOUT
+                  value: {{ .Values.performance.timeout | quote }}
+                - name: S3RY_MAX_RETRIES
+                  value: {{ .Values.performance.maxRetries | quote }}
+                - name: S3RY_LOG_LEVEL
+                  value: {{ .Values.logging.level | quote }}
+                - name: S3RY_LOG_FORMAT
+                  value: {{ .Values.logging.format | quote }}
+                {{- if .Values.env }}
+                {{- toYaml .Values.env | nindent 16 }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+              {{- if or .Values.persistence.enabled .Values.volumeMounts }}
+              volumeMounts:
+                {{- if .Values.persistence.enabled }}
+                - name: data
+                  mountPath: /data
+                {{- end }}
+                {{- if .Values.volumeMounts }}
+                {{- toYaml .Values.volumeMounts | nindent 16 }}
+                {{- end }}
+              {{- end }}
+          {{- if or .Values.persistence.enabled .Values.volumes }}
+          volumes:
+            {{- if .Values.persistence.enabled }}
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "s3ry.fullname" . }}
+            {{- end }}
+            {{- if .Values.volumes }}
+            {{- toYaml .Values.volumes | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

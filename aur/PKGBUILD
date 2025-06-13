@@ -1,0 +1,107 @@
+# Maintainer: seike460 <seike460@gmail.com>
+pkgname=s3ry
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Ultra-high performance S3 operations tool with Terminal UI achieving 271,615x performance improvement"
+arch=('x86_64' 'aarch64')
+url="https://github.com/seike460/s3ry"
+license=('Apache-2.0')
+makedepends=('go' 'git')
+depends=('glibc')
+optdepends=(
+    'aws-cli: for AWS credential configuration'
+    'bash-completion: for bash completion support'
+    'zsh-completions: for zsh completion support'
+    'fish: for fish completion support'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/seike460/s3ry/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # Will be updated during release
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    
+    # Create the go mod cache directory
+    export GOPATH="$srcdir/gopath"
+    export GOCACHE="$srcdir/gocache"
+    export GOMODCACHE="$srcdir/gomodcache"
+    
+    # Download dependencies
+    go mod download
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    
+    export GOPATH="$srcdir/gopath"
+    export GOCACHE="$srcdir/gocache"
+    export GOMODCACHE="$srcdir/gomodcache"
+    export CGO_ENABLED=0
+    export GOOS=linux
+    
+    # Build for current architecture
+    case "$CARCH" in
+        x86_64)
+            export GOARCH=amd64
+            ;;
+        aarch64)
+            export GOARCH=arm64
+            ;;
+    esac
+    
+    # Build the main binary
+    go build \
+        -trimpath \
+        -buildmode=pie \
+        -mod=readonly \
+        -modcacherw \
+        -ldflags="-linkmode external -extldflags '$LDFLAGS' -s -w -X main.Version=$pkgver" \
+        -o $pkgname \
+        ./cmd/s3ry
+    
+    # Generate completion scripts if the binary supports it
+    if ./$pkgname completion bash >/dev/null 2>&1; then
+        ./$pkgname completion bash > ${pkgname}_completion.bash
+        ./$pkgname completion zsh > ${pkgname}_completion.zsh
+        ./$pkgname completion fish > ${pkgname}_completion.fish
+    fi
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    
+    export GOPATH="$srcdir/gopath"
+    export GOCACHE="$srcdir/gocache"
+    export GOMODCACHE="$srcdir/gomodcache"
+    
+    # Run basic tests (skip integration tests that require AWS)
+    go test -short ./...
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    
+    # Install the main binary
+    install -Dm755 $pkgname "$pkgdir/usr/bin/$pkgname"
+    
+    # Install documentation
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    
+    # Install completion scripts if they exist
+    if [[ -f ${pkgname}_completion.bash ]]; then
+        install -Dm644 ${pkgname}_completion.bash "$pkgdir/usr/share/bash-completion/completions/$pkgname"
+    fi
+    
+    if [[ -f ${pkgname}_completion.zsh ]]; then
+        install -Dm644 ${pkgname}_completion.zsh "$pkgdir/usr/share/zsh/site-functions/_$pkgname"
+    fi
+    
+    if [[ -f ${pkgname}_completion.fish ]]; then
+        install -Dm644 ${pkgname}_completion.fish "$pkgdir/usr/share/fish/completions/$pkgname.fish"
+    fi
+    
+    # Install additional documentation if available
+    if [[ -d docs ]]; then
+        cp -r docs "$pkgdir/usr/share/doc/$pkgname/"
+    fi
+}

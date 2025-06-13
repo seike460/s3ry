@@ -1,0 +1,46 @@
+{
+  "name": "s3ry-desktop-frontend",
+  "version": "2.0.0",
+  "description": "S3ry Desktop Frontend - High-Performance S3 Browser",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .vue,.js,.ts",
+    "format": "prettier --write src/"
+  },
+  "keywords": [
+    "s3",
+    "aws",
+    "browser",
+    "desktop",
+    "wails",
+    "vue"
+  ],
+  "author": "S3ry Team",
+  "license": "MIT",
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0",
+    "pinia": "^2.1.0",
+    "@vueuse/core": "^10.7.0",
+    "lucide-vue-next": "^0.294.0",
+    "tailwindcss": "^3.4.0",
+    "@headlessui/vue": "^1.7.0",
+    "chart.js": "^4.4.0",
+    "vue-chartjs": "^5.3.0",
+    "date-fns": "^2.30.0",
+    "file-saver": "^2.0.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.19.0",
+    "prettier": "^3.1.0",
+    "@types/file-saver": "^2.0.7"
+  }
+}

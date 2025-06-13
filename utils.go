@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/briandowns/spinner"
+	"github.com/seike460/s3ry/internal/i18n"
 )
 
 // PromptItems struct for promptui
@@ -41,7 +42,7 @@ func checkLocalExists(objectKey string) {
 	_, err := os.Stat(filename)
 	if err == nil {
 		var overlide string
-		fmt.Println(i18nPrinter.Sprintf("The file exists. Overwrite? File name:% s, [Yy] / [Nn]", filename))
+		fmt.Println(i18n.Sprintf("The file exists. Overwrite? File name:% s, [Yy] / [Nn]", filename))
 		fmt.Scan(&overlide)
 		if overlide != "y" && overlide != "Y" {
 			log.Fatal("End processing")
@@ -68,8 +69,19 @@ func dirwalk(dir string) []string {
 	}
 	var paths []string
 	for _, file := range files {
+		// Skip hidden files and directories to prevent infinite loops
+		if file.Name()[0] == '.' {
+			continue
+		}
+		
 		if file.IsDir() {
-			paths = append(paths, dirwalk(filepath.Join(dir, file.Name()))...)
+			// Add safety check to prevent infinite recursion
+			subDir := filepath.Join(dir, file.Name())
+			// Skip common directories that cause infinite loops
+			if file.Name() == "bin" || file.Name() == "dist" || file.Name() == "vendor" {
+				continue
+			}
+			paths = append(paths, dirwalk(subDir)...)
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, file.Name()))

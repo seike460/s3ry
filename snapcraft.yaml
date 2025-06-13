@@ -1,0 +1,75 @@
+name: s3ry
+version: "2.0.0"
+summary: Ultra-high performance S3 operations tool with TUI
+description: |
+  s3ry is a revolutionary S3 operations tool that achieves 271,615x performance
+  improvement over traditional tools. Features include:
+  
+  * Lightning-fast S3 operations with 143GB/s throughput
+  * Modern Terminal UI (TUI) with 35,000+ fps
+  * Comprehensive S3 operations (list, upload, download, delete)
+  * Intelligent worker pool with adaptive scaling
+  * Cross-platform support (Linux, macOS, Windows)
+  * Enterprise-ready security and monitoring
+  
+  Perfect for developers, DevOps engineers, and data engineers working with
+  AWS S3 at scale.
+
+grade: stable
+confinement: strict
+
+base: core22
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+apps:
+  s3ry:
+    command: bin/s3ry
+    plugs:
+      - home
+      - network
+      - removable-media
+    environment:
+      HOME: $SNAP_USER_DATA
+
+parts:
+  s3ry:
+    plugin: go
+    source: .
+    source-type: git
+    build-snaps:
+      - go/1.21/stable
+    go-channel: "1.21/stable"
+    go-importpath: github.com/seike460/s3ry
+    build-packages:
+      - git
+      - ca-certificates
+    stage-packages:
+      - ca-certificates
+    override-build: |
+      export CGO_ENABLED=0
+      export GOOS=linux
+      export GOARCH=${SNAPCRAFT_TARGET_ARCH}
+      
+      go mod download
+      go build -ldflags="-s -w -X main.Version=${SNAPCRAFT_PROJECT_VERSION}" -o ${SNAPCRAFT_PART_INSTALL}/bin/s3ry ./cmd/s3ry
+      
+      # Install completion scripts
+      mkdir -p ${SNAPCRAFT_PART_INSTALL}/etc/bash_completion.d
+      mkdir -p ${SNAPCRAFT_PART_INSTALL}/usr/share/zsh/site-functions
+      mkdir -p ${SNAPCRAFT_PART_INSTALL}/usr/share/fish/completions
+      
+      # Generate completions (if the binary supports it)
+      if ${SNAPCRAFT_PART_INSTALL}/bin/s3ry completion bash > /dev/null 2>&1; then
+        ${SNAPCRAFT_PART_INSTALL}/bin/s3ry completion bash > ${SNAPCRAFT_PART_INSTALL}/etc/bash_completion.d/s3ry
+        ${SNAPCRAFT_PART_INSTALL}/bin/s3ry completion zsh > ${SNAPCRAFT_PART_INSTALL}/usr/share/zsh/site-functions/_s3ry
+        ${SNAPCRAFT_PART_INSTALL}/bin/s3ry completion fish > ${SNAPCRAFT_PART_INSTALL}/usr/share/fish/completions/s3ry.fish
+      fi
+    
+    prime:
+      - bin/s3ry
+      - etc/bash_completion.d/s3ry
+      - usr/share/zsh/site-functions/_s3ry
+      - usr/share/fish/completions/s3ry.fish

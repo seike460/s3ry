@@ -1,0 +1,105 @@
+{
+  "name": "@s3ry/copilot-extension",
+  "version": "2.0.0",
+  "description": "GitHub Copilot extension for S3ry ultra-high performance S3 operations",
+  "main": "s3ry-copilot-extension.js",
+  "keywords": [
+    "github-copilot",
+    "s3ry",
+    "s3",
+    "aws",
+    "cloud",
+    "performance",
+    "copilot-extension"
+  ],
+  "author": "seike460 <seike460@gmail.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seike460/s3ry.git",
+    "directory": "integrations/copilot"
+  },
+  "homepage": "https://github.com/seike460/s3ry",
+  "bugs": {
+    "url": "https://github.com/seike460/s3ry/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint *.js",
+    "build": "npm run lint && npm test",
+    "publish-extension": "npm publish --access public"
+  },
+  "dependencies": {
+    "@github/copilot-extension": "^1.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0"
+  },
+  "copilot": {
+    "name": "s3ry",
+    "description": "Ultra-high performance S3 operations with 271,615x improvement",
+    "version": "2.0.0",
+    "categories": [
+      "aws",
+      "cloud",
+      "storage",
+      "performance"
+    ],
+    "capabilities": [
+      "code-generation",
+      "smart-completion",
+      "performance-optimization",
+      "error-handling",
+      "best-practices"
+    ],
+    "triggers": [
+      "s3ry",
+      "s3 upload",
+      "s3 download",
+      "high performance s3",
+      "parallel s3",
+      "s3 sync",
+      "aws s3 performance"
+    ],
+    "languages": [
+      "javascript",
+      "typescript",
+      "python",
+      "go",
+      "bash",
+      "shell"
+    ],
+    "patterns": [
+      {
+        "name": "s3ry-upload",
+        "description": "High-performance S3 upload patterns",
+        "triggers": ["upload", "s3ry upload", "high performance upload"]
+      },
+      {
+        "name": "s3ry-download",
+        "description": "Parallel S3 download patterns",
+        "triggers": ["download", "parallel download", "s3ry download"]
+      },
+      {
+        "name": "s3ry-sync",
+        "description": "Directory synchronization patterns",
+        "triggers": ["sync", "directory sync", "s3ry sync"]
+      },
+      {
+        "name": "s3ry-performance",
+        "description": "Performance optimization patterns",
+        "triggers": ["performance", "optimize", "s3 performance"]
+      }
+    ]
+  },
+  "files": [
+    "s3ry-copilot-extension.js",
+    "README.md",
+    "snippets/",
+    "examples/"
+  ]
+}

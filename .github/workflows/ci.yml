@@ -1,0 +1,401 @@
+name: CI - S3ry Modern Architecture
+
+on:
+  push:
+    branches: [ main, master, develop, 'llm-*/**' ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  GO_VERSION: '1.23.4'
+  
+# Parallel LLM Development Support
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Keep running for parallel LLM branches
+
+jobs:
+  # Parallel Development Integration Check
+  integration-check:
+    name: 🔍 Parallel Development Integration
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for parallel branch analysis
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: integration-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          integration-${{ runner.os }}-go-
+
+    - name: Run Integration Check
+      run: |
+        chmod +x build/scripts/integration-check.sh
+        ./build/scripts/integration-check.sh
+        
+    - name: Run Dependency Check
+      run: |
+        chmod +x build/scripts/dependency-check.sh
+        ./build/scripts/dependency-check.sh
+        
+    - name: Parallel Development Status
+      run: |
+        echo "## 🚀 Parallel Development Status" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        git branch -a | grep -E "(llm-[1-4]|main|master)" || echo "No LLM branches found"
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### 📊 Build Status" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Compilation: $(if go build ./...; then echo "PASS"; else echo "FAIL"; fi)" >> $GITHUB_STEP_SUMMARY
+        echo "- 🏗️ Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔗 Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    needs: integration-check
+    strategy:
+      matrix:
+        test-type: [unit, integration, e2e]
+      fail-fast: false  # Don't stop other tests if one fails
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: test-${{ matrix.test-type }}-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          test-${{ matrix.test-type }}-${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+
+    - name: Run Unit Tests
+      if: matrix.test-type == 'unit'
+      run: |
+        echo "🧪 Running unit tests with race detection..."
+        go test -v -race -timeout=10m -coverprofile=coverage-unit.out ./...
+        go tool cover -func=coverage-unit.out
+
+    - name: Run Integration Tests
+      if: matrix.test-type == 'integration'
+      run: |
+        echo "🔗 Running integration tests..."
+        go test -v -timeout=15m -tags=integration ./test/integration/...
+
+    - name: Run E2E Tests
+      if: matrix.test-type == 'e2e'
+      env:
+        RUN_E2E_TESTS: "1"
+      run: |
+        echo "🎯 Running e2e tests..."
+        go test -v -timeout=20m ./test/e2e/...
+
+    - name: Upload test coverage
+      if: matrix.test-type == 'unit'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage-unit.out
+        flags: unittests
+        name: codecov-${{ matrix.test-type }}
+        fail_ci_if_error: false
+
+  lint:
+    name: 🔍 Code Quality & Security
+    runs-on: ubuntu-latest
+    needs: integration-check
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: v1.62.2
+        args: --timeout=10m --out-format github-actions
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec-results.sarif ./...'
+      continue-on-error: true
+
+    - name: Upload Gosec results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: gosec-results.sarif
+
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
+  build:
+    name: 🔨 Cross-Platform Build
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: build-${{ matrix.goos }}-${{ matrix.goarch }}-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          build-${{ matrix.goos }}-${{ matrix.goarch }}-${{ runner.os }}-go-
+
+    - name: Create dist directory
+      run: mkdir -p dist
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        BINARY_NAME=s3ry
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        
+        VERSION=$(git describe --tags --always --dirty)
+        COMMIT=$(git rev-parse HEAD)
+        DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}"
+        
+        echo "🔨 Building ${BINARY_NAME} for ${GOOS}/${GOARCH}..."
+        go build -ldflags="${LDFLAGS}" -o "dist/${BINARY_NAME}-${GOOS}-${GOARCH}" ./cmd/s3ry
+        
+        # Verify build
+        ls -la "dist/${BINARY_NAME}-${GOOS}-${GOARCH}"
+        file "dist/${BINARY_NAME}-${GOOS}-${GOARCH}" || true
+
+    - name: Performance monitoring
+      if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+      run: |
+        chmod +x build/scripts/performance-monitor.sh
+        ./build/scripts/performance-monitor.sh || echo "Performance monitoring failed, continuing..."
+        
+    - name: Upload performance logs
+      if: matrix.goos == 'linux' && matrix.goarch == 'amd64' && always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-logs
+        path: |
+          performance.log
+          build-metrics.json
+        retention-days: 30
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: s3ry-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/s3ry-*
+        retention-days: 30
+
+  # Modern Architecture Integration Tests
+  integration-aws:
+    name: 🌐 AWS Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: [test, lint]
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,iam
+          DEBUG: 1
+          DATA_DIR: /tmp/localstack/data
+        options: >-
+          --health-cmd="curl -f http://localhost:4566/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: integration-aws-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          integration-aws-${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Wait for LocalStack
+      run: |
+        echo "🔄 Waiting for LocalStack to be ready..."
+        timeout 120 bash -c 'until curl -f http://localhost:4566/health; do echo "Waiting..."; sleep 5; done'
+        echo "✅ LocalStack is ready"
+
+    - name: Setup LocalStack S3 Environment
+      env:
+        AWS_ACCESS_KEY_ID: test
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ENDPOINT_URL: http://localhost:4566
+      run: |
+        # Install AWS CLI for setup
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+        
+        # Create test bucket
+        aws --endpoint-url=http://localhost:4566 s3 mb s3://test-bucket-s3ry
+        echo "test content" | aws --endpoint-url=http://localhost:4566 s3 cp - s3://test-bucket-s3ry/test-file.txt
+
+    - name: Run Modern Backend Integration Tests
+      env:
+        AWS_ACCESS_KEY_ID: test
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ENDPOINT_URL: http://localhost:4566
+        S3RY_TEST_BUCKET: test-bucket-s3ry
+      run: |
+        echo "🧪 Testing modern architecture with LocalStack..."
+        go test -v -timeout=30m -tags=integration ./test/integration/...
+
+    - name: Test Worker Pool Performance
+      env:
+        AWS_ACCESS_KEY_ID: test
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_DEFAULT_REGION: us-east-1
+        AWS_ENDPOINT_URL: http://localhost:4566
+      run: |
+        echo "⚡ Testing worker pool performance..."
+        go test -v -bench=. -run=Benchmark ./internal/worker/...
+
+  # Parallel Development Monitoring
+  parallel-dev-monitor:
+    name: 🔍 Parallel Development Monitor
+    runs-on: ubuntu-latest
+    needs: [integration-check]
+    if: always()
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Analyze Parallel Development State
+      run: |
+        echo "## 🔍 Parallel Development Analysis" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Branch analysis
+        echo "### 📊 Branch Status" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        git branch -a | grep -E "(llm-[1-4]|main|master)" | head -10 || echo "No LLM branches found"
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        
+        # Recent activity
+        echo "### ⏰ Recent Activity (24h)" >> $GITHUB_STEP_SUMMARY
+        recent_commits=$(git log --oneline --since="24 hours ago" --all 2>/dev/null | wc -l || echo "0")
+        echo "- Recent commits: **$recent_commits**" >> $GITHUB_STEP_SUMMARY
+        
+        # Merge conflicts check
+        echo "### ⚠️ Conflict Status" >> $GITHUB_STEP_SUMMARY
+        if git status --porcelain | grep -q "^UU"; then
+          echo "- ❌ **Merge conflicts detected**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ✅ **No conflicts detected**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Dependency drift check
+        echo "### 📦 Dependency Health" >> $GITHUB_STEP_SUMMARY
+        if [ -f go.mod ]; then
+          dep_count=$(go list -m all | wc -l)
+          echo "- Total dependencies: **$dep_count**" >> $GITHUB_STEP_SUMMARY
+          
+          if go mod verify &>/dev/null; then
+            echo "- ✅ **Dependencies verified**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **Dependency verification failed**" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
+  # Parallel Development Summary
+  parallel-dev-summary:
+    name: 📊 Parallel Development Summary
+    runs-on: ubuntu-latest
+    needs: [integration-check, test, lint, build, parallel-dev-monitor]
+    if: always()
+    steps:
+    - name: Generate Summary
+      run: |
+        echo "# 🚀 S3ry Parallel Development CI Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📋 Job Status" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Integration Check | ${{ needs.integration-check.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Suite | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Quality | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cross-Platform Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🏗️ Build Info" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Go Version**: ${{ env.GO_VERSION }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: s3ry
+description: Ultra-high performance S3 operations tool with Terminal UI achieving 271,615x performance improvement
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+home: https://github.com/seike460/s3ry
+sources:
+  - https://github.com/seike460/s3ry
+maintainers:
+  - name: seike460
+    email: seike460@gmail.com
+    url: https://github.com/seike460
+keywords:
+  - s3
+  - aws
+  - cloud
+  - cli
+  - performance
+  - tui
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0

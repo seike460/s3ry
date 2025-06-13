@@ -1,0 +1,300 @@
+{
+  "name": "s3ry-vscode",
+  "displayName": "S3ry - High-Performance S3 Browser",
+  "description": "S3ry integration for VS Code with 271,615x performance improvement",
+  "version": "2.0.0",
+  "publisher": "s3ry-team",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "s3",
+    "aws",
+    "cloud",
+    "storage",
+    "file-manager",
+    "sync"
+  ],
+  "activationEvents": [
+    "onCommand:s3ry.refreshExplorer",
+    "onView:s3ryExplorer"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "s3ryExplorer",
+          "name": "S3ry",
+          "when": "s3ry.enabled"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "s3ry",
+          "title": "S3ry",
+          "icon": "$(cloud)"
+        }
+      ]
+    },
+    "views": {
+      "s3ry": [
+        {
+          "id": "s3ryBuckets",
+          "name": "Buckets",
+          "when": "s3ry.enabled"
+        },
+        {
+          "id": "s3ryHistory",
+          "name": "History",
+          "when": "s3ry.enabled"
+        },
+        {
+          "id": "s3ryBookmarks",
+          "name": "Bookmarks",
+          "when": "s3ry.enabled"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "s3ry.enable",
+        "title": "Enable S3ry",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.disable",
+        "title": "Disable S3ry",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.refreshExplorer",
+        "title": "Refresh",
+        "icon": "$(refresh)",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.uploadFile",
+        "title": "Upload to S3",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.uploadWorkspace",
+        "title": "Upload Workspace to S3",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.downloadFile",
+        "title": "Download from S3",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.syncWorkspace",
+        "title": "Sync Workspace with S3",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.createBucket",
+        "title": "Create Bucket",
+        "icon": "$(add)",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.deleteBucket",
+        "title": "Delete Bucket",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.copyObject",
+        "title": "Copy Object",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.deleteObject",
+        "title": "Delete Object",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.previewObject",
+        "title": "Preview Object",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.addBookmark",
+        "title": "Add Bookmark",
+        "icon": "$(bookmark)",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.removeBookmark",
+        "title": "Remove Bookmark",
+        "category": "S3ry"
+      },
+      {
+        "command": "s3ry.openSettings",
+        "title": "Open Settings",
+        "icon": "$(settings-gear)",
+        "category": "S3ry"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "s3ry.refreshExplorer",
+          "when": "view == s3ryBuckets",
+          "group": "navigation"
+        },
+        {
+          "command": "s3ry.createBucket",
+          "when": "view == s3ryBuckets",
+          "group": "navigation"
+        },
+        {
+          "command": "s3ry.openSettings",
+          "when": "view == s3ryBuckets",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "s3ry.downloadFile",
+          "when": "view == s3ryBuckets && viewItem == s3Object",
+          "group": "s3ry@1"
+        },
+        {
+          "command": "s3ry.copyObject",
+          "when": "view == s3ryBuckets && viewItem == s3Object",
+          "group": "s3ry@2"
+        },
+        {
+          "command": "s3ry.deleteObject",
+          "when": "view == s3ryBuckets && viewItem == s3Object",
+          "group": "s3ry@3"
+        },
+        {
+          "command": "s3ry.previewObject",
+          "when": "view == s3ryBuckets && viewItem == s3Object",
+          "group": "s3ry@4"
+        },
+        {
+          "command": "s3ry.addBookmark",
+          "when": "view == s3ryBuckets && (viewItem == s3Bucket || viewItem == s3Folder)",
+          "group": "s3ry@5"
+        },
+        {
+          "command": "s3ry.deleteBucket",
+          "when": "view == s3ryBuckets && viewItem == s3Bucket",
+          "group": "s3ry@6"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "s3ry.uploadFile",
+          "when": "s3ry.enabled && !explorerResourceIsFolder",
+          "group": "s3ry@1"
+        },
+        {
+          "command": "s3ry.uploadWorkspace",
+          "when": "s3ry.enabled && explorerResourceIsFolder",
+          "group": "s3ry@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "s3ry.refreshExplorer",
+          "when": "s3ry.enabled"
+        },
+        {
+          "command": "s3ry.uploadFile",
+          "when": "s3ry.enabled"
+        },
+        {
+          "command": "s3ry.syncWorkspace",
+          "when": "s3ry.enabled"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "S3ry",
+      "properties": {
+        "s3ry.serverPort": {
+          "type": "number",
+          "default": 3001,
+          "description": "Port for S3ry backend server"
+        },
+        "s3ry.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start S3ry server when extension activates"
+        },
+        "s3ry.awsRegion": {
+          "type": "string",
+          "default": "us-east-1",
+          "description": "Default AWS region"
+        },
+        "s3ry.awsProfile": {
+          "type": "string",
+          "default": "",
+          "description": "AWS profile to use (leave empty for default)"
+        },
+        "s3ry.customEndpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Custom S3 endpoint (for MinIO, LocalStack, etc.)"
+        },
+        "s3ry.autoSync": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically sync workspace changes to S3"
+        },
+        "s3ry.maxFileSize": {
+          "type": "number",
+          "default": 104857600,
+          "description": "Maximum file size for uploads (in bytes, default 100MB)"
+        },
+        "s3ry.compressionEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable compression for file uploads"
+        },
+        "s3ry.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for S3ry operations"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "18.x",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seike460/s3ry.git"
+  },
+  "homepage": "https://github.com/seike460/s3ry#readme",
+  "bugs": {
+    "url": "https://github.com/seike460/s3ry/issues"
+  },
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  }
+}

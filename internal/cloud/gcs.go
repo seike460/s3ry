@@ -1,0 +1,646 @@
+package cloud
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"time"
+
+	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+)
+
+// GCSClient provides Google Cloud Storage integration
+type GCSClient struct {
+	client     *storage.Client
+	bucketName string
+	config     *GCSConfig
+}
+
+// GCSConfig contains Google Cloud Storage configuration
+type GCSConfig struct {
+	ProjectID             string `json:"project_id"`
+	BucketName            string `json:"bucket_name"`
+	ServiceAccountKeyPath string `json:"service_account_key_path,omitempty"`
+	ServiceAccountKey     []byte `json:"service_account_key,omitempty"`
+	UseDefaultCredentials bool   `json:"use_default_credentials"`
+	Endpoint              string `json:"endpoint,omitempty"`
+	RetryOptions          *GCSRetryOptions `json:"retry_options,omitempty"`
+}
+
+// GCSRetryOptions configures retry behavior for GCS operations
+type GCSRetryOptions struct {
+	MaxRetries    int           `json:"max_retries"`
+	InitialDelay  time.Duration `json:"initial_delay"`
+	MaxDelay      time.Duration `json:"max_delay"`
+	Multiplier    float64       `json:"multiplier"`
+	Timeout       time.Duration `json:"timeout"`
+}
+
+// DefaultGCSConfig returns default GCS configuration
+func DefaultGCSConfig() *GCSConfig {
+	return &GCSConfig{
+		UseDefaultCredentials: true,
+		RetryOptions: &GCSRetryOptions{
+			MaxRetries:   3,
+			InitialDelay: time.Second,
+			MaxDelay:     time.Minute,
+			Multiplier:   2.0,
+			Timeout:      time.Minute * 10,
+		},
+	}
+}
+
+// GCSObject represents a Google Cloud Storage object
+type GCSObject struct {
+	Name            string            `json:"name"`
+	Bucket          string            `json:"bucket"`
+	Size            int64             `json:"size"`
+	Created         time.Time         `json:"created"`
+	Updated         time.Time         `json:"updated"`
+	ContentType     string            `json:"content_type"`
+	ContentEncoding string            `json:"content_encoding,omitempty"`
+	CRC32C          uint32            `json:"crc32c"`
+	MD5             string            `json:"md5"`
+	ETag            string            `json:"etag"`
+	Generation      int64             `json:"generation"`
+	Metadata        map[string]string `json:"metadata"`
+	StorageClass    string            `json:"storage_class"`
+	KMSKeyName      string            `json:"kms_key_name,omitempty"`
+}
+
+// GCSBucket represents a Google Cloud Storage bucket
+type GCSBucket struct {
+	Name               string            `json:"name"`
+	Created            time.Time         `json:"created"`
+	Updated            time.Time         `json:"updated"`
+	Location           string            `json:"location"`
+	StorageClass       string            `json:"storage_class"`
+	VersioningEnabled  bool              `json:"versioning_enabled"`
+	Labels             map[string]string `json:"labels"`
+	RequesterPays      bool              `json:"requester_pays"`
+	DefaultEventBasedHold bool           `json:"default_event_based_hold"`
+}
+
+// NewGCSClient creates a new Google Cloud Storage client
+func NewGCSClient(ctx context.Context, config *GCSConfig) (*GCSClient, error) {
+	if config == nil {
+		config = DefaultGCSConfig()
+	}
+
+	var client *storage.Client
+	var err error
+
+	// Set up client options
+	var clientOptions []option.ClientOption
+
+	if config.ServiceAccountKeyPath != "" {
+		clientOptions = append(clientOptions, option.WithCredentialsFile(config.ServiceAccountKeyPath))
+	} else if len(config.ServiceAccountKey) > 0 {
+		clientOptions = append(clientOptions, option.WithCredentialsJSON(config.ServiceAccountKey))
+	} else if !config.UseDefaultCredentials {
+		return nil, fmt.Errorf("no credentials provided and default credentials disabled")
+	}
+
+	if config.Endpoint != "" {
+		clientOptions = append(clientOptions, option.WithEndpoint(config.Endpoint))
+	}
+
+	// Create client
+	client, err = storage.NewClient(ctx, clientOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCS client: %w", err)
+	}
+
+	return &GCSClient{
+		client:     client,
+		bucketName: config.BucketName,
+		config:     config,
+	}, nil
+}
+
+// Close closes the GCS client
+func (client *GCSClient) Close() error {
+	return client.client.Close()
+}
+
+// ListBuckets lists all buckets in the project
+func (client *GCSClient) ListBuckets(ctx context.Context) ([]GCSBucket, error) {
+	if client.config.ProjectID == "" {
+		return nil, fmt.Errorf("project ID is required to list buckets")
+	}
+
+	var buckets []GCSBucket
+	it := client.client.Buckets(ctx, client.config.ProjectID)
+
+	for {
+		bucketAttrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate buckets: %w", err)
+		}
+
+		bucket := GCSBucket{
+			Name:                  bucketAttrs.Name,
+			Created:               bucketAttrs.Created,
+			Updated:               bucketAttrs.Updated,
+			Location:              bucketAttrs.Location,
+			StorageClass:          string(bucketAttrs.StorageClass),
+			VersioningEnabled:     bucketAttrs.VersioningEnabled,
+			Labels:                bucketAttrs.Labels,
+			RequesterPays:         bucketAttrs.RequesterPays,
+			DefaultEventBasedHold: bucketAttrs.DefaultEventBasedHold,
+		}
+
+		buckets = append(buckets, bucket)
+	}
+
+	return buckets, nil
+}
+
+// ListObjects lists objects in a bucket
+func (client *GCSClient) ListObjects(ctx context.Context, bucketName, prefix string) ([]GCSObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	query := &storage.Query{
+		Prefix: prefix,
+	}
+
+	var objects []GCSObject
+	it := bucket.Objects(ctx, query)
+
+	for {
+		objectAttrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate objects: %w", err)
+		}
+
+		object := GCSObject{
+			Name:            objectAttrs.Name,
+			Bucket:          bucketName,
+			Size:            objectAttrs.Size,
+			Created:         objectAttrs.Created,
+			Updated:         objectAttrs.Updated,
+			ContentType:     objectAttrs.ContentType,
+			ContentEncoding: objectAttrs.ContentEncoding,
+			CRC32C:          objectAttrs.CRC32C,
+			Generation:      objectAttrs.Generation,
+			Metadata:        objectAttrs.Metadata,
+			StorageClass:    string(objectAttrs.StorageClass),
+			KMSKeyName:      objectAttrs.KMSKeyName,
+		}
+
+		if len(objectAttrs.MD5) > 0 {
+			object.MD5 = fmt.Sprintf("%x", objectAttrs.MD5)
+		}
+
+		object.ETag = objectAttrs.Etag
+
+		objects = append(objects, object)
+	}
+
+	return objects, nil
+}
+
+// DownloadObject downloads an object from Google Cloud Storage
+func (client *GCSClient) DownloadObject(ctx context.Context, bucketName, objectName string, writer io.Writer) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	reader, err := object.NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create object reader: %w", err)
+	}
+	defer reader.Close()
+
+	_, err = io.Copy(writer, reader)
+	if err != nil {
+		return fmt.Errorf("failed to copy object data: %w", err)
+	}
+
+	return nil
+}
+
+// UploadObject uploads an object to Google Cloud Storage
+func (client *GCSClient) UploadObject(ctx context.Context, bucketName, objectName string, reader io.Reader, options *GCSUploadOptions) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	writer := object.NewWriter(ctx)
+
+	// Set upload options
+	if options != nil {
+		if options.ContentType != "" {
+			writer.ContentType = options.ContentType
+		}
+		if options.ContentEncoding != "" {
+			writer.ContentEncoding = options.ContentEncoding
+		}
+		if len(options.Metadata) > 0 {
+			writer.Metadata = options.Metadata
+		}
+		if options.StorageClass != "" {
+			writer.StorageClass = options.StorageClass
+		}
+		if options.KMSKeyName != "" {
+			writer.KMSKeyName = options.KMSKeyName
+		}
+		if options.ChunkSize > 0 {
+			writer.ChunkSize = options.ChunkSize
+		}
+	}
+
+	_, err := io.Copy(writer, reader)
+	if err != nil {
+		writer.Close()
+		return fmt.Errorf("failed to copy data to object: %w", err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close object writer: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteObject deletes an object from Google Cloud Storage
+func (client *GCSClient) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	err := object.Delete(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete object: %w", err)
+	}
+
+	return nil
+}
+
+// CopyObject copies an object within Google Cloud Storage
+func (client *GCSClient) CopyObject(ctx context.Context, sourceBucket, sourceObject, destBucket, destObject string) error {
+	if sourceBucket == "" {
+		sourceBucket = client.bucketName
+	}
+	if destBucket == "" {
+		destBucket = client.bucketName
+	}
+
+	sourceBucketHandle := client.client.Bucket(sourceBucket)
+	sourceObjectHandle := sourceBucketHandle.Object(sourceObject)
+
+	destBucketHandle := client.client.Bucket(destBucket)
+	destObjectHandle := destBucketHandle.Object(destObject)
+
+	_, err := destObjectHandle.CopierFrom(sourceObjectHandle).Run(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to copy object: %w", err)
+	}
+
+	return nil
+}
+
+// GetObjectMetadata retrieves metadata for an object
+func (client *GCSClient) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*GCSObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	attrs, err := object.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
+	gcsObject := &GCSObject{
+		Name:            attrs.Name,
+		Bucket:          bucketName,
+		Size:            attrs.Size,
+		Created:         attrs.Created,
+		Updated:         attrs.Updated,
+		ContentType:     attrs.ContentType,
+		ContentEncoding: attrs.ContentEncoding,
+		CRC32C:          attrs.CRC32C,
+		Generation:      attrs.Generation,
+		Metadata:        attrs.Metadata,
+		StorageClass:    string(attrs.StorageClass),
+		KMSKeyName:      attrs.KMSKeyName,
+		ETag:            attrs.Etag,
+	}
+
+	if len(attrs.MD5) > 0 {
+		gcsObject.MD5 = fmt.Sprintf("%x", attrs.MD5)
+	}
+
+	return gcsObject, nil
+}
+
+// CreateBucket creates a new bucket
+func (client *GCSClient) CreateBucket(ctx context.Context, bucketName string, options *GCSBucketOptions) error {
+	bucket := client.client.Bucket(bucketName)
+
+	attrs := &storage.BucketAttrs{}
+	if options != nil {
+		if options.Location != "" {
+			attrs.Location = options.Location
+		}
+		if options.StorageClass != "" {
+			attrs.StorageClass = options.StorageClass
+		}
+		if len(options.Labels) > 0 {
+			attrs.Labels = options.Labels
+		}
+		attrs.VersioningEnabled = options.VersioningEnabled
+		attrs.RequesterPays = options.RequesterPays
+
+		if options.LifecycleRules != nil {
+			attrs.Lifecycle = storage.Lifecycle{
+				Rules: options.LifecycleRules,
+			}
+		}
+	}
+
+	err := bucket.Create(ctx, client.config.ProjectID, attrs)
+	if err != nil {
+		return fmt.Errorf("failed to create bucket: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteBucket deletes a bucket
+func (client *GCSClient) DeleteBucket(ctx context.Context, bucketName string) error {
+	bucket := client.client.Bucket(bucketName)
+
+	err := bucket.Delete(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete bucket: %w", err)
+	}
+
+	return nil
+}
+
+// SetObjectStorageClass changes the storage class of an object
+func (client *GCSClient) SetObjectStorageClass(ctx context.Context, bucketName, objectName, storageClass string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	_, err := object.Update(ctx, storage.ObjectAttrsToUpdate{
+		StorageClass: storageClass,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update object storage class: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateSignedURL generates a signed URL for an object
+func (client *GCSClient) GenerateSignedURL(bucketName, objectName, method string, expiration time.Time) (string, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	opts := &storage.SignedURLOptions{
+		Scheme:  storage.SigningSchemeV4,
+		Method:  method,
+		Expires: expiration,
+	}
+
+	url, err := client.client.Bucket(bucketName).SignedURL(objectName, opts)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate signed URL: %w", err)
+	}
+
+	return url, nil
+}
+
+// Supporting types and options
+
+// GCSUploadOptions contains options for uploading objects
+type GCSUploadOptions struct {
+	ContentType     string            `json:"content_type"`
+	ContentEncoding string            `json:"content_encoding"`
+	Metadata        map[string]string `json:"metadata"`
+	StorageClass    string            `json:"storage_class"`
+	KMSKeyName      string            `json:"kms_key_name"`
+	ChunkSize       int               `json:"chunk_size"`
+}
+
+// GCSBucketOptions contains options for creating buckets
+type GCSBucketOptions struct {
+	Location          string                   `json:"location"`
+	StorageClass      string                   `json:"storage_class"`
+	Labels            map[string]string        `json:"labels"`
+	VersioningEnabled bool                     `json:"versioning_enabled"`
+	RequesterPays     bool                     `json:"requester_pays"`
+	LifecycleRules    []storage.LifecycleRule  `json:"lifecycle_rules"`
+}
+
+// ObjectExists checks if an object exists in Google Cloud Storage
+func (client *GCSClient) ObjectExists(ctx context.Context, bucketName, objectName string) (bool, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	object := bucket.Object(objectName)
+
+	_, err := object.Attrs(ctx)
+	if err != nil {
+		if err == storage.ErrObjectNotExist {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check if object exists: %w", err)
+	}
+
+	return true, nil
+}
+
+// BatchDeleteObjects deletes multiple objects in batches
+func (client *GCSClient) BatchDeleteObjects(ctx context.Context, bucketName string, objectNames []string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+
+	// GCS doesn't have native batch delete, so we'll delete objects concurrently
+	// In a real implementation, you might want to use goroutines with proper error handling
+	for _, objectName := range objectNames {
+		err := bucket.Object(objectName).Delete(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", objectName, err)
+		}
+	}
+
+	return nil
+}
+
+// GetBucketMetadata retrieves metadata for a bucket
+func (client *GCSClient) GetBucketMetadata(ctx context.Context, bucketName string) (*GCSBucket, error) {
+	bucket := client.client.Bucket(bucketName)
+
+	attrs, err := bucket.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket attributes: %w", err)
+	}
+
+	gcsBucket := &GCSBucket{
+		Name:                  attrs.Name,
+		Created:               attrs.Created,
+		Updated:               attrs.Updated,
+		Location:              attrs.Location,
+		StorageClass:          string(attrs.StorageClass),
+		VersioningEnabled:     attrs.VersioningEnabled,
+		Labels:                attrs.Labels,
+		RequesterPays:         attrs.RequesterPays,
+		DefaultEventBasedHold: attrs.DefaultEventBasedHold,
+	}
+
+	return gcsBucket, nil
+}
+
+// SetBucketLabels sets labels on a bucket
+func (client *GCSClient) SetBucketLabels(ctx context.Context, bucketName string, labels map[string]string) error {
+	bucket := client.client.Bucket(bucketName)
+
+	_, err := bucket.Update(ctx, storage.BucketAttrsToUpdate{
+		Labels: labels,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update bucket labels: %w", err)
+	}
+
+	return nil
+}
+
+// EnableBucketVersioning enables versioning on a bucket
+func (client *GCSClient) EnableBucketVersioning(ctx context.Context, bucketName string) error {
+	bucket := client.client.Bucket(bucketName)
+
+	_, err := bucket.Update(ctx, storage.BucketAttrsToUpdate{
+		VersioningEnabled: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to enable bucket versioning: %w", err)
+	}
+
+	return nil
+}
+
+// DisableBucketVersioning disables versioning on a bucket
+func (client *GCSClient) DisableBucketVersioning(ctx context.Context, bucketName string) error {
+	bucket := client.client.Bucket(bucketName)
+
+	_, err := bucket.Update(ctx, storage.BucketAttrsToUpdate{
+		VersioningEnabled: false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to disable bucket versioning: %w", err)
+	}
+
+	return nil
+}
+
+// ListObjectVersions lists all versions of objects in a bucket
+func (client *GCSClient) ListObjectVersions(ctx context.Context, bucketName, prefix string) ([]GCSObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	bucket := client.client.Bucket(bucketName)
+	query := &storage.Query{
+		Prefix:   prefix,
+		Versions: true,
+	}
+
+	var objects []GCSObject
+	it := bucket.Objects(ctx, query)
+
+	for {
+		objectAttrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate object versions: %w", err)
+		}
+
+		object := GCSObject{
+			Name:            objectAttrs.Name,
+			Bucket:          bucketName,
+			Size:            objectAttrs.Size,
+			Created:         objectAttrs.Created,
+			Updated:         objectAttrs.Updated,
+			ContentType:     objectAttrs.ContentType,
+			ContentEncoding: objectAttrs.ContentEncoding,
+			CRC32C:          objectAttrs.CRC32C,
+			Generation:      objectAttrs.Generation,
+			Metadata:        objectAttrs.Metadata,
+			StorageClass:    string(objectAttrs.StorageClass),
+			KMSKeyName:      objectAttrs.KMSKeyName,
+			ETag:            objectAttrs.Etag,
+		}
+
+		if len(objectAttrs.MD5) > 0 {
+			object.MD5 = fmt.Sprintf("%x", objectAttrs.MD5)
+		}
+
+		objects = append(objects, object)
+	}
+
+	return objects, nil
+}
+
+// ValidateGCSConfiguration validates the GCS configuration
+func ValidateGCSConfiguration(config *GCSConfig) error {
+	if config.ProjectID == "" {
+		return fmt.Errorf("project ID is required")
+	}
+
+	if !config.UseDefaultCredentials && config.ServiceAccountKeyPath == "" && len(config.ServiceAccountKey) == 0 {
+		return fmt.Errorf("credentials must be provided when not using default credentials")
+	}
+
+	if config.RetryOptions != nil {
+		if config.RetryOptions.MaxRetries < 0 {
+			return fmt.Errorf("max retries cannot be negative")
+		}
+		if config.RetryOptions.InitialDelay <= 0 {
+			return fmt.Errorf("initial delay must be positive")
+		}
+		if config.RetryOptions.Multiplier <= 1.0 {
+			return fmt.Errorf("multiplier must be greater than 1.0")
+		}
+	}
+
+	return nil
+}

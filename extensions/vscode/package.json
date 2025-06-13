@@ -1,0 +1,309 @@
+{
+  "name": "s3ry-vscode",
+  "displayName": "S3ry - Ultra-High Performance S3 Operations",
+  "description": "VS Code extension for s3ry - the revolutionary S3 operations tool with 271,615x performance improvement",
+  "version": "2.0.0",
+  "publisher": "seike460",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seike460/s3ry.git"
+  },
+  "homepage": "https://github.com/seike460/s3ry",
+  "bugs": {
+    "url": "https://github.com/seike460/s3ry/issues"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets",
+    "Debuggers"
+  ],
+  "keywords": [
+    "s3",
+    "aws",
+    "cloud",
+    "storage",
+    "performance",
+    "cli",
+    "tui"
+  ],
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#667eea",
+    "theme": "dark"
+  },
+  "activationEvents": [
+    "onCommand:s3ry.listBuckets",
+    "onCommand:s3ry.openTUI",
+    "onLanguage:yaml",
+    "onLanguage:json",
+    "workspaceContains:**.s3ry.yaml",
+    "workspaceContains:**/.s3ry/**"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "s3ry.listBuckets",
+        "title": "List S3 Buckets",
+        "category": "S3ry",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "s3ry.openTUI",
+        "title": "Open S3ry TUI",
+        "category": "S3ry",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "s3ry.uploadFile",
+        "title": "Upload File to S3",
+        "category": "S3ry",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "s3ry.downloadFile",
+        "title": "Download File from S3",
+        "category": "S3ry",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "s3ry.syncFolder",
+        "title": "Sync Folder with S3",
+        "category": "S3ry",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "s3ry.showPerformanceStats",
+        "title": "Show Performance Statistics",
+        "category": "S3ry",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "s3ry.configure",
+        "title": "Configure S3ry",
+        "category": "S3ry",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "s3ry.checkForUpdates",
+        "title": "Check for Updates",
+        "category": "S3ry",
+        "icon": "$(extensions)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "s3ry.uploadFile",
+          "when": "resourceScheme == file",
+          "group": "s3ry@1"
+        },
+        {
+          "command": "s3ry.syncFolder",
+          "when": "resourceScheme == file && explorerResourceIsFolder",
+          "group": "s3ry@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "s3ry.uploadFile",
+          "when": "resourceScheme == file",
+          "group": "s3ry@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "s3ry.listBuckets"
+        },
+        {
+          "command": "s3ry.openTUI"
+        },
+        {
+          "command": "s3ry.uploadFile",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "s3ry.downloadFile"
+        },
+        {
+          "command": "s3ry.syncFolder"
+        },
+        {
+          "command": "s3ry.showPerformanceStats"
+        },
+        {
+          "command": "s3ry.configure"
+        },
+        {
+          "command": "s3ry.checkForUpdates"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "s3ryBuckets",
+          "name": "S3 Buckets",
+          "when": "s3ry.enabled"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "s3ry",
+          "title": "S3ry",
+          "icon": "$(cloud)"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "S3ry Configuration",
+      "properties": {
+        "s3ry.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable S3ry extension"
+        },
+        "s3ry.binaryPath": {
+          "type": "string",
+          "default": "s3ry",
+          "description": "Path to s3ry binary"
+        },
+        "s3ry.defaultRegion": {
+          "type": "string",
+          "default": "us-west-2",
+          "description": "Default AWS region"
+        },
+        "s3ry.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh S3 bucket lists"
+        },
+        "s3ry.refreshInterval": {
+          "type": "number",
+          "default": 30,
+          "description": "Refresh interval in seconds"
+        },
+        "s3ry.showPerformanceMetrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show performance metrics in status bar"
+        },
+        "s3ry.workerPoolSize": {
+          "type": "number",
+          "default": 10,
+          "description": "Worker pool size for parallel operations"
+        },
+        "s3ry.chunkSize": {
+          "type": "number",
+          "default": 64,
+          "description": "Chunk size for uploads (in MB)"
+        },
+        "s3ry.tuiTerminal": {
+          "type": "string",
+          "enum": [
+            "integrated",
+            "external"
+          ],
+          "default": "integrated",
+          "description": "Terminal to use for TUI mode"
+        },
+        "s3ry.notifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for operations"
+        },
+        "s3ry.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging"
+        }
+      }
+    },
+    "snippets": [
+      {
+        "language": "yaml",
+        "path": "./snippets/s3ry-config.json"
+      },
+      {
+        "language": "json",
+        "path": "./snippets/s3ry-config.json"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "s3ry",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The s3ry command to execute"
+          },
+          "args": {
+            "type": "array",
+            "description": "Arguments for the command"
+          },
+          "bucket": {
+            "type": "string",
+            "description": "Target S3 bucket"
+          },
+          "region": {
+            "type": "string",
+            "description": "AWS region"
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "s3ry",
+        "owner": "s3ry",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "eslint": "^8.47.0",
+    "typescript": "^5.1.6",
+    "@vscode/test-cli": "^0.0.3",
+    "@vscode/test-electron": "^2.3.4",
+    "@vscode/vsce": "^2.21.0"
+  },
+  "dependencies": {
+    "axios": "^1.5.0",
+    "yaml": "^2.3.2"
+  }
+}

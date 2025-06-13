@@ -1,0 +1,722 @@
+package cloud
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+)
+
+// MinIOClient provides MinIO/S3-compatible storage integration
+type MinIOClient struct {
+	client     *minio.Client
+	bucketName string
+	config     *MinIOConfig
+}
+
+// MinIOConfig contains MinIO/S3-compatible storage configuration
+type MinIOConfig struct {
+	Endpoint        string `json:"endpoint"`
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+	SessionToken    string `json:"session_token,omitempty"`
+	BucketName      string `json:"bucket_name"`
+	Region          string `json:"region,omitempty"`
+	UseSSL          bool   `json:"use_ssl"`
+	CustomCAs       []byte `json:"custom_cas,omitempty"`
+	Transport       *MinIOTransportConfig `json:"transport,omitempty"`
+}
+
+// MinIOTransportConfig configures HTTP transport settings
+type MinIOTransportConfig struct {
+	MaxIdleConns        int           `json:"max_idle_conns"`
+	MaxIdleConnsPerHost int           `json:"max_idle_conns_per_host"`
+	IdleConnTimeout     time.Duration `json:"idle_conn_timeout"`
+	TLSHandshakeTimeout time.Duration `json:"tls_handshake_timeout"`
+	ResponseHeaderTimeout time.Duration `json:"response_header_timeout"`
+}
+
+// DefaultMinIOConfig returns default MinIO configuration
+func DefaultMinIOConfig() *MinIOConfig {
+	return &MinIOConfig{
+		UseSSL: true,
+		Region: "us-east-1",
+		Transport: &MinIOTransportConfig{
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+		},
+	}
+}
+
+// MinIOObject represents a MinIO/S3-compatible object
+type MinIOObject struct {
+	Name         string            `json:"name"`
+	Bucket       string            `json:"bucket"`
+	Size         int64             `json:"size"`
+	LastModified time.Time         `json:"last_modified"`
+	ETag         string            `json:"etag"`
+	ContentType  string            `json:"content_type"`
+	Metadata     map[string]string `json:"metadata"`
+	StorageClass string            `json:"storage_class,omitempty"`
+	VersionID    string            `json:"version_id,omitempty"`
+	IsLatest     bool              `json:"is_latest,omitempty"`
+	DeleteMarker bool              `json:"delete_marker,omitempty"`
+}
+
+// MinIOBucket represents a MinIO/S3-compatible bucket
+type MinIOBucket struct {
+	Name         string    `json:"name"`
+	CreationDate time.Time `json:"creation_date"`
+}
+
+// NewMinIOClient creates a new MinIO/S3-compatible client
+func NewMinIOClient(config *MinIOConfig) (*MinIOClient, error) {
+	if config == nil {
+		config = DefaultMinIOConfig()
+	}
+
+	if err := ValidateMinIOConfiguration(config); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// Create credentials
+	var creds *credentials.Credentials
+	if config.SessionToken != "" {
+		creds = credentials.NewSTSAssumeRole(config.AccessKeyID, config.SecretAccessKey, config.SessionToken)
+	} else {
+		creds = credentials.NewStaticV4(config.AccessKeyID, config.SecretAccessKey, "")
+	}
+
+	// Set up options
+	options := &minio.Options{
+		Creds:  creds,
+		Secure: config.UseSSL,
+	}
+
+	if config.Region != "" {
+		options.Region = config.Region
+	}
+
+	// Create client
+	client, err := minio.New(config.Endpoint, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	// Set application info
+	client.SetAppInfo("s3ry", "2.0.0")
+
+	return &MinIOClient{
+		client:     client,
+		bucketName: config.BucketName,
+		config:     config,
+	}, nil
+}
+
+// ListBuckets lists all buckets
+func (client *MinIOClient) ListBuckets(ctx context.Context) ([]MinIOBucket, error) {
+	buckets, err := client.client.ListBuckets(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	}
+
+	minioBuckets := make([]MinIOBucket, len(buckets))
+	for i, bucket := range buckets {
+		minioBuckets[i] = MinIOBucket{
+			Name:         bucket.Name,
+			CreationDate: bucket.CreationDate,
+		}
+	}
+
+	return minioBuckets, nil
+}
+
+// ListObjects lists objects in a bucket
+func (client *MinIOClient) ListObjects(ctx context.Context, bucketName, prefix string, recursive bool) ([]MinIOObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	var objects []MinIOObject
+	
+	objectCh := client.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: recursive,
+	})
+
+	for object := range objectCh {
+		if object.Err != nil {
+			return nil, fmt.Errorf("failed to list objects: %w", object.Err)
+		}
+
+		minioObject := MinIOObject{
+			Name:         object.Key,
+			Bucket:       bucketName,
+			Size:         object.Size,
+			LastModified: object.LastModified,
+			ETag:         strings.Trim(object.ETag, "\""),
+			StorageClass: object.StorageClass,
+		}
+
+		objects = append(objects, minioObject)
+	}
+
+	return objects, nil
+}
+
+// ListObjectVersions lists all versions of objects in a bucket
+func (client *MinIOClient) ListObjectVersions(ctx context.Context, bucketName, prefix string) ([]MinIOObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	var objects []MinIOObject
+	
+	objectCh := client.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
+		Prefix:       prefix,
+		WithVersions: true,
+		Recursive:    true,
+	})
+
+	for object := range objectCh {
+		if object.Err != nil {
+			return nil, fmt.Errorf("failed to list object versions: %w", object.Err)
+		}
+
+		minioObject := MinIOObject{
+			Name:         object.Key,
+			Bucket:       bucketName,
+			Size:         object.Size,
+			LastModified: object.LastModified,
+			ETag:         strings.Trim(object.ETag, "\""),
+			VersionID:    object.VersionID,
+			IsLatest:     object.IsLatest,
+			DeleteMarker: object.IsDeleteMarker,
+			StorageClass: object.StorageClass,
+		}
+
+		objects = append(objects, minioObject)
+	}
+
+	return objects, nil
+}
+
+// DownloadObject downloads an object from MinIO/S3-compatible storage
+func (client *MinIOClient) DownloadObject(ctx context.Context, bucketName, objectName string, writer io.Writer) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	object, err := client.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get object: %w", err)
+	}
+	defer object.Close()
+
+	_, err = io.Copy(writer, object)
+	if err != nil {
+		return fmt.Errorf("failed to copy object data: %w", err)
+	}
+
+	return nil
+}
+
+// DownloadObjectWithVersion downloads a specific version of an object
+func (client *MinIOClient) DownloadObjectWithVersion(ctx context.Context, bucketName, objectName, versionID string, writer io.Writer) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	options := minio.GetObjectOptions{}
+	if versionID != "" {
+		options.VersionID = versionID
+	}
+
+	object, err := client.client.GetObject(ctx, bucketName, objectName, options)
+	if err != nil {
+		return fmt.Errorf("failed to get object version: %w", err)
+	}
+	defer object.Close()
+
+	_, err = io.Copy(writer, object)
+	if err != nil {
+		return fmt.Errorf("failed to copy object data: %w", err)
+	}
+
+	return nil
+}
+
+// UploadObject uploads an object to MinIO/S3-compatible storage
+func (client *MinIOClient) UploadObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, options *MinIOUploadOptions) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	putOptions := minio.PutObjectOptions{}
+	
+	if options != nil {
+		if options.ContentType != "" {
+			putOptions.ContentType = options.ContentType
+		}
+		if options.ContentEncoding != "" {
+			putOptions.ContentEncoding = options.ContentEncoding
+		}
+		if len(options.Metadata) > 0 {
+			putOptions.UserMetadata = options.Metadata
+		}
+		if options.StorageClass != "" {
+			putOptions.StorageClass = options.StorageClass
+		}
+		if len(options.Tags) > 0 {
+			putOptions.UserTags = options.Tags
+		}
+		if options.ServerSideEncryption != nil {
+			putOptions.ServerSideEncryption = options.ServerSideEncryption
+		}
+	}
+
+	_, err := client.client.PutObject(ctx, bucketName, objectName, reader, objectSize, putOptions)
+	if err != nil {
+		return fmt.Errorf("failed to upload object: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteObject deletes an object from MinIO/S3-compatible storage
+func (client *MinIOClient) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	err := client.client.RemoveObject(ctx, bucketName, objectName, minio.RemoveObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete object: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteObjectWithVersion deletes a specific version of an object
+func (client *MinIOClient) DeleteObjectWithVersion(ctx context.Context, bucketName, objectName, versionID string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	options := minio.RemoveObjectOptions{}
+	if versionID != "" {
+		options.VersionID = versionID
+	}
+
+	err := client.client.RemoveObject(ctx, bucketName, objectName, options)
+	if err != nil {
+		return fmt.Errorf("failed to delete object version: %w", err)
+	}
+
+	return nil
+}
+
+// CopyObject copies an object within MinIO/S3-compatible storage
+func (client *MinIOClient) CopyObject(ctx context.Context, sourceBucket, sourceObject, destBucket, destObject string, options *MinIOCopyOptions) error {
+	if sourceBucket == "" {
+		sourceBucket = client.bucketName
+	}
+	if destBucket == "" {
+		destBucket = client.bucketName
+	}
+
+	// Create source object info
+	sourceInfo := minio.CopySrcOptions{
+		Bucket: sourceBucket,
+		Object: sourceObject,
+	}
+
+	if options != nil && options.SourceVersionID != "" {
+		sourceInfo.VersionID = options.SourceVersionID
+	}
+
+	// Create destination object info
+	destInfo := minio.CopyDestOptions{
+		Bucket: destBucket,
+		Object: destObject,
+	}
+
+	if options != nil {
+		if len(options.Metadata) > 0 {
+			destInfo.UserMetadata = options.Metadata
+		}
+		if len(options.Tags) > 0 {
+			destInfo.UserTags = options.Tags
+		}
+		if options.StorageClass != "" {
+			destInfo.StorageClass = options.StorageClass
+		}
+		if options.ServerSideEncryption != nil {
+			destInfo.ServerSideEncryption = options.ServerSideEncryption
+		}
+	}
+
+	_, err := client.client.CopyObject(ctx, destInfo, sourceInfo)
+	if err != nil {
+		return fmt.Errorf("failed to copy object: %w", err)
+	}
+
+	return nil
+}
+
+// GetObjectMetadata retrieves metadata for an object
+func (client *MinIOClient) GetObjectMetadata(ctx context.Context, bucketName, objectName string) (*MinIOObject, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	stat, err := client.client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object metadata: %w", err)
+	}
+
+	object := &MinIOObject{
+		Name:         stat.Key,
+		Bucket:       bucketName,
+		Size:         stat.Size,
+		LastModified: stat.LastModified,
+		ETag:         strings.Trim(stat.ETag, "\""),
+		ContentType:  stat.ContentType,
+		Metadata:     stat.UserMetadata,
+		VersionID:    stat.VersionID,
+	}
+
+	return object, nil
+}
+
+// CreateBucket creates a new bucket
+func (client *MinIOClient) CreateBucket(ctx context.Context, bucketName string, options *MinIOBucketOptions) error {
+	makeBucketOptions := minio.MakeBucketOptions{}
+	
+	if options != nil {
+		if options.Region != "" {
+			makeBucketOptions.Region = options.Region
+		}
+		makeBucketOptions.ObjectLocking = options.ObjectLocking
+	}
+
+	err := client.client.MakeBucket(ctx, bucketName, makeBucketOptions)
+	if err != nil {
+		return fmt.Errorf("failed to create bucket: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteBucket deletes a bucket
+func (client *MinIOClient) DeleteBucket(ctx context.Context, bucketName string) error {
+	err := client.client.RemoveBucket(ctx, bucketName)
+	if err != nil {
+		return fmt.Errorf("failed to delete bucket: %w", err)
+	}
+
+	return nil
+}
+
+// BucketExists checks if a bucket exists
+func (client *MinIOClient) BucketExists(ctx context.Context, bucketName string) (bool, error) {
+	exists, err := client.client.BucketExists(ctx, bucketName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if bucket exists: %w", err)
+	}
+
+	return exists, nil
+}
+
+// ObjectExists checks if an object exists
+func (client *MinIOClient) ObjectExists(ctx context.Context, bucketName, objectName string) (bool, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	_, err := client.client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check if object exists: %w", err)
+	}
+
+	return true, nil
+}
+
+// GeneratePresignedURL generates a presigned URL for an object
+func (client *MinIOClient) GeneratePresignedURL(ctx context.Context, bucketName, objectName, method string, expires time.Duration) (string, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	var presignedURL *url.URL
+	var err error
+
+	switch strings.ToUpper(method) {
+	case "GET":
+		presignedURL, err = client.client.PresignedGetObject(ctx, bucketName, objectName, expires, nil)
+	case "PUT":
+		presignedURL, err = client.client.PresignedPutObject(ctx, bucketName, objectName, expires)
+	case "POST":
+		policy := minio.NewPostPolicy()
+		policy.SetBucket(bucketName)
+		policy.SetKey(objectName)
+		policy.SetExpires(time.Now().Add(expires))
+		
+		formData, err := client.client.PresignedPostPolicy(ctx, policy)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate presigned POST URL: %w", err)
+		}
+		return formData["key"], nil
+	default:
+		return "", fmt.Errorf("unsupported HTTP method: %s", method)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+
+	return presignedURL.String(), nil
+}
+
+// BatchDeleteObjects deletes multiple objects in a single request
+func (client *MinIOClient) BatchDeleteObjects(ctx context.Context, bucketName string, objectNames []string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	// Create channel for object names
+	objectsCh := make(chan minio.ObjectInfo, len(objectNames))
+	
+	// Send object names to channel
+	go func() {
+		defer close(objectsCh)
+		for _, objectName := range objectNames {
+			objectsCh <- minio.ObjectInfo{Key: objectName}
+		}
+	}()
+
+	// Remove objects
+	errorCh := client.client.RemoveObjects(ctx, bucketName, objectsCh, minio.RemoveObjectsOptions{})
+	
+	// Check for errors
+	for err := range errorCh {
+		if err.Err != nil {
+			return fmt.Errorf("failed to delete object %s: %w", err.ObjectName, err.Err)
+		}
+	}
+
+	return nil
+}
+
+// SetBucketVersioning enables or disables versioning on a bucket
+func (client *MinIOClient) SetBucketVersioning(ctx context.Context, bucketName string, enabled bool) error {
+	config := minio.BucketVersioningConfiguration{}
+	if enabled {
+		config.Status = "Enabled"
+	} else {
+		config.Status = "Suspended"
+	}
+
+	err := client.client.SetBucketVersioning(ctx, bucketName, config)
+	if err != nil {
+		return fmt.Errorf("failed to set bucket versioning: %w", err)
+	}
+
+	return nil
+}
+
+// GetBucketVersioning gets the versioning configuration of a bucket
+func (client *MinIOClient) GetBucketVersioning(ctx context.Context, bucketName string) (bool, error) {
+	config, err := client.client.GetBucketVersioning(ctx, bucketName)
+	if err != nil {
+		return false, fmt.Errorf("failed to get bucket versioning: %w", err)
+	}
+
+	return config.Status == "Enabled", nil
+}
+
+// Supporting types and options
+
+// MinIOUploadOptions contains options for uploading objects
+type MinIOUploadOptions struct {
+	ContentType           string                    `json:"content_type"`
+	ContentEncoding       string                    `json:"content_encoding"`
+	Metadata              map[string]string         `json:"metadata"`
+	Tags                  map[string]string         `json:"tags"`
+	StorageClass          string                    `json:"storage_class"`
+	ServerSideEncryption  minio.ServerSideEncryption `json:"-"`
+}
+
+// MinIOCopyOptions contains options for copying objects
+type MinIOCopyOptions struct {
+	SourceVersionID       string                    `json:"source_version_id"`
+	Metadata              map[string]string         `json:"metadata"`
+	Tags                  map[string]string         `json:"tags"`
+	StorageClass          string                    `json:"storage_class"`
+	ServerSideEncryption  minio.ServerSideEncryption `json:"-"`
+}
+
+// MinIOBucketOptions contains options for creating buckets
+type MinIOBucketOptions struct {
+	Region        string `json:"region"`
+	ObjectLocking bool   `json:"object_locking"`
+}
+
+// SetObjectTags sets tags on an object
+func (client *MinIOClient) SetObjectTags(ctx context.Context, bucketName, objectName string, tags map[string]string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	objectTags, err := minio.NewObjectTagging(tags, false)
+	if err != nil {
+		return fmt.Errorf("failed to create object tags: %w", err)
+	}
+
+	err = client.client.PutObjectTagging(ctx, bucketName, objectName, objectTags, minio.PutObjectTaggingOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to set object tags: %w", err)
+	}
+
+	return nil
+}
+
+// GetObjectTags gets tags from an object
+func (client *MinIOClient) GetObjectTags(ctx context.Context, bucketName, objectName string) (map[string]string, error) {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	tags, err := client.client.GetObjectTagging(ctx, bucketName, objectName, minio.GetObjectTaggingOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object tags: %w", err)
+	}
+
+	return tags.ToMap(), nil
+}
+
+// DeleteObjectTags removes all tags from an object
+func (client *MinIOClient) DeleteObjectTags(ctx context.Context, bucketName, objectName string) error {
+	if bucketName == "" {
+		bucketName = client.bucketName
+	}
+
+	err := client.client.RemoveObjectTagging(ctx, bucketName, objectName, minio.RemoveObjectTaggingOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete object tags: %w", err)
+	}
+
+	return nil
+}
+
+// GetBucketPolicy gets the bucket policy
+func (client *MinIOClient) GetBucketPolicy(ctx context.Context, bucketName string) (string, error) {
+	policy, err := client.client.GetBucketPolicy(ctx, bucketName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get bucket policy: %w", err)
+	}
+
+	return policy, nil
+}
+
+// SetBucketPolicy sets the bucket policy
+func (client *MinIOClient) SetBucketPolicy(ctx context.Context, bucketName, policy string) error {
+	err := client.client.SetBucketPolicy(ctx, bucketName, policy)
+	if err != nil {
+		return fmt.Errorf("failed to set bucket policy: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteBucketPolicy deletes the bucket policy
+func (client *MinIOClient) DeleteBucketPolicy(ctx context.Context, bucketName string) error {
+	err := client.client.SetBucketPolicy(ctx, bucketName, "")
+	if err != nil {
+		return fmt.Errorf("failed to delete bucket policy: %w", err)
+	}
+
+	return nil
+}
+
+// ValidateMinIOConfiguration validates the MinIO configuration
+func ValidateMinIOConfiguration(config *MinIOConfig) error {
+	if config.Endpoint == "" {
+		return fmt.Errorf("endpoint is required")
+	}
+
+	if config.AccessKeyID == "" {
+		return fmt.Errorf("access key ID is required")
+	}
+
+	if config.SecretAccessKey == "" {
+		return fmt.Errorf("secret access key is required")
+	}
+
+	// Validate endpoint format
+	if !strings.Contains(config.Endpoint, "://") {
+		// Add protocol if missing
+		if config.UseSSL {
+			config.Endpoint = "https://" + config.Endpoint
+		} else {
+			config.Endpoint = "http://" + config.Endpoint
+		}
+	}
+
+	// Parse and validate URL
+	u, err := url.Parse(config.Endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid endpoint URL: %w", err)
+	}
+
+	// Remove protocol for MinIO client
+	config.Endpoint = u.Host
+
+	return nil
+}
+
+// ParseMinIOURL parses a MinIO/S3-compatible URL
+func ParseMinIOURL(objectURL string) (*MinIOURLParts, error) {
+	u, err := url.Parse(objectURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	// Extract bucket and object from path
+	pathParts := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 2)
+	if len(pathParts) < 1 {
+		return nil, fmt.Errorf("bucket name not found in URL")
+	}
+
+	bucketName := pathParts[0]
+	var objectName string
+	if len(pathParts) > 1 {
+		objectName = pathParts[1]
+	}
+
+	return &MinIOURLParts{
+		Endpoint:   u.Host,
+		BucketName: bucketName,
+		ObjectName: objectName,
+		UseSSL:     u.Scheme == "https",
+	}, nil
+}
+
+// MinIOURLParts represents the components of a MinIO/S3-compatible URL
+type MinIOURLParts struct {
+	Endpoint   string `json:"endpoint"`
+	BucketName string `json:"bucket_name"`
+	ObjectName string `json:"object_name"`
+	UseSSL     bool   `json:"use_ssl"`
+}

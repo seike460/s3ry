@@ -1,0 +1,250 @@
+# Default values for s3ry
+# This is a YAML-formatted file.
+
+# Image configuration
+image:
+  repository: seike460/s3ry
+  pullPolicy: IfNotPresent
+  tag: "2.0.0"
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Override the chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Deployment configuration
+replicaCount: 1
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Startup probe
+startupProbe:
+  exec:
+    command:
+    - /bin/sh
+    - -c
+    - "s3ry --version"
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Liveness probe
+livenessProbe:
+  exec:
+    command:
+    - /bin/sh
+    - -c
+    - "s3ry --version"
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  exec:
+    command:
+    - /bin/sh
+    - -c
+    - "s3ry --version"
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# AWS Configuration
+aws:
+  # AWS region
+  region: us-west-2
+  
+  # AWS credentials configuration
+  # Option 1: Use existing secret
+  existingSecret: ""
+  existingSecretAccessKeyKey: "access-key"
+  existingSecretSecretKeyKey: "secret-key"
+  
+  # Option 2: Use service account with IRSA (recommended for EKS)
+  useServiceAccount: true
+  
+  # Option 3: Use environment variables (not recommended for production)
+  accessKey: ""
+  secretKey: ""
+
+# S3 Configuration
+s3:
+  # Default bucket for operations
+  defaultBucket: ""
+  
+  # S3 endpoint (for S3-compatible services)
+  endpoint: ""
+  
+  # Use SSL for S3 connections
+  useSSL: true
+  
+  # Path style access (for MinIO and some S3-compatible services)
+  pathStyle: false
+
+# Performance Configuration
+performance:
+  # Worker pool size
+  workerPoolSize: 10
+  
+  # Chunk size for uploads (in MB)
+  chunkSize: 64
+  
+  # Timeout for S3 operations (in seconds)
+  timeout: 300
+  
+  # Maximum retries for failed operations
+  maxRetries: 3
+
+# TUI Configuration
+tui:
+  # Enable TUI mode by default
+  enabled: true
+  
+  # Theme configuration
+  theme: "default"
+  
+  # Update interval (in milliseconds)
+  updateInterval: 100
+
+# Logging Configuration
+logging:
+  # Log level (debug, info, warn, error)
+  level: "info"
+  
+  # Log format (json, text)
+  format: "json"
+  
+  # Enable structured logging
+  structured: true
+
+# Job configuration for running s3ry as a CronJob
+job:
+  # Enable job mode
+  enabled: false
+  
+  # CronJob schedule
+  schedule: "0 2 * * *"
+  
+  # Job command
+  command: ["s3ry", "list"]
+  
+  # Job arguments
+  args: []
+  
+  # Restart policy
+  restartPolicy: OnFailure
+  
+  # Backoff limit
+  backoffLimit: 3
+  
+  # Active deadline seconds
+  activeDeadlineSeconds: 3600
+  
+  # TTL seconds after finished
+  ttlSecondsAfterFinished: 86400
+
+# Service configuration (if running as a service)
+service:
+  enabled: false
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: s3ry.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Persistent Volume Claim
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Config Map for additional configuration
+configMap:
+  enabled: false
+  data: {}
+
+# Environment variables
+env: []
+
+# Additional volumes
+volumes: []
+
+# Additional volume mounts
+volumeMounts: []
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

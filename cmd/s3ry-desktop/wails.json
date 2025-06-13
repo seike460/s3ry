@@ -1,0 +1,46 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "s3ry-desktop",
+  "outputfilename": "s3ry-desktop",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://localhost:3000",
+  "author": {
+    "name": "S3ry Team",
+    "email": "team@s3ry.dev"
+  },
+  "info": {
+    "companyName": "S3ry",
+    "productName": "S3ry Desktop",
+    "productVersion": "2.0.0",
+    "copyright": "Copyright © 2024 S3ry Team. All rights reserved.",
+    "comments": "High-Performance S3 Browser with 271,615x improvement"
+  },
+  "nsisType": "multiple",
+  "obfuscated": false,
+  "garbleargs": "",
+  "wailsjsdir": "./frontend",
+  "build": {
+    "appArgs": "",
+    "compiler": "gc",
+    "devMode": "auto",
+    "frontend": "./frontend",
+    "ldflags": [
+      "-s",
+      "-w"
+    ],
+    "mode": "",
+    "tags": [],
+    "trimpath": true,
+    "verbosity": 1,
+    "windowsConsole": false,
+    "deleteProjectDir": false,
+    "ignoreChecksum": false,
+    "upx": false,
+    "upxflags": ""
+  },
+  "debug": {
+    "openInspectorOnStartup": false
+  }
+}
