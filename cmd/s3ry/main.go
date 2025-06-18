@@ -107,7 +107,7 @@ func shouldUseNewUI(flags *Flags, cfg *config.Config) bool {
 // runNewUI starts the new Bubble Tea UI
 func runNewUI(cfg *config.Config, flags *Flags) {
 	fmt.Println("🚀 Starting new Bubble Tea UI...")
-	
+
 	// Check if new UI implementation is available
 	if !isNewUIAvailable() {
 		fmt.Println("❌ New UI not available in this environment (no TTY)")
@@ -115,7 +115,7 @@ func runNewUI(cfg *config.Config, flags *Flags) {
 		runLegacyUI(cfg, flags)
 		return
 	}
-	
+
 	// Start Bubble Tea application
 	if err := ui.Run(cfg); err != nil {
 		log.Fatalf("Failed to run new UI: %v", err)
@@ -136,7 +136,7 @@ func runLegacyUI(cfg *config.Config, flags *Flags) {
 
 	// Original legacy implementation
 	selectedRegion, selectBucket := s3ry.SelectBucketAndRegion()
-	
+
 	// Override region if specified in config/flags
 	if region != "ap-northeast-1" && region != selectedRegion {
 		selectedRegion = region

@@ -26,15 +26,15 @@ type Uploader struct {
 
 // UploadConfig configures upload behavior
 type UploadConfig struct {
-	ConcurrentUploads int                    // Number of concurrent uploads
-	PartSize          int64                  // Size of each upload part
-	Concurrency       int                    // Number of concurrent parts per file
-	ChecksumValidation bool                  // Whether to validate checksums
-	AutoContentType   bool                   // Whether to auto-detect content type
-	Metadata          map[string]*string     // Default metadata for all uploads
-	OnProgress        ProgressCallback       // Progress callback
-	Compression       bool                   // Whether to compress files before upload
-	Deduplication     bool                   // Whether to check for existing files
+	ConcurrentUploads  int                // Number of concurrent uploads
+	PartSize           int64              // Size of each upload part
+	Concurrency        int                // Number of concurrent parts per file
+	ChecksumValidation bool               // Whether to validate checksums
+	AutoContentType    bool               // Whether to auto-detect content type
+	Metadata           map[string]*string // Default metadata for all uploads
+	OnProgress         ProgressCallback   // Progress callback
+	Compression        bool               // Whether to compress files before upload
+	Deduplication      bool               // Whether to check for existing files
 }
 
 // DefaultUploadConfig returns default upload configuration
@@ -150,7 +150,7 @@ func (u *Uploader) Upload(ctx context.Context, request UploadRequest, config Upl
 // UploadBatch uploads multiple files concurrently
 func (u *Uploader) UploadBatch(ctx context.Context, requests []UploadRequest, config UploadConfig) []BatchOperation {
 	jobs := make([]worker.Job, 0, len(requests))
-	
+
 	// Filter and prepare requests
 	for _, request := range requests {
 		// Check if file exists
@@ -185,7 +185,7 @@ func (u *Uploader) UploadBatch(ctx context.Context, requests []UploadRequest, co
 	})
 
 	results := batchProcessor.ProcessBatch(jobs)
-	
+
 	// Convert worker results to batch operations
 	operations := make([]BatchOperation, len(results))
 	for i, result := range results {
@@ -204,7 +204,7 @@ func (u *Uploader) UploadBatch(ctx context.Context, requests []UploadRequest, co
 func (u *Uploader) UploadDirectory(ctx context.Context, localDir, bucket, prefix string, config UploadConfig) error {
 	// Walk through the directory
 	var requests []UploadRequest
-	
+
 	err := filepath.Walk(localDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -220,7 +220,7 @@ func (u *Uploader) UploadDirectory(ctx context.Context, localDir, bucket, prefix
 		if err != nil {
 			return err
 		}
-		
+
 		// Convert Windows paths to S3 paths (use forward slashes)
 		s3Key := prefix + strings.ReplaceAll(relativePath, "\\", "/")
 
@@ -239,7 +239,7 @@ func (u *Uploader) UploadDirectory(ctx context.Context, localDir, bucket, prefix
 
 	// Upload all files
 	operations := u.UploadBatch(ctx, requests, config)
-	
+
 	// Check for any errors
 	for _, op := range operations {
 		if !op.Success {
@@ -253,23 +253,23 @@ func (u *Uploader) UploadDirectory(ctx context.Context, localDir, bucket, prefix
 // UploadWithRetry uploads a file with automatic retry on failure
 func (u *Uploader) UploadWithRetry(ctx context.Context, request UploadRequest, config UploadConfig, maxRetries int) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := u.Upload(ctx, request, config)
 		if err == nil {
 			return nil // Success
 		}
-		
+
 		lastErr = err
-		
+
 		// Don't retry if context was cancelled
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		
+
 		// Clean up partial upload before retry (multipart uploads are handled by AWS SDK)
 	}
-	
+
 	return fmt.Errorf("upload failed after %d attempts: %w", maxRetries+1, lastErr)
 }
 
@@ -293,7 +293,7 @@ func (u *Uploader) GetUploadURL(ctx context.Context, bucket, key string, expirat
 func (u *Uploader) detectContentType(filePath string) string {
 	ext := filepath.Ext(filePath)
 	contentType := mime.TypeByExtension(ext)
-	
+
 	if contentType == "" {
 		// Try to detect by reading file content
 		file, err := os.Open(filePath)

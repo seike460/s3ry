@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-// Client wraps AWS S3 client with additional functionality
+// Client wraps AWS S3 client for basic S3/MinIO operations
 type Client struct {
 	session    *session.Session
 	s3Client   *s3.S3
@@ -19,9 +19,29 @@ type Client struct {
 
 // NewClient creates a new S3 client with the given region
 func NewClient(region string) *Client {
-	sess := session.Must(session.NewSession(&aws.Config{
+	awsConfig := &aws.Config{
 		Region: aws.String(region),
-	}))
+	}
+
+	sess := session.Must(session.NewSession(awsConfig))
+
+	return &Client{
+		session:    sess,
+		s3Client:   s3.New(sess),
+		uploader:   s3manager.NewUploader(sess),
+		downloader: s3manager.NewDownloader(sess),
+	}
+}
+
+// NewClientWithEndpoint creates a new S3 client with custom endpoint (for MinIO)
+func NewClientWithEndpoint(region, endpoint string, forcePathStyle bool) *Client {
+	awsConfig := &aws.Config{
+		Region:           aws.String(region),
+		Endpoint:         aws.String(endpoint),
+		S3ForcePathStyle: aws.Bool(forcePathStyle),
+	}
+
+	sess := session.Must(session.NewSession(awsConfig))
 
 	return &Client{
 		session:    sess,
@@ -58,6 +78,5 @@ func (c *Client) Downloader() *s3manager.Downloader {
 
 // GetBucketRegion determines the region of a given bucket
 func (c *Client) GetBucketRegion(ctx context.Context, bucket string) (string, error) {
-	region, err := s3manager.GetBucketRegion(ctx, c.session, bucket, "ap-northeast-1")
-	return region, err
+	return s3manager.GetBucketRegion(ctx, c.session, bucket, "us-east-1")
 }

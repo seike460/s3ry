@@ -60,8 +60,8 @@ func (l *Lister) ListBuckets(ctx context.Context) ([]Bucket, error) {
 		wg.Add(1)
 		go func(bucketName string, creationDate time.Time) {
 			defer wg.Done()
-			
-			semaphore <- struct{}{} // Acquire
+
+			semaphore <- struct{}{}        // Acquire
 			defer func() { <-semaphore }() // Release
 
 			// Get bucket region (this can be slow, so we do it concurrently)
@@ -139,7 +139,7 @@ func (l *Lister) ListObjectsConcurrent(ctx context.Context, bucket string, prefi
 		wg.Add(1)
 		go func(p string) {
 			defer wg.Done()
-			
+
 			job := &worker.S3ListJob{
 				Client: l.client,
 				Request: ToTypesListRequest(ListRequest{

@@ -21,14 +21,14 @@ type ChaosEngine struct {
 // ChaosConfig holds chaos engineering configuration
 type ChaosConfig struct {
 	Enabled           bool          `json:"enabled"`
-	SafeMode          bool          `json:"safe_mode"`           // Enables automatic rollback
-	MaxConcurrent     int           `json:"max_concurrent"`      // Max concurrent experiments
-	DefaultDuration   time.Duration `json:"default_duration"`    // Default experiment duration
-	CooldownPeriod    time.Duration `json:"cooldown_period"`     // Time between experiments
-	TargetServices    []string      `json:"target_services"`     // Services to target
-	ExcludeProduction bool          `json:"exclude_production"`  // Skip production environments
-	NotificationURL   string        `json:"notification_url"`    // Webhook for notifications
-	MetricsRetention  time.Duration `json:"metrics_retention"`   // How long to keep metrics
+	SafeMode          bool          `json:"safe_mode"`          // Enables automatic rollback
+	MaxConcurrent     int           `json:"max_concurrent"`     // Max concurrent experiments
+	DefaultDuration   time.Duration `json:"default_duration"`   // Default experiment duration
+	CooldownPeriod    time.Duration `json:"cooldown_period"`    // Time between experiments
+	TargetServices    []string      `json:"target_services"`    // Services to target
+	ExcludeProduction bool          `json:"exclude_production"` // Skip production environments
+	NotificationURL   string        `json:"notification_url"`   // Webhook for notifications
+	MetricsRetention  time.Duration `json:"metrics_retention"`  // How long to keep metrics
 }
 
 // DefaultChaosConfig returns default chaos engineering configuration
@@ -67,16 +67,16 @@ const (
 
 // ExperimentResult holds the result of a chaos experiment
 type ExperimentResult struct {
-	ExperimentName string            `json:"experiment_name"`
-	Target         string            `json:"target"`
-	StartTime      time.Time         `json:"start_time"`
-	EndTime        time.Time         `json:"end_time"`
-	Duration       time.Duration     `json:"duration"`
-	Success        bool              `json:"success"`
-	ErrorMessage   string            `json:"error_message,omitempty"`
+	ExperimentName string             `json:"experiment_name"`
+	Target         string             `json:"target"`
+	StartTime      time.Time          `json:"start_time"`
+	EndTime        time.Time          `json:"end_time"`
+	Duration       time.Duration      `json:"duration"`
+	Success        bool               `json:"success"`
+	ErrorMessage   string             `json:"error_message,omitempty"`
 	Metrics        map[string]float64 `json:"metrics"`
-	Observations   []string          `json:"observations"`
-	Impact         ImpactLevel       `json:"impact"`
+	Observations   []string           `json:"observations"`
+	Impact         ImpactLevel        `json:"impact"`
 }
 
 // ImpactLevel represents the impact level of an experiment
@@ -92,15 +92,15 @@ const (
 
 // ChaosMetrics tracks chaos engineering metrics
 type ChaosMetrics struct {
-	TotalExperiments    int64             `json:"total_experiments"`
-	SuccessfulTests     int64             `json:"successful_tests"`
-	FailedTests         int64             `json:"failed_tests"`
-	SystemResilience    float64           `json:"system_resilience"`    // 0-100%
-	MeanTimeToRecovery  time.Duration     `json:"mean_time_to_recovery"`
-	ExperimentsByType   map[string]int64  `json:"experiments_by_type"`
-	ImpactDistribution  map[string]int64  `json:"impact_distribution"`
-	LastExperimentTime  time.Time         `json:"last_experiment_time"`
-	mutex               sync.RWMutex
+	TotalExperiments   int64            `json:"total_experiments"`
+	SuccessfulTests    int64            `json:"successful_tests"`
+	FailedTests        int64            `json:"failed_tests"`
+	SystemResilience   float64          `json:"system_resilience"` // 0-100%
+	MeanTimeToRecovery time.Duration    `json:"mean_time_to_recovery"`
+	ExperimentsByType  map[string]int64 `json:"experiments_by_type"`
+	ImpactDistribution map[string]int64 `json:"impact_distribution"`
+	LastExperimentTime time.Time        `json:"last_experiment_time"`
+	mutex              sync.RWMutex
 }
 
 // NewChaosMetrics creates new chaos metrics
@@ -113,21 +113,21 @@ func NewChaosMetrics() *ChaosMetrics {
 
 // ExperimentScheduler manages experiment scheduling
 type ExperimentScheduler struct {
-	config    *ChaosConfig
-	queue     []*ScheduledExperiment
-	mutex     sync.Mutex
-	stopCh    chan struct{}
-	ticker    *time.Ticker
+	config *ChaosConfig
+	queue  []*ScheduledExperiment
+	mutex  sync.Mutex
+	stopCh chan struct{}
+	ticker *time.Ticker
 }
 
 // ScheduledExperiment represents a scheduled chaos experiment
 type ScheduledExperiment struct {
-	Experiment   ChaosExperiment `json:"experiment"`
-	Target       string          `json:"target"`
-	ScheduledAt  time.Time       `json:"scheduled_at"`
-	Priority     int             `json:"priority"`
-	Recurring    bool            `json:"recurring"`
-	Interval     time.Duration   `json:"interval,omitempty"`
+	Experiment  ChaosExperiment `json:"experiment"`
+	Target      string          `json:"target"`
+	ScheduledAt time.Time       `json:"scheduled_at"`
+	Priority    int             `json:"priority"`
+	Recurring   bool            `json:"recurring"`
+	Interval    time.Duration   `json:"interval,omitempty"`
 }
 
 // NetworkLatencyExperiment adds network latency
@@ -163,7 +163,7 @@ func (n *NetworkLatencyExperiment) Execute(ctx context.Context, target string) (
 
 	// Simulate network latency injection
 	// In a real implementation, this would use tools like tc (traffic control)
-	result.Observations = append(result.Observations, 
+	result.Observations = append(result.Observations,
 		fmt.Sprintf("Injected %dms latency on %s", n.latencyMs, target))
 
 	// Simulate the experiment duration
@@ -253,7 +253,7 @@ func (m *MemoryPressureExperiment) Execute(ctx context.Context, target string) (
 	memoryBallast := make([]byte, m.pressureMB*1024*1024)
 	_ = memoryBallast // Prevent optimization
 
-	result.Observations = append(result.Observations, 
+	result.Observations = append(result.Observations,
 		fmt.Sprintf("Allocated %dMB memory on %s", m.pressureMB, target))
 
 	// Hold memory for duration
@@ -363,7 +363,7 @@ func (c *CPUStressExperiment) Execute(ctx context.Context, target string) (*Expe
 		}(i)
 	}
 
-	result.Observations = append(result.Observations, 
+	result.Observations = append(result.Observations,
 		fmt.Sprintf("Started %d CPU stress workers on %s", c.workers, target))
 
 	// Run for specified duration
@@ -493,7 +493,7 @@ func (e *ChaosEngine) RunExperiment(ctx context.Context, experimentName, target 
 	// Auto-rollback if safe mode is enabled and experiment failed
 	if e.config.SafeMode && !result.Success && experiment.IsReversible() {
 		if rollbackErr := experiment.Rollback(ctx, target); rollbackErr != nil {
-			result.Observations = append(result.Observations, 
+			result.Observations = append(result.Observations,
 				fmt.Sprintf("Rollback failed: %v", rollbackErr))
 		} else {
 			result.Observations = append(result.Observations, "Auto-rollback successful")

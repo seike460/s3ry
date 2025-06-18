@@ -15,7 +15,7 @@ type RegionInfo struct {
 // RegionView represents the region selection view
 type RegionView struct {
 	list *components.List
-	
+
 	// Styles
 	headerStyle lipgloss.Style
 }
@@ -84,10 +84,10 @@ func NewRegionView() *RegionView {
 			Data:        RegionInfo{Code: "ca-central-1", Name: "Central"},
 		},
 	}
-	
+
 	return &RegionView{
 		list: components.NewList("🌏 Select AWS Region", regions),
-		
+
 		headerStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
@@ -105,11 +105,14 @@ func (v *RegionView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.list, _ = v.list.Update(msg)
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return v, tea.Quit
+		case "?":
+			// Show help view
+			return NewHelpView(), nil
 		case "enter", " ":
 			selectedItem := v.list.GetCurrentItem()
 			if selectedItem != nil {
@@ -118,15 +121,21 @@ func (v *RegionView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return NewBucketView(regionInfo.Code), nil
 			}
 		}
-		
+
 		v.list, _ = v.list.Update(msg)
 	}
-	
+
 	return v, nil
 }
 
-// View renders the region view
+// View renders the region view with enhanced UX
 func (v *RegionView) View() string {
-	header := v.headerStyle.Render("S3ry - S3 File Manager")
-	return header + "\n\n" + v.list.View()
+	header := v.headerStyle.Render("🚀 S3ry - S3 File Manager")
+
+	// Add helpful navigation footer
+	footer := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#626262")).
+		Render("↑↓: navigate • enter: select • q: quit • ?: help")
+
+	return header + "\n\n" + v.list.View() + "\n\n" + footer
 }

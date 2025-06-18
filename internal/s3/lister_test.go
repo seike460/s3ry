@@ -11,12 +11,12 @@ import (
 func TestNewLister(t *testing.T) {
 	client := NewClient("us-east-1")
 	lister := NewLister(client)
-	
+
 	assert.NotNil(t, lister)
 	assert.NotNil(t, lister.client)
 	assert.NotNil(t, lister.pool)
 	assert.Equal(t, client, lister.client)
-	
+
 	// Clean up
 	lister.Close()
 }
@@ -24,7 +24,7 @@ func TestNewLister(t *testing.T) {
 func TestLister_Close(t *testing.T) {
 	client := NewClient("us-east-1")
 	lister := NewLister(client)
-	
+
 	// Should not panic
 	assert.NotPanics(t, func() {
 		lister.Close()
@@ -35,11 +35,11 @@ func TestLister_MultipleListersl(t *testing.T) {
 	client := NewClient("us-east-1")
 	lister1 := NewLister(client)
 	lister2 := NewLister(client)
-	
+
 	assert.NotNil(t, lister1)
 	assert.NotNil(t, lister2)
 	assert.NotEqual(t, lister1.pool, lister2.pool)
-	
+
 	lister1.Close()
 	lister2.Close()
 }
@@ -48,16 +48,16 @@ func TestLister_ContextHandling(t *testing.T) {
 	client := NewClient("us-east-1")
 	lister := NewLister(client)
 	defer lister.Close()
-	
+
 	// Test context creation
 	ctx := context.Background()
 	assert.NotNil(t, ctx)
-	
+
 	// Test context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	assert.NotNil(t, ctx)
-	
+
 	// Test context with cancellation
 	ctx, cancel = context.WithCancel(context.Background())
 	assert.NotNil(t, ctx)
@@ -72,7 +72,7 @@ func TestLister_BucketSorting(t *testing.T) {
 		{Name: "alpha-bucket", Region: "us-west-2"},
 		{Name: "beta-bucket", Region: "eu-west-1"},
 	}
-	
+
 	// Sort buckets manually to test sorting logic
 	for i := 0; i < len(buckets)-1; i++ {
 		for j := i + 1; j < len(buckets); j++ {
@@ -81,7 +81,7 @@ func TestLister_BucketSorting(t *testing.T) {
 			}
 		}
 	}
-	
+
 	assert.Equal(t, "alpha-bucket", buckets[0].Name)
 	assert.Equal(t, "beta-bucket", buckets[1].Name)
 	assert.Equal(t, "zebra-bucket", buckets[2].Name)
@@ -95,7 +95,7 @@ func TestListRequest_Creation(t *testing.T) {
 		MaxKeys:    100,
 		StartAfter: "documents/file1.txt",
 	}
-	
+
 	assert.Equal(t, "test-bucket", request.Bucket)
 	assert.Equal(t, "documents/", request.Prefix)
 	assert.Equal(t, "/", request.Delimiter)
@@ -107,7 +107,7 @@ func TestListRequest_DefaultValues(t *testing.T) {
 	request := ListRequest{
 		Bucket: "test-bucket",
 	}
-	
+
 	assert.Equal(t, "test-bucket", request.Bucket)
 	assert.Equal(t, "", request.Prefix)
 	assert.Equal(t, "", request.Delimiter)
@@ -161,7 +161,7 @@ func TestListRequest_Validation(t *testing.T) {
 			valid: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.valid {
@@ -189,7 +189,7 @@ func TestLister_ObjectSorting(t *testing.T) {
 			LastModified: now.Add(-2 * time.Hour),
 		},
 	}
-	
+
 	// Sort by LastModified (newest first) to test sorting logic
 	for i := 0; i < len(objects)-1; i++ {
 		for j := i + 1; j < len(objects); j++ {
@@ -198,7 +198,7 @@ func TestLister_ObjectSorting(t *testing.T) {
 			}
 		}
 	}
-	
+
 	assert.Equal(t, "file2.txt", objects[0].Key) // Most recent
 	assert.Equal(t, "file1.txt", objects[1].Key) // Middle
 	assert.Equal(t, "file3.txt", objects[2].Key) // Oldest
@@ -212,9 +212,9 @@ func TestLister_ConcurrentPrefixes(t *testing.T) {
 		"videos/",
 		"archives/",
 	}
-	
+
 	assert.Len(t, prefixes, 4)
-	
+
 	// Test that each prefix is properly formatted
 	for _, prefix := range prefixes {
 		assert.NotEmpty(t, prefix)
@@ -228,27 +228,27 @@ func TestLister_PaginationLogic(t *testing.T) {
 	// Test pagination parameters
 	maxObjects := 5000
 	pageSize := int64(1000)
-	
+
 	if maxObjects > 0 && int64(maxObjects) < pageSize {
 		pageSize = int64(maxObjects)
 	}
-	
+
 	assert.Equal(t, int64(1000), pageSize)
-	
+
 	// Test with smaller max
 	maxObjects = 500
 	pageSize = int64(1000)
 	if maxObjects > 0 && int64(maxObjects) < pageSize {
 		pageSize = int64(maxObjects)
 	}
-	
+
 	assert.Equal(t, int64(500), pageSize)
 }
 
 func TestLister_StreamingLogic(t *testing.T) {
 	// Test streaming channel logic
 	objectChan := make(chan Object, 10)
-	
+
 	// Simulate streaming objects
 	go func() {
 		defer close(objectChan)
@@ -264,13 +264,13 @@ func TestLister_StreamingLogic(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Collect streamed objects
 	var objects []Object
 	for obj := range objectChan {
 		objects = append(objects, obj)
 	}
-	
+
 	assert.Len(t, objects, 5)
 	for i, obj := range objects {
 		assert.Equal(t, "streamed-file", obj.Key)
@@ -285,7 +285,7 @@ func TestLister_BucketMetadata(t *testing.T) {
 		CreationDate: now,
 		Region:       "us-east-1",
 	}
-	
+
 	assert.Equal(t, "test-bucket", bucket.Name)
 	assert.Equal(t, now, bucket.CreationDate)
 	assert.Equal(t, "us-east-1", bucket.Region)
@@ -293,7 +293,7 @@ func TestLister_BucketMetadata(t *testing.T) {
 
 func TestLister_ResourceCleanup(t *testing.T) {
 	client := NewClient("us-east-1")
-	
+
 	// Create and close multiple listers to test resource cleanup
 	for i := 0; i < 5; i++ {
 		lister := NewLister(client)
@@ -311,7 +311,7 @@ func TestLister_RegionDetection(t *testing.T) {
 		"ap-northeast-1",
 		"unknown",
 	}
-	
+
 	for _, region := range regions {
 		assert.NotEmpty(t, region)
 		if region == "unknown" {
@@ -328,7 +328,7 @@ func TestLister_ConcurrencyLimiting(t *testing.T) {
 	// Test concurrency limiting with semaphore pattern
 	semaphoreSize := 5
 	semaphore := make(chan struct{}, semaphoreSize)
-	
+
 	// Test that we can acquire up to semaphoreSize tokens
 	for i := 0; i < semaphoreSize; i++ {
 		select {
@@ -338,7 +338,7 @@ func TestLister_ConcurrencyLimiting(t *testing.T) {
 			t.Fatalf("Should be able to acquire token %d", i)
 		}
 	}
-	
+
 	// Test that the next acquisition would block
 	select {
 	case semaphore <- struct{}{}:
@@ -346,7 +346,7 @@ func TestLister_ConcurrencyLimiting(t *testing.T) {
 	default:
 		// Expected behavior
 	}
-	
+
 	// Release tokens
 	for i := 0; i < semaphoreSize; i++ {
 		<-semaphore
@@ -356,7 +356,7 @@ func TestLister_ConcurrencyLimiting(t *testing.T) {
 // Benchmark tests
 func BenchmarkNewLister(b *testing.B) {
 	client := NewClient("us-east-1")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lister := NewLister(client)
@@ -380,7 +380,7 @@ func BenchmarkListRequest_Creation(b *testing.B) {
 
 func BenchmarkObject_Creation(b *testing.B) {
 	now := time.Now()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := Object{
@@ -396,7 +396,7 @@ func BenchmarkObject_Creation(b *testing.B) {
 
 func BenchmarkBucket_Creation(b *testing.B) {
 	now := time.Now()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bucket := Bucket{
@@ -417,7 +417,7 @@ func BenchmarkObjectSorting(b *testing.B) {
 			LastModified: now.Add(time.Duration(i) * time.Second),
 		}
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simple sorting benchmark

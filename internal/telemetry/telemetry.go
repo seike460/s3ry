@@ -43,11 +43,11 @@ type PerformanceData struct {
 
 // SystemInfo contains system information
 type SystemInfo struct {
-	OS           string `json:"os"`
-	Arch         string `json:"arch"`
-	GoVersion    string `json:"go_version"`
-	NumCPU       int    `json:"num_cpu"`
-	IsContainer  bool   `json:"is_container"`
+	OS            string `json:"os"`
+	Arch          string `json:"arch"`
+	GoVersion     string `json:"go_version"`
+	NumCPU        int    `json:"num_cpu"`
+	IsContainer   bool   `json:"is_container"`
 	CloudProvider string `json:"cloud_provider,omitempty"`
 }
 
@@ -65,10 +65,10 @@ type Client struct {
 
 // Config contains telemetry configuration
 type Config struct {
-	Enabled   bool   `json:"enabled"`
-	UserID    string `json:"user_id"`
-	Endpoint  string `json:"endpoint"`
-	Debug     bool   `json:"debug"`
+	Enabled  bool   `json:"enabled"`
+	UserID   string `json:"user_id"`
+	Endpoint string `json:"endpoint"`
+	Debug    bool   `json:"debug"`
 }
 
 const (
@@ -337,8 +337,8 @@ func (c *Client) sendBatch(events []Event) {
 	}
 
 	payload := map[string]interface{}{
-		"events": events,
-		"client": "s3ry",
+		"events":      events,
+		"client":      "s3ry",
 		"sdk_version": "1.0.0",
 	}
 
@@ -368,11 +368,11 @@ func (c *Client) sendBatch(events []Event) {
 // getSystemInfo returns system information
 func getSystemInfo() *SystemInfo {
 	return &SystemInfo{
-		OS:          runtime.GOOS,
-		Arch:        runtime.GOARCH,
-		GoVersion:   runtime.Version(),
-		NumCPU:      runtime.NumCPU(),
-		IsContainer: isContainer(),
+		OS:            runtime.GOOS,
+		Arch:          runtime.GOARCH,
+		GoVersion:     runtime.Version(),
+		NumCPU:        runtime.NumCPU(),
+		IsContainer:   isContainer(),
 		CloudProvider: detectCloudProvider(),
 	}
 }

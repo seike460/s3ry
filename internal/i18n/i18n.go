@@ -37,13 +37,13 @@ func detectLanguage() language.Tag {
 			return language.Japanese
 		}
 	}
-	
+
 	if lang := os.Getenv("LANGUAGE"); lang != "" {
 		if strings.HasPrefix(lang, "ja") {
 			return language.Japanese
 		}
 	}
-	
+
 	// Default to English
 	return language.English
 }
@@ -53,10 +53,10 @@ func parseLanguageCode(languageCode string) language.Tag {
 	if languageCode == "" {
 		return detectLanguage()
 	}
-	
+
 	// Normalize the language code
 	languageCode = strings.ToLower(strings.TrimSpace(languageCode))
-	
+
 	switch languageCode {
 	case "ja", "japanese", "jp":
 		return language.Japanese

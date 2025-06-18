@@ -1,8 +1,9 @@
 package enterprise
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
+	"crypto/sha1"
 	"encoding/base32"
 	"encoding/hex"
 	"fmt"
@@ -47,7 +48,7 @@ func (t *TOTPProvider) GenerateSecret() (*MFASecret, error) {
 	}
 
 	secret := base32.StdEncoding.EncodeToString(secretBytes)
-	
+
 	return &MFASecret{
 		Secret:    secret,
 		CreatedAt: time.Now(),
@@ -86,17 +87,17 @@ func (t *TOTPProvider) GenerateQRCodeURL(secret *MFASecret, userID, issuer strin
 // GenerateBackupCodes generates backup codes for MFA
 func (t *TOTPProvider) GenerateBackupCodes() ([]string, error) {
 	codes := make([]string, 10)
-	
+
 	for i := 0; i < 10; i++ {
 		codeBytes := make([]byte, 8)
 		if _, err := rand.Read(codeBytes); err != nil {
 			return nil, fmt.Errorf("failed to generate backup code: %w", err)
 		}
-		
+
 		// Format as 8-character hex string
 		codes[i] = hex.EncodeToString(codeBytes)[:8]
 	}
-	
+
 	return codes, nil
 }
 
@@ -116,9 +117,8 @@ func generateTOTP(secret []byte, timeStep int64) string {
 		timeStep >>= 8
 	}
 
-	// HMAC-SHA1
-	h := sha256.New()
-	h.Write(secret)
+	// HMAC-SHA1 (RFC 6238 compliant)
+	h := hmac.New(sha1.New, secret)
 	h.Write(timeBytes)
 	hash := h.Sum(nil)
 
@@ -136,23 +136,23 @@ func generateTOTP(secret []byte, timeStep int64) string {
 
 // MFAConfig holds MFA configuration
 type MFAConfig struct {
-	Required      bool          `json:"required"`
-	Provider      string        `json:"provider"`
-	Issuer        string        `json:"issuer"`
-	TokenWindow   time.Duration `json:"token_window"`
-	BackupCodes   int           `json:"backup_codes"`
-	GracePeriod   time.Duration `json:"grace_period"`
+	Required    bool          `json:"required"`
+	Provider    string        `json:"provider"`
+	Issuer      string        `json:"issuer"`
+	TokenWindow time.Duration `json:"token_window"`
+	BackupCodes int           `json:"backup_codes"`
+	GracePeriod time.Duration `json:"grace_period"`
 }
 
 // DefaultMFAConfig returns default MFA configuration
 func DefaultMFAConfig() *MFAConfig {
 	return &MFAConfig{
-		Required:      false,
-		Provider:      "totp",
-		Issuer:        "s3ry",
-		TokenWindow:   time.Minute * 5,
-		BackupCodes:   10,
-		GracePeriod:   time.Hour * 24,
+		Required:    false,
+		Provider:    "totp",
+		Issuer:      "s3ry",
+		TokenWindow: time.Minute * 5,
+		BackupCodes: 10,
+		GracePeriod: time.Hour * 24,
 	}
 }
 
@@ -190,7 +190,7 @@ func (m *MFAManager) SetupMFA(userID string) (*MFASetupResponse, error) {
 	}
 
 	qrCodeURL := m.provider.GenerateQRCodeURL(secret, userID, m.config.Issuer)
-	
+
 	backupCodes, err := m.provider.GenerateBackupCodes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate backup codes: %w", err)

@@ -28,7 +28,7 @@ const (
 type App struct {
 	config *config.Config
 	view   tea.Model
-	
+
 	// Styles
 	titleStyle lipgloss.Style
 	errorStyle lipgloss.Style
@@ -38,20 +38,20 @@ type App struct {
 func New(cfg *config.Config) *App {
 	app := &App{
 		config: cfg,
-		
+
 		// Initialize styles
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginLeft(2).
 			MarginTop(1),
-		
+
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FF5555")).
 			MarginLeft(2),
 	}
-	
+
 	// Initialize with region view, using configured region if available
 	if cfg.AWS.Region != "" {
 		// If region is pre-configured, skip region selection and go directly to bucket selection
@@ -60,7 +60,7 @@ func New(cfg *config.Config) *App {
 		// Start with region selection
 		app.view = views.NewRegionView()
 	}
-	
+
 	return app
 }
 
@@ -90,14 +90,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, a.view.Init()
 		}
 	}
-	
+
 	// Delegate to current view
 	var cmd tea.Cmd
 	a.view, cmd = a.view.Update(msg)
-	
+
 	return a, cmd
 }
-
 
 // View renders the current state of the application
 func (a *App) View() string {

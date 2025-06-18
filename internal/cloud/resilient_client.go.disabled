@@ -1,0 +1,481 @@
+package cloud
+
+import (
+	"context"
+	"io"
+	"time"
+)
+
+// ResilientClient wraps any StorageClient with enhanced error handling and resilience
+type ResilientClient struct {
+	underlying   StorageClient
+	errorHandler *CloudErrorHandler
+	logger       Logger
+}
+
+// NewResilientClient creates a new resilient client wrapper
+func NewResilientClient(underlying StorageClient, logger Logger) *ResilientClient {
+	errorHandler := NewCloudErrorHandler(underlying.GetProvider(), logger)
+
+	return &ResilientClient{
+		underlying:   underlying,
+		errorHandler: errorHandler,
+		logger:       logger,
+	}
+}
+
+// Provider information methods
+func (r *ResilientClient) GetProvider() CloudProvider {
+	return r.underlying.GetProvider()
+}
+
+func (r *ResilientClient) GetRegion() string {
+	return r.underlying.GetRegion()
+}
+
+// Connection management with retry
+func (r *ResilientClient) Connect(ctx context.Context) error {
+	return r.errorHandler.ExecuteWithRetry(ctx, "Connect", func() error {
+		return r.underlying.Connect(ctx)
+	})
+}
+
+func (r *ResilientClient) Disconnect(ctx context.Context) error {
+	return r.errorHandler.ExecuteWithRetry(ctx, "Disconnect", func() error {
+		return r.underlying.Disconnect(ctx)
+	})
+}
+
+func (r *ResilientClient) HealthCheck(ctx context.Context) error {
+	return r.errorHandler.ExecuteWithRetry(ctx, "HealthCheck", func() error {
+		return r.underlying.HealthCheck(ctx)
+	})
+}
+
+// Bucket operations with enhanced error handling
+func (r *ResilientClient) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
+	var result []BucketInfo
+	err := r.errorHandler.ExecuteWithRetry(ctx, "ListBuckets", func() error {
+		buckets, err := r.underlying.ListBuckets(ctx)
+		if err != nil {
+			return err
+		}
+		result = buckets
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "ListBuckets", nil)
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) CreateBucket(ctx context.Context, bucket string, options *CreateBucketOptions) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "CreateBucket", func() error {
+		return r.underlying.CreateBucket(ctx, bucket, options)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "CreateBucket", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) DeleteBucket(ctx context.Context, bucket string) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "DeleteBucket", func() error {
+		return r.underlying.DeleteBucket(ctx, bucket)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "DeleteBucket", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) BucketExists(ctx context.Context, bucket string) (bool, error) {
+	var result bool
+	err := r.errorHandler.ExecuteWithRetry(ctx, "BucketExists", func() error {
+		exists, err := r.underlying.BucketExists(ctx, bucket)
+		if err != nil {
+			return err
+		}
+		result = exists
+		return nil
+	})
+
+	if err != nil {
+		return false, r.errorHandler.HandleError(err, "BucketExists", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) GetBucketInfo(ctx context.Context, bucket string) (*BucketInfo, error) {
+	var result *BucketInfo
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetBucketInfo", func() error {
+		info, err := r.underlying.GetBucketInfo(ctx, bucket)
+		if err != nil {
+			return err
+		}
+		result = info
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "GetBucketInfo", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return result, nil
+}
+
+// Object operations with enhanced error handling
+func (r *ResilientClient) ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) (*ObjectList, error) {
+	var result *ObjectList
+	err := r.errorHandler.ExecuteWithRetry(ctx, "ListObjects", func() error {
+		objects, err := r.underlying.ListObjects(ctx, bucket, options)
+		if err != nil {
+			return err
+		}
+		result = objects
+		return nil
+	})
+
+	if err != nil {
+		context := map[string]interface{}{
+			"bucket": bucket,
+		}
+		if options != nil {
+			context["prefix"] = options.Prefix
+			context["max_keys"] = options.MaxKeys
+		}
+		return nil, r.errorHandler.HandleError(err, "ListObjects", context)
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) GetObject(ctx context.Context, bucket, key string, options *GetObjectOptions) (*Object, error) {
+	var result *Object
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetObject", func() error {
+		obj, err := r.underlying.GetObject(ctx, bucket, key, options)
+		if err != nil {
+			return err
+		}
+		result = obj
+		return nil
+	})
+
+	if err != nil {
+		context := map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		}
+		if options != nil && options.Range != "" {
+			context["range"] = options.Range
+		}
+		return nil, r.errorHandler.HandleError(err, "GetObject", context)
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) PutObject(ctx context.Context, bucket, key string, data io.Reader, options *PutObjectOptions) (*PutObjectResult, error) {
+	var result *PutObjectResult
+	err := r.errorHandler.ExecuteWithRetry(ctx, "PutObject", func() error {
+		putResult, err := r.underlying.PutObject(ctx, bucket, key, data, options)
+		if err != nil {
+			return err
+		}
+		result = putResult
+		return nil
+	})
+
+	if err != nil {
+		context := map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		}
+		if options != nil {
+			context["content_type"] = options.ContentType
+			context["storage_class"] = options.StorageClass
+		}
+		return nil, r.errorHandler.HandleError(err, "PutObject", context)
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) DeleteObject(ctx context.Context, bucket, key string, options *DeleteObjectOptions) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "DeleteObject", func() error {
+		return r.underlying.DeleteObject(ctx, bucket, key, options)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "DeleteObject", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) DeleteObjects(ctx context.Context, bucket string, keys []string, options *DeleteObjectsOptions) (*BatchDeleteResult, error) {
+	var result *BatchDeleteResult
+	err := r.errorHandler.ExecuteWithRetry(ctx, "DeleteObjects", func() error {
+		deleteResult, err := r.underlying.DeleteObjects(ctx, bucket, keys, options)
+		if err != nil {
+			return err
+		}
+		result = deleteResult
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "DeleteObjects", map[string]interface{}{
+			"bucket":    bucket,
+			"key_count": len(keys),
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) CopyObject(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string, options *CopyObjectOptions) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "CopyObject", func() error {
+		return r.underlying.CopyObject(ctx, srcBucket, srcKey, dstBucket, dstKey, options)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "CopyObject", map[string]interface{}{
+			"src_bucket": srcBucket,
+			"src_key":    srcKey,
+			"dst_bucket": dstBucket,
+			"dst_key":    dstKey,
+		})
+	}
+	return nil
+}
+
+// Object metadata and properties
+func (r *ResilientClient) HeadObject(ctx context.Context, bucket, key string) (*ObjectMetadata, error) {
+	var result *ObjectMetadata
+	err := r.errorHandler.ExecuteWithRetry(ctx, "HeadObject", func() error {
+		metadata, err := r.underlying.HeadObject(ctx, bucket, key)
+		if err != nil {
+			return err
+		}
+		result = metadata
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "HeadObject", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) SetObjectMetadata(ctx context.Context, bucket, key string, metadata map[string]string) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "SetObjectMetadata", func() error {
+		return r.underlying.SetObjectMetadata(ctx, bucket, key, metadata)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "SetObjectMetadata", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) GetObjectURL(ctx context.Context, bucket, key string, options *URLOptions) (string, error) {
+	var result string
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetObjectURL", func() error {
+		url, err := r.underlying.GetObjectURL(ctx, bucket, key, options)
+		if err != nil {
+			return err
+		}
+		result = url
+		return nil
+	})
+
+	if err != nil {
+		return "", r.errorHandler.HandleError(err, "GetObjectURL", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) GeneratePresignedURL(ctx context.Context, bucket, key string, options *PresignedURLOptions) (string, error) {
+	var result string
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GeneratePresignedURL", func() error {
+		url, err := r.underlying.GeneratePresignedURL(ctx, bucket, key, options)
+		if err != nil {
+			return err
+		}
+		result = url
+		return nil
+	})
+
+	if err != nil {
+		context := map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		}
+		if options != nil {
+			context["expiration"] = options.Expiration
+		}
+		return "", r.errorHandler.HandleError(err, "GeneratePresignedURL", context)
+	}
+	return result, nil
+}
+
+// Advanced operations
+func (r *ResilientClient) MultipartUpload(ctx context.Context, bucket, key string, options *MultipartUploadOptions) (MultipartUploader, error) {
+	var result MultipartUploader
+	err := r.errorHandler.ExecuteWithRetry(ctx, "MultipartUpload", func() error {
+		uploader, err := r.underlying.MultipartUpload(ctx, bucket, key, options)
+		if err != nil {
+			return err
+		}
+		result = uploader
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "MultipartUpload", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) BatchOperations(ctx context.Context, operations []BatchOperation) (*BatchResult, error) {
+	var result *BatchResult
+	err := r.errorHandler.ExecuteWithRetry(ctx, "BatchOperations", func() error {
+		batchResult, err := r.underlying.BatchOperations(ctx, operations)
+		if err != nil {
+			return err
+		}
+		result = batchResult
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "BatchOperations", map[string]interface{}{
+			"operation_count": len(operations),
+		})
+	}
+	return result, nil
+}
+
+// Storage class and lifecycle
+func (r *ResilientClient) SetStorageClass(ctx context.Context, bucket, key string, storageClass StorageClass) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "SetStorageClass", func() error {
+		return r.underlying.SetStorageClass(ctx, bucket, key, storageClass)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "SetStorageClass", map[string]interface{}{
+			"bucket":        bucket,
+			"key":           key,
+			"storage_class": storageClass.String(),
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) GetStorageClass(ctx context.Context, bucket, key string) (StorageClass, error) {
+	var result StorageClass
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetStorageClass", func() error {
+		class, err := r.underlying.GetStorageClass(ctx, bucket, key)
+		if err != nil {
+			return err
+		}
+		result = class
+		return nil
+	})
+
+	if err != nil {
+		return "", r.errorHandler.HandleError(err, "GetStorageClass", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return result, nil
+}
+
+// Access control
+func (r *ResilientClient) SetBucketPolicy(ctx context.Context, bucket string, policy *BucketPolicy) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "SetBucketPolicy", func() error {
+		return r.underlying.SetBucketPolicy(ctx, bucket, policy)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "SetBucketPolicy", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) GetBucketPolicy(ctx context.Context, bucket string) (*BucketPolicy, error) {
+	var result *BucketPolicy
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetBucketPolicy", func() error {
+		policy, err := r.underlying.GetBucketPolicy(ctx, bucket)
+		if err != nil {
+			return err
+		}
+		result = policy
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "GetBucketPolicy", map[string]interface{}{
+			"bucket": bucket,
+		})
+	}
+	return result, nil
+}
+
+func (r *ResilientClient) SetObjectACL(ctx context.Context, bucket, key string, acl *ObjectACL) error {
+	err := r.errorHandler.ExecuteWithRetry(ctx, "SetObjectACL", func() error {
+		return r.underlying.SetObjectACL(ctx, bucket, key, acl)
+	})
+
+	if err != nil {
+		return r.errorHandler.HandleError(err, "SetObjectACL", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return nil
+}
+
+func (r *ResilientClient) GetObjectACL(ctx context.Context, bucket, key string) (*ObjectACL, error) {
+	var result *ObjectACL
+	err := r.errorHandler.ExecuteWithRetry(ctx, "GetObjectACL", func() error {
+		acl, err := r.underlying.GetObjectACL(ctx, bucket, key)
+		if err != nil {
+			return err
+		}
+		result = acl
+		return nil
+	})
+
+	if err != nil {
+		return nil, r.errorHandler.HandleError(err, "GetObjectACL", map[string]interface{}{
+			"bucket": bucket,
+			"key":    key,
+		})
+	}
+	return result, nil
+}

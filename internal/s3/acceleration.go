@@ -15,20 +15,20 @@ import (
 // AcceleratedClient provides S3 Transfer Acceleration support
 type AcceleratedClient struct {
 	*Client
-	accelerationEnabled bool
-	acceleratedSession  *session.Session
-	acceleratedUploader *s3manager.Uploader
+	accelerationEnabled   bool
+	acceleratedSession    *session.Session
+	acceleratedUploader   *s3manager.Uploader
 	acceleratedDownloader *s3manager.Downloader
 }
 
 // AccelerationConfig configures S3 Transfer Acceleration settings
 type AccelerationConfig struct {
-	Enabled            bool   `json:"enabled"`
-	UseAcceleration    bool   `json:"use_acceleration"`
-	PreferAcceleration bool   `json:"prefer_acceleration"`
-	FallbackToRegular  bool   `json:"fallback_to_regular"`
-	SpeedTestEnabled   bool   `json:"speed_test_enabled"`
-	SpeedTestDuration  int    `json:"speed_test_duration_seconds"`
+	Enabled            bool `json:"enabled"`
+	UseAcceleration    bool `json:"use_acceleration"`
+	PreferAcceleration bool `json:"prefer_acceleration"`
+	FallbackToRegular  bool `json:"fallback_to_regular"`
+	SpeedTestEnabled   bool `json:"speed_test_enabled"`
+	SpeedTestDuration  int  `json:"speed_test_duration_seconds"`
 }
 
 // DefaultAccelerationConfig returns default acceleration configuration
@@ -57,7 +57,7 @@ func NewAcceleratedClient(region string, config AccelerationConfig) (*Accelerate
 		// Create accelerated session with transfer acceleration endpoint
 		acceleratedConfig := &aws.Config{
 			Region:                        aws.String(region),
-			S3UseAccelerate:              aws.Bool(true),
+			S3UseAccelerate:               aws.Bool(true),
 			S3DisableContentMD5Validation: aws.Bool(false),
 		}
 
@@ -204,7 +204,7 @@ func (c *AcceleratedClient) SpeedTest(ctx context.Context, bucket string, testSi
 func (c *AcceleratedClient) testEndpointSpeed(ctx context.Context, bucket string, testSize int64, useAcceleration bool) (float64, error) {
 	// This is a simplified speed test implementation
 	// In a real implementation, you would upload/download test data and measure throughput
-	
+
 	if useAcceleration {
 		_ = fmt.Sprintf("s3-accelerate.amazonaws.com")
 	} else {
@@ -303,13 +303,13 @@ type SpeedTestResult struct {
 
 // AccelerationMetrics tracks acceleration usage and performance
 type AccelerationMetrics struct {
-	TotalTransfers        int64   `json:"total_transfers"`
-	AcceleratedTransfers  int64   `json:"accelerated_transfers"`
-	TotalBytes            int64   `json:"total_bytes"`
-	AcceleratedBytes      int64   `json:"accelerated_bytes"`
-	AverageSpeedRegular   float64 `json:"average_speed_regular_mbps"`
+	TotalTransfers          int64   `json:"total_transfers"`
+	AcceleratedTransfers    int64   `json:"accelerated_transfers"`
+	TotalBytes              int64   `json:"total_bytes"`
+	AcceleratedBytes        int64   `json:"accelerated_bytes"`
+	AverageSpeedRegular     float64 `json:"average_speed_regular_mbps"`
 	AverageSpeedAccelerated float64 `json:"average_speed_accelerated_mbps"`
-	TotalTimeSaved        float64 `json:"total_time_saved_seconds"`
+	TotalTimeSaved          float64 `json:"total_time_saved_seconds"`
 }
 
 // UpdateMetrics updates acceleration metrics
@@ -320,7 +320,7 @@ func (m *AccelerationMetrics) UpdateMetrics(bytesTransferred int64, speed float6
 	if useAcceleration {
 		m.AcceleratedTransfers++
 		m.AcceleratedBytes += bytesTransferred
-		
+
 		// Update average accelerated speed
 		if m.AverageSpeedAccelerated == 0 {
 			m.AverageSpeedAccelerated = speed
@@ -338,7 +338,7 @@ func (m *AccelerationMetrics) UpdateMetrics(bytesTransferred int64, speed float6
 
 	// Calculate time saved
 	if m.AverageSpeedRegular > 0 && m.AverageSpeedAccelerated > 0 {
-		regularTime := float64(m.AcceleratedBytes) / (m.AverageSpeedRegular * 1024 * 1024) // seconds
+		regularTime := float64(m.AcceleratedBytes) / (m.AverageSpeedRegular * 1024 * 1024)         // seconds
 		acceleratedTime := float64(m.AcceleratedBytes) / (m.AverageSpeedAccelerated * 1024 * 1024) // seconds
 		m.TotalTimeSaved = regularTime - acceleratedTime
 	}
@@ -348,8 +348,8 @@ func (m *AccelerationMetrics) UpdateMetrics(bytesTransferred int64, speed float6
 func (c *AcceleratedClient) GetAccelerationRecommendation(metrics *AccelerationMetrics) *AccelerationRecommendation {
 	recommendation := &AccelerationRecommendation{
 		ShouldUseAcceleration: false,
-		Confidence:           0,
-		Reasons:              make([]string, 0),
+		Confidence:            0,
+		Reasons:               make([]string, 0),
 	}
 
 	if metrics.AcceleratedTransfers < 10 {
@@ -360,9 +360,9 @@ func (c *AcceleratedClient) GetAccelerationRecommendation(metrics *AccelerationM
 	// Check if acceleration provides significant improvement
 	if metrics.AverageSpeedAccelerated > metrics.AverageSpeedRegular*1.1 {
 		recommendation.ShouldUseAcceleration = true
-		improvement := (metrics.AverageSpeedAccelerated / metrics.AverageSpeedRegular - 1) * 100
+		improvement := (metrics.AverageSpeedAccelerated/metrics.AverageSpeedRegular - 1) * 100
 		recommendation.Confidence = int(improvement)
-		recommendation.Reasons = append(recommendation.Reasons, 
+		recommendation.Reasons = append(recommendation.Reasons,
 			fmt.Sprintf("%.1f%% speed improvement observed", improvement))
 	}
 
@@ -370,14 +370,14 @@ func (c *AcceleratedClient) GetAccelerationRecommendation(metrics *AccelerationM
 	avgFileSize := float64(metrics.TotalBytes) / float64(metrics.TotalTransfers)
 	if avgFileSize > 100*1024*1024 { // >100MB average
 		recommendation.ShouldUseAcceleration = true
-		recommendation.Reasons = append(recommendation.Reasons, 
+		recommendation.Reasons = append(recommendation.Reasons,
 			"Large file transfers benefit from acceleration")
 	}
 
 	// Check time savings
 	if metrics.TotalTimeSaved > 3600 { // >1 hour saved
 		recommendation.ShouldUseAcceleration = true
-		recommendation.Reasons = append(recommendation.Reasons, 
+		recommendation.Reasons = append(recommendation.Reasons,
 			fmt.Sprintf("%.1f hours of transfer time saved", metrics.TotalTimeSaved/3600))
 	}
 
@@ -387,15 +387,15 @@ func (c *AcceleratedClient) GetAccelerationRecommendation(metrics *AccelerationM
 // AccelerationRecommendation provides acceleration usage recommendations
 type AccelerationRecommendation struct {
 	ShouldUseAcceleration bool     `json:"should_use_acceleration"`
-	Confidence           int      `json:"confidence_percent"`
-	Reasons              []string `json:"reasons"`
+	Confidence            int      `json:"confidence_percent"`
+	Reasons               []string `json:"reasons"`
 }
 
 // ValidateAccelerationEndpoint validates that an acceleration endpoint is reachable
 func (c *AcceleratedClient) ValidateAccelerationEndpoint(ctx context.Context) error {
 	// Create a test URL for the acceleration endpoint
 	testURL := "https://s3-accelerate.amazonaws.com"
-	
+
 	// Parse URL
 	_, err := url.Parse(testURL)
 	if err != nil {
@@ -413,12 +413,12 @@ func (c *AcceleratedClient) GetAccelerationEndpoint(bucket, region string, useAc
 		// Use global acceleration endpoint
 		return "s3-accelerate.amazonaws.com"
 	}
-	
+
 	// Use regional endpoint
 	if region == "" {
 		region = "us-east-1" // Default region
 	}
-	
+
 	// Handle special cases for certain regions
 	switch region {
 	case "us-east-1":
@@ -435,12 +435,12 @@ func (c *AcceleratedClient) IsAccelerationSupported(region string) bool {
 		"cn-north-1",     // China (Beijing)
 		"cn-northwest-1", // China (Ningxia)
 	}
-	
+
 	for _, unsupported := range unsupportedRegions {
 		if strings.EqualFold(region, unsupported) {
 			return false
 		}
 	}
-	
+
 	return true
 }

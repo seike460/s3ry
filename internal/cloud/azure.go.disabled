@@ -1,0 +1,596 @@
+package cloud
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/Azure/azure-storage-blob-go/azblob"
+)
+
+// AzureBlobClient provides Azure Blob Storage integration
+type AzureBlobClient struct {
+	serviceURL    azblob.ServiceURL
+	containerName string
+	config        *AzureConfig
+}
+
+// AzureConfig contains Azure Blob Storage configuration
+type AzureConfig struct {
+	AccountName      string             `json:"account_name"`
+	AccountKey       string             `json:"account_key"`
+	ConnectionString string             `json:"connection_string,omitempty"`
+	SASToken         string             `json:"sas_token,omitempty"`
+	ContainerName    string             `json:"container_name"`
+	Endpoint         string             `json:"endpoint,omitempty"`
+	UseHTTPS         bool               `json:"use_https"`
+	RetryOptions     *AzureRetryOptions `json:"retry_options,omitempty"`
+}
+
+// AzureRetryOptions configures retry behavior for Azure operations
+type AzureRetryOptions struct {
+	MaxTries      int32         `json:"max_tries"`
+	TryTimeout    time.Duration `json:"try_timeout"`
+	RetryDelay    time.Duration `json:"retry_delay"`
+	MaxRetryDelay time.Duration `json:"max_retry_delay"`
+}
+
+// DefaultAzureConfig returns default Azure configuration
+func DefaultAzureConfig() *AzureConfig {
+	return &AzureConfig{
+		UseHTTPS: true,
+		RetryOptions: &AzureRetryOptions{
+			MaxTries:      3,
+			TryTimeout:    time.Minute,
+			RetryDelay:    time.Second * 4,
+			MaxRetryDelay: time.Minute,
+		},
+	}
+}
+
+// AzureObject represents an Azure blob object
+type AzureObject struct {
+	Name         string            `json:"name"`
+	Container    string            `json:"container"`
+	Size         int64             `json:"size"`
+	LastModified time.Time         `json:"last_modified"`
+	ETag         string            `json:"etag"`
+	ContentType  string            `json:"content_type"`
+	Metadata     map[string]string `json:"metadata"`
+	BlobType     string            `json:"blob_type"`
+	AccessTier   string            `json:"access_tier,omitempty"`
+}
+
+// AzureContainer represents an Azure blob container
+type AzureContainer struct {
+	Name         string            `json:"name"`
+	LastModified time.Time         `json:"last_modified"`
+	ETag         string            `json:"etag"`
+	Metadata     map[string]string `json:"metadata"`
+	PublicAccess string            `json:"public_access"`
+}
+
+// NewAzureBlobClient creates a new Azure Blob Storage client
+func NewAzureBlobClient(config *AzureConfig) (*AzureBlobClient, error) {
+	if config == nil {
+		config = DefaultAzureConfig()
+	}
+
+	var credential azblob.Credential
+	var err error
+
+	// Determine authentication method
+	if config.SASToken != "" {
+		// Use SAS token
+		credential = azblob.NewAnonymousCredential()
+	} else if config.AccountKey != "" {
+		// Use account key
+		credential, err = azblob.NewSharedKeyCredential(config.AccountName, config.AccountKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create shared key credential: %w", err)
+		}
+	} else {
+		return nil, fmt.Errorf("either account key or SAS token must be provided")
+	}
+
+	// Build service URL
+	var serviceURLString string
+	if config.Endpoint != "" {
+		serviceURLString = config.Endpoint
+	} else {
+		protocol := "https"
+		if !config.UseHTTPS {
+			protocol = "http"
+		}
+		serviceURLString = fmt.Sprintf("%s://%s.blob.core.windows.net/", protocol, config.AccountName)
+	}
+
+	if config.SASToken != "" {
+		serviceURLString += "?" + config.SASToken
+	}
+
+	serviceURL, err := url.Parse(serviceURLString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse service URL: %w", err)
+	}
+
+	// Create retry options
+	retryOptions := azblob.RetryOptions{}
+	if config.RetryOptions != nil {
+		retryOptions = azblob.RetryOptions{
+			Policy:        azblob.RetryPolicyExponential,
+			MaxTries:      config.RetryOptions.MaxTries,
+			TryTimeout:    config.RetryOptions.TryTimeout,
+			RetryDelay:    config.RetryOptions.RetryDelay,
+			MaxRetryDelay: config.RetryOptions.MaxRetryDelay,
+		}
+	}
+
+	// Create pipeline
+	pipeline := azblob.NewPipeline(credential, azblob.PipelineOptions{
+		Retry: retryOptions,
+	})
+
+	// Create service URL
+	azureServiceURL := azblob.NewServiceURL(*serviceURL, pipeline)
+
+	return &AzureBlobClient{
+		serviceURL:    azureServiceURL,
+		containerName: config.ContainerName,
+		config:        config,
+	}, nil
+}
+
+// ListContainers lists all containers in the storage account
+func (client *AzureBlobClient) ListContainers(ctx context.Context) ([]AzureContainer, error) {
+	var containers []AzureContainer
+
+	marker := azblob.Marker{}
+	for marker.NotDone() {
+		listContainerOptions := azblob.ListContainersSegmentOptions{}
+
+		response, err := client.serviceURL.ListContainersSegment(ctx, marker, listContainerOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list containers: %w", err)
+		}
+
+		for _, containerItem := range response.ContainerItems {
+			container := AzureContainer{
+				Name:         containerItem.Name,
+				LastModified: containerItem.Properties.LastModified,
+				ETag:         string(containerItem.Properties.Etag),
+				Metadata:     containerItem.Metadata,
+			}
+
+			if containerItem.Properties.PublicAccess != nil {
+				container.PublicAccess = string(*containerItem.Properties.PublicAccess)
+			}
+
+			containers = append(containers, container)
+		}
+
+		marker = response.NextMarker
+	}
+
+	return containers, nil
+}
+
+// ListObjects lists objects in a container
+func (client *AzureBlobClient) ListObjects(ctx context.Context, containerName, prefix string) ([]AzureObject, error) {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	var objects []AzureObject
+
+	marker := azblob.Marker{}
+	for marker.NotDone() {
+		listBlobsOptions := azblob.ListBlobsSegmentOptions{
+			Prefix: prefix,
+		}
+
+		response, err := containerURL.ListBlobsHierarchySegment(ctx, marker, "/", listBlobsOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list blobs: %w", err)
+		}
+
+		for _, blobInfo := range response.Segment.BlobItems {
+			object := AzureObject{
+				Name:         blobInfo.Name,
+				Container:    containerName,
+				Size:         *blobInfo.Properties.ContentLength,
+				LastModified: blobInfo.Properties.LastModified,
+				ETag:         string(blobInfo.Properties.Etag),
+				ContentType:  *blobInfo.Properties.ContentType,
+				Metadata:     blobInfo.Metadata,
+				BlobType:     string(blobInfo.Properties.BlobType),
+			}
+
+			if blobInfo.Properties.AccessTier != nil {
+				object.AccessTier = string(*blobInfo.Properties.AccessTier)
+			}
+
+			objects = append(objects, object)
+		}
+
+		marker = response.NextMarker
+	}
+
+	return objects, nil
+}
+
+// DownloadObject downloads an object from Azure Blob Storage
+func (client *AzureBlobClient) DownloadObject(ctx context.Context, containerName, blobName string, writer io.Writer) error {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	downloadResponse, err := blobURL.Download(ctx, 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to download blob: %w", err)
+	}
+
+	bodyStream := downloadResponse.Body(azblob.RetryReaderOptions{MaxRetryRequests: 3})
+	defer bodyStream.Close()
+
+	_, err = io.Copy(writer, bodyStream)
+	if err != nil {
+		return fmt.Errorf("failed to copy blob data: %w", err)
+	}
+
+	return nil
+}
+
+// UploadObject uploads an object to Azure Blob Storage
+func (client *AzureBlobClient) UploadObject(ctx context.Context, containerName, blobName string, reader io.Reader, options *AzureUploadOptions) error {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	if options == nil {
+		options = &AzureUploadOptions{}
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	uploadOptions := azblob.UploadStreamToBlockBlobOptions{
+		BufferSize: options.BufferSize,
+		MaxBuffers: options.MaxBuffers,
+		Metadata:   options.Metadata,
+		BlobHTTPHeaders: azblob.BlobHTTPHeaders{
+			ContentType: options.ContentType,
+		},
+	}
+
+	if options.AccessTier != "" {
+		uploadOptions.AccessTier = azblob.AccessTierType(options.AccessTier)
+	}
+
+	_, err := azblob.UploadStreamToBlockBlob(ctx, reader, blobURL, uploadOptions)
+	if err != nil {
+		return fmt.Errorf("failed to upload blob: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteObject deletes an object from Azure Blob Storage
+func (client *AzureBlobClient) DeleteObject(ctx context.Context, containerName, blobName string) error {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	_, err := blobURL.Delete(ctx, azblob.DeleteSnapshotsOptionInclude, azblob.BlobAccessConditions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete blob: %w", err)
+	}
+
+	return nil
+}
+
+// CopyObject copies an object within Azure Blob Storage
+func (client *AzureBlobClient) CopyObject(ctx context.Context, sourceContainer, sourceBlob, destContainer, destBlob string) error {
+	if sourceContainer == "" {
+		sourceContainer = client.containerName
+	}
+	if destContainer == "" {
+		destContainer = client.containerName
+	}
+
+	sourceContainerURL := client.serviceURL.NewContainerURL(sourceContainer)
+	sourceBlobURL := sourceContainerURL.NewBlockBlobURL(sourceBlob)
+
+	destContainerURL := client.serviceURL.NewContainerURL(destContainer)
+	destBlobURL := destContainerURL.NewBlockBlobURL(destBlob)
+
+	_, err := destBlobURL.StartCopyFromURL(ctx, sourceBlobURL.URL(), azblob.Metadata{}, azblob.ModifiedAccessConditions{}, azblob.BlobAccessConditions{}, azblob.DefaultAccessTier, nil)
+	if err != nil {
+		return fmt.Errorf("failed to copy blob: %w", err)
+	}
+
+	return nil
+}
+
+// GetObjectMetadata retrieves metadata for an object
+func (client *AzureBlobClient) GetObjectMetadata(ctx context.Context, containerName, blobName string) (*AzureObject, error) {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	properties, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob properties: %w", err)
+	}
+
+	object := &AzureObject{
+		Name:         blobName,
+		Container:    containerName,
+		Size:         properties.ContentLength(),
+		LastModified: properties.LastModified(),
+		ETag:         string(properties.ETag()),
+		ContentType:  properties.ContentType(),
+		Metadata:     properties.NewMetadata(),
+		BlobType:     string(properties.BlobType()),
+	}
+
+	if properties.AccessTier() != "" {
+		object.AccessTier = string(properties.AccessTier())
+	}
+
+	return object, nil
+}
+
+// CreateContainer creates a new container
+func (client *AzureBlobClient) CreateContainer(ctx context.Context, containerName string, options *AzureContainerOptions) error {
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+
+	createOptions := azblob.ContainerCreateOptions{}
+	if options != nil {
+		createOptions.Metadata = options.Metadata
+		if options.PublicAccess != "" {
+			publicAccessType := azblob.PublicAccessType(options.PublicAccess)
+			createOptions.Access = publicAccessType
+		}
+	}
+
+	_, err := containerURL.Create(ctx, createOptions.Metadata, createOptions.Access)
+	if err != nil {
+		return fmt.Errorf("failed to create container: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteContainer deletes a container
+func (client *AzureBlobClient) DeleteContainer(ctx context.Context, containerName string) error {
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+
+	_, err := containerURL.Delete(ctx, azblob.ContainerAccessConditions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete container: %w", err)
+	}
+
+	return nil
+}
+
+// SetObjectAccessTier changes the access tier of a blob
+func (client *AzureBlobClient) SetObjectAccessTier(ctx context.Context, containerName, blobName, accessTier string) error {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	_, err := blobURL.SetTier(ctx, azblob.AccessTierType(accessTier), azblob.LeaseAccessConditions{})
+	if err != nil {
+		return fmt.Errorf("failed to set blob access tier: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateSASURL generates a SAS URL for a blob
+func (client *AzureBlobClient) GenerateSASURL(containerName, blobName string, permissions string, expiry time.Time) (string, error) {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	// Create SAS query parameters
+	sasQueryParams, err := azblob.BlobSASSignatureValues{
+		Protocol:      azblob.SASProtocolHTTPS,
+		ExpiryTime:    expiry,
+		ContainerName: containerName,
+		BlobName:      blobName,
+		Permissions:   permissions,
+	}.NewSASQueryParameters(client.serviceURL.URL().User.(*azblob.SharedKeyCredential))
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate SAS query parameters: %w", err)
+	}
+
+	// Construct the full URL
+	sasURL := blobURL.URL()
+	sasURL.RawQuery = sasQueryParams.Encode()
+
+	return sasURL.String(), nil
+}
+
+// Supporting types and options
+
+// AzureUploadOptions contains options for uploading objects
+type AzureUploadOptions struct {
+	BufferSize  int               `json:"buffer_size"`
+	MaxBuffers  int               `json:"max_buffers"`
+	ContentType string            `json:"content_type"`
+	Metadata    map[string]string `json:"metadata"`
+	AccessTier  string            `json:"access_tier"`
+}
+
+// AzureContainerOptions contains options for creating containers
+type AzureContainerOptions struct {
+	Metadata     map[string]string `json:"metadata"`
+	PublicAccess string            `json:"public_access"`
+}
+
+// AzureObjectExists checks if an object exists in Azure Blob Storage
+func (client *AzureBlobClient) AzureObjectExists(ctx context.Context, containerName, blobName string) (bool, error) {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+	blobURL := containerURL.NewBlockBlobURL(blobName)
+
+	_, err := blobURL.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	if err != nil {
+		if storageError, ok := err.(azblob.StorageError); ok {
+			if storageError.ServiceCode() == azblob.ServiceCodeBlobNotFound {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("failed to check if blob exists: %w", err)
+	}
+
+	return true, nil
+}
+
+// GetStorageAccountInfo retrieves information about the storage account
+func (client *AzureBlobClient) GetStorageAccountInfo(ctx context.Context) (*AzureStorageAccountInfo, error) {
+	response, err := client.serviceURL.GetAccountInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account info: %w", err)
+	}
+
+	info := &AzureStorageAccountInfo{
+		AccountKind: string(response.AccountKind()),
+		SKUName:     string(response.SkuName()),
+	}
+
+	return info, nil
+}
+
+// AzureStorageAccountInfo contains information about the storage account
+type AzureStorageAccountInfo struct {
+	AccountKind string `json:"account_kind"`
+	SKUName     string `json:"sku_name"`
+}
+
+// BatchDeleteObjects deletes multiple objects in a single request (if supported)
+func (client *AzureBlobClient) BatchDeleteObjects(ctx context.Context, containerName string, blobNames []string) error {
+	if containerName == "" {
+		containerName = client.containerName
+	}
+
+	// Azure doesn't have native batch delete, so we'll delete objects concurrently
+	// In a real implementation, you might want to use goroutines with proper error handling
+	for _, blobName := range blobNames {
+		err := client.DeleteObject(ctx, containerName, blobName)
+		if err != nil {
+			return fmt.Errorf("failed to delete blob %s: %w", blobName, err)
+		}
+	}
+
+	return nil
+}
+
+// GetContainerProperties retrieves properties of a container
+func (client *AzureBlobClient) GetContainerProperties(ctx context.Context, containerName string) (*AzureContainer, error) {
+	containerURL := client.serviceURL.NewContainerURL(containerName)
+
+	properties, err := containerURL.GetProperties(ctx, azblob.LeaseAccessConditions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container properties: %w", err)
+	}
+
+	container := &AzureContainer{
+		Name:         containerName,
+		LastModified: properties.LastModified(),
+		ETag:         string(properties.ETag()),
+		Metadata:     properties.NewMetadata(),
+	}
+
+	return container, nil
+}
+
+// ValidateConfiguration validates the Azure configuration
+func ValidateAzureConfiguration(config *AzureConfig) error {
+	if config.AccountName == "" {
+		return fmt.Errorf("account name is required")
+	}
+
+	if config.AccountKey == "" && config.SASToken == "" {
+		return fmt.Errorf("either account key or SAS token is required")
+	}
+
+	if config.RetryOptions != nil {
+		if config.RetryOptions.MaxTries <= 0 {
+			return fmt.Errorf("max tries must be positive")
+		}
+		if config.RetryOptions.TryTimeout <= 0 {
+			return fmt.Errorf("try timeout must be positive")
+		}
+	}
+
+	return nil
+}
+
+// ParseAzureBlobURL parses an Azure Blob Storage URL
+func ParseAzureBlobURL(blobURL string) (*AzureBlobURLParts, error) {
+	u, err := url.Parse(blobURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	// Extract account name from hostname
+	hostParts := strings.Split(u.Hostname(), ".")
+	if len(hostParts) < 1 {
+		return nil, fmt.Errorf("invalid Azure blob URL format")
+	}
+
+	accountName := hostParts[0]
+
+	// Extract container and blob from path
+	pathParts := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 2)
+	if len(pathParts) < 1 {
+		return nil, fmt.Errorf("container name not found in URL")
+	}
+
+	containerName := pathParts[0]
+	var blobName string
+	if len(pathParts) > 1 {
+		blobName = pathParts[1]
+	}
+
+	return &AzureBlobURLParts{
+		AccountName:   accountName,
+		ContainerName: containerName,
+		BlobName:      blobName,
+		SASToken:      u.RawQuery,
+	}, nil
+}
+
+// AzureBlobURLParts represents the components of an Azure Blob Storage URL
+type AzureBlobURLParts struct {
+	AccountName   string `json:"account_name"`
+	ContainerName string `json:"container_name"`
+	BlobName      string `json:"blob_name"`
+	SASToken      string `json:"sas_token"`
+}

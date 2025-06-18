@@ -25,8 +25,8 @@ type S3ry struct {
 	Sess         *session.Session
 	Svc          *s3.S3
 	Bucket       string
-	ModernClient *modernS3.Client    // Modern S3 client for enhanced performance
-	UseModern    bool               // Flag to enable modern backend
+	ModernClient *modernS3.Client // Modern S3 client for enhanced performance
+	UseModern    bool             // Flag to enable modern backend
 }
 
 // ApNortheastOne Japan Region String
@@ -70,7 +70,7 @@ func NewS3ryWithModernBackend(region string) *S3ry {
 	))
 	svc := s3.New(sess)
 	modernClient := modernS3.NewClient(region)
-	
+
 	s := &S3ry{
 		Sess:         sess,
 		Svc:          svc,
@@ -188,7 +188,7 @@ func (s S3ry) getObjectLegacy(bucket string, objectKey string) {
 func (s S3ry) getObjectModern(bucket string, objectKey string) {
 	sps(i18n.Sprintf("Downloading object (modern backend) ..."))
 	filename := filepath.Base(objectKey)
-	
+
 	// Create modern downloader with enhanced configuration
 	config := modernS3.DefaultDownloadConfig()
 	config.ConcurrentDownloads = 3
@@ -201,16 +201,16 @@ func (s S3ry) getObjectModern(bucket string, objectKey string) {
 			}
 		}
 	}
-	
+
 	downloader := modernS3.NewDownloader(s.ModernClient, config)
 	defer downloader.Close()
-	
+
 	request := modernS3.DownloadRequest{
 		Bucket:   bucket,
 		Key:      objectKey,
 		FilePath: filename,
 	}
-	
+
 	ctx := context.Background()
 	err := downloader.Download(ctx, request, config)
 	if err != nil {
@@ -219,14 +219,14 @@ func (s S3ry) getObjectModern(bucket string, objectKey string) {
 		s.getObjectLegacy(bucket, objectKey)
 		return
 	}
-	
+
 	// Get file size for reporting
 	fileInfo, err := os.Stat(filename)
 	var fileSize int64
 	if err == nil {
 		fileSize = fileInfo.Size()
 	}
-	
+
 	spe()
 	fmt.Println(i18n.Sprintf("File downloaded (modern),% s,% d bytes", filename, fileSize))
 }
@@ -277,7 +277,7 @@ func (s S3ry) uploadObjectLegacy(bucket string, selectUpload string) {
 func (s S3ry) uploadObjectModern(bucket string, selectUpload string) {
 	sps(i18n.Sprintf("Uploading object (modern backend) ..."))
 	uploadObject := selectUpload
-	
+
 	// Create modern uploader with enhanced configuration
 	config := modernS3.DefaultUploadConfig()
 	config.ConcurrentUploads = 3
@@ -290,16 +290,16 @@ func (s S3ry) uploadObjectModern(bucket string, selectUpload string) {
 			}
 		}
 	}
-	
+
 	uploader := modernS3.NewUploader(s.ModernClient, config)
 	defer uploader.Close()
-	
+
 	request := modernS3.UploadRequest{
 		Bucket:   bucket,
 		Key:      uploadObject,
 		FilePath: uploadObject,
 	}
-	
+
 	ctx := context.Background()
 	err := uploader.Upload(ctx, request, config)
 	if err != nil {
@@ -308,7 +308,7 @@ func (s S3ry) uploadObjectModern(bucket string, selectUpload string) {
 		s.uploadObjectLegacy(bucket, selectUpload)
 		return
 	}
-	
+
 	spe()
 	fmt.Println(i18n.Sprintf("Uploaded file (modern),% s", uploadObject))
 }
@@ -384,13 +384,13 @@ func (s S3ry) deleteObjectModern(bucket string, item string) {
 	pool := worker.NewPool(config)
 	pool.Start()
 	defer pool.Stop()
-	
+
 	job := &worker.S3DeleteJob{
 		Client: s.ModernClient,
 		Bucket: bucket,
 		Key:    item,
 	}
-	
+
 	err := pool.Submit(job)
 	if err != nil {
 		// Fallback to legacy on error
@@ -398,7 +398,7 @@ func (s S3ry) deleteObjectModern(bucket string, item string) {
 		s.deleteObjectLegacy(bucket, item)
 		return
 	}
-	
+
 	// Wait for result
 	select {
 	case result := <-pool.Results():

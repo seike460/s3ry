@@ -19,11 +19,11 @@ type BatchProcessor struct {
 
 // BatchConfig configures batch operation behavior
 type BatchConfig struct {
-	ConcurrentOperations int           // Number of concurrent operations
-	BatchSize            int           // Size of each batch
-	RetryCount           int           // Number of retries for failed operations
-	RetryDelay           time.Duration // Delay between retries
-	DryRun               bool          // Whether to perform a dry run
+	ConcurrentOperations int                        // Number of concurrent operations
+	BatchSize            int                        // Size of each batch
+	RetryCount           int                        // Number of retries for failed operations
+	RetryDelay           time.Duration              // Delay between retries
+	DryRun               bool                       // Whether to perform a dry run
 	OnProgress           func(completed, total int) // Progress callback
 }
 
@@ -94,7 +94,7 @@ func (bp *BatchProcessor) deleteBatchOptimized(ctx context.Context, bucket strin
 		}
 
 		batchKeys := keys[i:end]
-		
+
 		// Create delete objects input
 		deleteObjects := make([]*s3.ObjectIdentifier, len(batchKeys))
 		for j, key := range batchKeys {
@@ -113,10 +113,10 @@ func (bp *BatchProcessor) deleteBatchOptimized(ctx context.Context, bucket strin
 
 		// Submit batch delete job
 		job := &BatchDeleteJob{
-			client:    bp.client,
-			input:     input,
-			keys:      batchKeys,
-			mutex:     &mutex,
+			client:     bp.client,
+			input:      input,
+			keys:       batchKeys,
+			mutex:      &mutex,
 			operations: &operations,
 		}
 
@@ -264,11 +264,23 @@ func (bp *BatchProcessor) SetPermissionsBatch(ctx context.Context, bucket string
 	return batchResults
 }
 
-// waitForBatchCompletion waits for all batch operations to complete
+// waitForBatchCompletion waits for all batch operations to complete with dynamic timeout
 func (bp *BatchProcessor) waitForBatchCompletion(expectedCount int, operations []BatchOperation, config BatchConfig) []BatchOperation {
-	timeout := time.After(30 * time.Second) // 30 second timeout
-	ticker := time.NewTicker(100 * time.Millisecond)
+	// Dynamic timeout based on expected count: minimum 30s, scale with size
+	baseTimeout := 30 * time.Second
+	dynamicTimeout := time.Duration(expectedCount/100) * time.Second
+	if dynamicTimeout > 300*time.Second {
+		dynamicTimeout = 300 * time.Second // Max 5 minutes
+	}
+	totalTimeout := baseTimeout + dynamicTimeout
+
+	timeout := time.After(totalTimeout)
+	ticker := time.NewTicker(50 * time.Millisecond) // Faster polling for better responsiveness
 	defer ticker.Stop()
+
+	lastCount := 0
+	stagnantCounter := 0
+	maxStagnantTicks := 100 // 5 seconds at 50ms intervals
 
 	for {
 		select {
@@ -276,9 +288,29 @@ func (bp *BatchProcessor) waitForBatchCompletion(expectedCount int, operations [
 			// Timeout reached, return what we have
 			return operations
 		case <-ticker.C:
-			if len(operations) >= expectedCount {
+			currentCount := len(operations)
+
+			// Progress callback
+			if config.OnProgress != nil {
+				config.OnProgress(currentCount, expectedCount)
+			}
+
+			// Check if all operations completed
+			if currentCount >= expectedCount {
 				return operations
 			}
+
+			// Detect stagnation (no progress for 5 seconds)
+			if currentCount == lastCount {
+				stagnantCounter++
+				if stagnantCounter >= maxStagnantTicks {
+					// No progress for too long, return what we have
+					return operations
+				}
+			} else {
+				stagnantCounter = 0
+			}
+			lastCount = currentCount
 		}
 	}
 }
@@ -317,7 +349,7 @@ type BatchDeleteJob struct {
 
 func (j *BatchDeleteJob) Execute(ctx context.Context) error {
 	output, err := j.client.s3Client.DeleteObjectsWithContext(ctx, j.input)
-	
+
 	j.mutex.Lock()
 	defer j.mutex.Unlock()
 
@@ -388,7 +420,7 @@ type BatchCopyJob struct {
 
 func (j *BatchCopyJob) Execute(ctx context.Context) error {
 	copySource := fmt.Sprintf("%s/%s", j.operation.SourceBucket, j.operation.SourceKey)
-	
+
 	input := &s3.CopyObjectInput{
 		Bucket:     aws.String(j.operation.DestBucket),
 		Key:        aws.String(j.operation.DestKey),
@@ -413,7 +445,7 @@ type BatchMetadataUpdateJob struct {
 
 func (j *BatchMetadataUpdateJob) Execute(ctx context.Context) error {
 	copySource := fmt.Sprintf("%s/%s", j.bucket, j.update.Key)
-	
+
 	input := &s3.CopyObjectInput{
 		Bucket:            aws.String(j.bucket),
 		Key:               aws.String(j.update.Key),

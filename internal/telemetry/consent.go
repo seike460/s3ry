@@ -80,7 +80,7 @@ You can:
 func (cm *ConsentManager) ShowStatus() {
 	fmt.Println("📊 S3ry Telemetry Status")
 	fmt.Println("═══════════════════════")
-	
+
 	if cm.client.IsEnabled() {
 		fmt.Println("Status: ✅ ENABLED")
 		fmt.Printf("User ID: %s\n", cm.client.userID)
@@ -96,7 +96,7 @@ func (cm *ConsentManager) ShowStatus() {
 		fmt.Println("\nCommands:")
 		fmt.Println("  s3ry telemetry enable   - Enable telemetry")
 	}
-	
+
 	fmt.Println("\nPrivacy:")
 	fmt.Println("  • No personal data is collected")
 	fmt.Println("  • No file names or content")
@@ -113,15 +113,15 @@ func (cm *ConsentManager) ShowDebugInfo() {
 
 	fmt.Println("🔍 S3ry Telemetry Debug Information")
 	fmt.Println("═════════════════════════════════")
-	
+
 	system := getSystemInfo()
-	
+
 	fmt.Printf("Client Information:\n")
 	fmt.Printf("  Version: %s\n", cm.client.version)
 	fmt.Printf("  User ID: %s\n", cm.client.userID)
 	fmt.Printf("  Session ID: %s\n", cm.client.sessionID)
 	fmt.Printf("  Endpoint: %s\n", cm.client.endpoint)
-	
+
 	fmt.Printf("\nSystem Information:\n")
 	fmt.Printf("  OS: %s\n", system.OS)
 	fmt.Printf("  Architecture: %s\n", system.Arch)
@@ -131,7 +131,7 @@ func (cm *ConsentManager) ShowDebugInfo() {
 	if system.CloudProvider != "" {
 		fmt.Printf("  Cloud Provider: %s\n", system.CloudProvider)
 	}
-	
+
 	fmt.Printf("\nExample Event (anonymized):\n")
 	fmt.Println(`{
   "event_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -158,7 +158,7 @@ func (cm *ConsentManager) ShowDebugInfo() {
   },
   "version": "2.0.0"
 }`)
-	
+
 	fmt.Println("\n🔒 Privacy Notes:")
 	fmt.Println("  • User ID is randomly generated and not linked to you")
 	fmt.Println("  • No file names, paths, or content are collected")
@@ -173,7 +173,7 @@ func (cm *ConsentManager) EnableWithConsent() error {
 	if err != nil {
 		return fmt.Errorf("failed to enable telemetry: %w", err)
 	}
-	
+
 	fmt.Println("✅ Telemetry enabled successfully!")
 	fmt.Println("\nWhat happens now:")
 	fmt.Println("  • Anonymous usage data will be collected")
@@ -184,7 +184,7 @@ func (cm *ConsentManager) EnableWithConsent() error {
 	fmt.Println("  s3ry telemetry status   - View current status")
 	fmt.Println("  s3ry telemetry disable  - Disable telemetry")
 	fmt.Println("  s3ry telemetry debug    - View debug information")
-	
+
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (cm *ConsentManager) DisableWithConfirmation() error {
 	if err != nil {
 		return fmt.Errorf("failed to disable telemetry: %w", err)
 	}
-	
+
 	fmt.Println("❌ Telemetry disabled successfully!")
 	fmt.Println("\nWhat happens now:")
 	fmt.Println("  • No usage data will be collected")
@@ -203,6 +203,6 @@ func (cm *ConsentManager) DisableWithConfirmation() error {
 	fmt.Println("  • You can re-enable anytime")
 	fmt.Println("\nTo re-enable:")
 	fmt.Println("  s3ry telemetry enable   - Re-enable telemetry")
-	
+
 	return nil
 }

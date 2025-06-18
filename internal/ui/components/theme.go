@@ -11,35 +11,35 @@ import (
 
 // Theme represents a UI theme
 type Theme struct {
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	Colors      ThemeColors          `json:"colors"`
-	Styles      ThemeStyles          `json:"styles"`
-	Custom      map[string]string    `json:"custom,omitempty"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Colors      ThemeColors       `json:"colors"`
+	Styles      ThemeStyles       `json:"styles"`
+	Custom      map[string]string `json:"custom,omitempty"`
 }
 
 // ThemeColors represents the color palette for a theme
 type ThemeColors struct {
 	// Primary colors
-	Primary     lipgloss.Color `json:"primary"`
-	Secondary   lipgloss.Color `json:"secondary"`
-	Accent      lipgloss.Color `json:"accent"`
-	
+	Primary   lipgloss.Color `json:"primary"`
+	Secondary lipgloss.Color `json:"secondary"`
+	Accent    lipgloss.Color `json:"accent"`
+
 	// Background colors
-	Background  lipgloss.Color `json:"background"`
-	Surface     lipgloss.Color `json:"surface"`
-	
+	Background lipgloss.Color `json:"background"`
+	Surface    lipgloss.Color `json:"surface"`
+
 	// Text colors
 	Text        lipgloss.Color `json:"text"`
 	TextMuted   lipgloss.Color `json:"text_muted"`
 	TextInverse lipgloss.Color `json:"text_inverse"`
-	
+
 	// Status colors
-	Success     lipgloss.Color `json:"success"`
-	Warning     lipgloss.Color `json:"warning"`
-	Error       lipgloss.Color `json:"error"`
-	Info        lipgloss.Color `json:"info"`
-	
+	Success lipgloss.Color `json:"success"`
+	Warning lipgloss.Color `json:"warning"`
+	Error   lipgloss.Color `json:"error"`
+	Info    lipgloss.Color `json:"info"`
+
 	// Interactive colors
 	Border      lipgloss.Color `json:"border"`
 	BorderFocus lipgloss.Color `json:"border_focus"`
@@ -67,21 +67,21 @@ type ThemeManager struct {
 func NewThemeManager() *ThemeManager {
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, ".s3ry", "themes.json")
-	
+
 	tm := &ThemeManager{
 		themes:     make(map[string]*Theme),
 		configPath: configPath,
 	}
-	
+
 	// Load built-in themes
 	tm.loadBuiltinThemes()
-	
+
 	// Try to load custom themes
 	tm.loadCustomThemes()
-	
+
 	// Set default theme
 	tm.SetTheme("dark")
-	
+
 	return tm
 }
 
@@ -117,7 +117,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "normal",
 		},
 	}
-	
+
 	// Light theme
 	light := &Theme{
 		Name:        "light",
@@ -148,7 +148,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "normal",
 		},
 	}
-	
+
 	// High contrast theme
 	highContrast := &Theme{
 		Name:        "high-contrast",
@@ -179,7 +179,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "bold",
 		},
 	}
-	
+
 	// Minimal theme
 	minimal := &Theme{
 		Name:        "minimal",
@@ -210,7 +210,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "normal",
 		},
 	}
-	
+
 	// Neon theme
 	neon := &Theme{
 		Name:        "neon",
@@ -241,7 +241,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "bold",
 		},
 	}
-	
+
 	// Ocean theme
 	ocean := &Theme{
 		Name:        "ocean",
@@ -272,7 +272,7 @@ func (tm *ThemeManager) loadBuiltinThemes() {
 			FontWeight:   "normal",
 		},
 	}
-	
+
 	tm.themes["dark"] = dark
 	tm.themes["light"] = light
 	tm.themes["high-contrast"] = highContrast
@@ -286,17 +286,17 @@ func (tm *ThemeManager) loadCustomThemes() {
 	if _, err := os.Stat(tm.configPath); os.IsNotExist(err) {
 		return // No custom themes file
 	}
-	
+
 	data, err := os.ReadFile(tm.configPath)
 	if err != nil {
 		return
 	}
-	
+
 	var customThemes map[string]*Theme
 	if err := json.Unmarshal(data, &customThemes); err != nil {
 		return
 	}
-	
+
 	// Add custom themes
 	for name, theme := range customThemes {
 		tm.themes[name] = theme
@@ -308,7 +308,7 @@ func (tm *ThemeManager) SaveCustomThemes() error {
 	// Filter out built-in themes
 	customThemes := make(map[string]*Theme)
 	builtinNames := []string{"dark", "light", "high-contrast", "minimal", "neon", "ocean"}
-	
+
 	for name, theme := range tm.themes {
 		isBuiltin := false
 		for _, builtinName := range builtinNames {
@@ -321,22 +321,22 @@ func (tm *ThemeManager) SaveCustomThemes() error {
 			customThemes[name] = theme
 		}
 	}
-	
+
 	// Ensure config directory exists
 	dir := filepath.Dir(tm.configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	data, err := json.MarshalIndent(customThemes, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal themes: %w", err)
 	}
-	
+
 	if err := os.WriteFile(tm.configPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write themes file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -351,7 +351,7 @@ func (tm *ThemeManager) SetTheme(name string) error {
 	if !exists {
 		return fmt.Errorf("theme %q not found", name)
 	}
-	
+
 	tm.currentTheme = theme
 	return nil
 }
@@ -370,7 +370,7 @@ func (tm *ThemeManager) AddCustomTheme(theme *Theme) error {
 	if theme.Name == "" {
 		return fmt.Errorf("theme name cannot be empty")
 	}
-	
+
 	tm.themes[theme.Name] = theme
 	return nil
 }
@@ -384,11 +384,11 @@ func (tm *ThemeManager) RemoveCustomTheme(name string) error {
 			return fmt.Errorf("cannot remove built-in theme %q", name)
 		}
 	}
-	
+
 	if _, exists := tm.themes[name]; !exists {
 		return fmt.Errorf("theme %q not found", name)
 	}
-	
+
 	delete(tm.themes, name)
 	return nil
 }
@@ -400,86 +400,86 @@ func (tm *ThemeManager) CreateThemedStyle(styleType string) lipgloss.Style {
 		// Fallback to default style
 		return lipgloss.NewStyle()
 	}
-	
+
 	style := lipgloss.NewStyle()
-	
+
 	switch styleType {
 	case "title":
 		style = style.
 			Bold(true).
 			Foreground(theme.Colors.Primary).
 			Padding(theme.Styles.Padding)
-			
+
 	case "subtitle":
 		style = style.
 			Foreground(theme.Colors.Secondary).
 			Padding(theme.Styles.Padding)
-			
+
 	case "text":
 		style = style.
 			Foreground(theme.Colors.Text)
-			
+
 	case "muted":
 		style = style.
 			Foreground(theme.Colors.TextMuted)
-			
+
 	case "success":
 		style = style.
 			Bold(true).
 			Foreground(theme.Colors.Success)
-			
+
 	case "warning":
 		style = style.
 			Bold(true).
 			Foreground(theme.Colors.Warning)
-			
+
 	case "error":
 		style = style.
 			Bold(true).
 			Foreground(theme.Colors.Error)
-			
+
 	case "info":
 		style = style.
 			Foreground(theme.Colors.Info)
-			
+
 	case "border":
 		style = style.
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Colors.Border)
-			
+
 	case "border-focus":
 		style = style.
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(theme.Colors.BorderFocus)
-			
+
 	case "surface":
 		style = style.
 			Background(theme.Colors.Surface).
 			Foreground(theme.Colors.Text).
 			Padding(theme.Styles.Padding)
-			
+
 	case "selection":
 		style = style.
 			Background(theme.Colors.Selection).
 			Foreground(theme.Colors.Text)
-			
+
 	case "hover":
 		style = style.
 			Background(theme.Colors.Hover).
 			Foreground(theme.Colors.Text)
-			
+
 	case "accent":
 		style = style.
 			Bold(true).
 			Foreground(theme.Colors.Accent)
-			
+
 	case "inverse":
 		style = style.
 			Background(theme.Colors.Text).
 			Foreground(theme.Colors.TextInverse).
 			Padding(theme.Styles.Padding)
 	}
-	
+
 	return style
 }
 
@@ -487,13 +487,13 @@ func (tm *ThemeManager) CreateThemedStyle(styleType string) lipgloss.Style {
 func (tm *ThemeManager) GetThemePreview(themeName string) string {
 	oldTheme := tm.currentTheme
 	defer func() { tm.currentTheme = oldTheme }() // Restore original theme
-	
+
 	if err := tm.SetTheme(themeName); err != nil {
 		return fmt.Sprintf("Error: %v", err)
 	}
-	
+
 	theme := tm.currentTheme
-	
+
 	// Create preview using theme colors
 	preview := fmt.Sprintf(`%s
 %s
@@ -509,20 +509,20 @@ func (tm *ThemeManager) GetThemePreview(themeName string) string {
   %s`,
 		tm.CreateThemedStyle("title").Render("■ "+theme.Name),
 		tm.CreateThemedStyle("muted").Render(theme.Description),
-		
+
 		tm.CreateThemedStyle("success").Render("● Success"),
-		tm.CreateThemedStyle("warning").Render("● Warning"), 
+		tm.CreateThemedStyle("warning").Render("● Warning"),
 		tm.CreateThemedStyle("error").Render("● Error"),
 		tm.CreateThemedStyle("info").Render("● Info"),
-		
+
 		tm.CreateThemedStyle("subtitle").Render("▓ Sample Content"),
 		tm.CreateThemedStyle("text").Render("This is regular text in the current theme."),
-		
+
 		tm.CreateThemedStyle("border").Render(" Bordered Container "),
 		tm.CreateThemedStyle("accent").Render("• Accent text"),
 		tm.CreateThemedStyle("selection").Render("• Selected item"),
 		tm.CreateThemedStyle("muted").Render("• Muted text"),
 	)
-	
+
 	return preview
 }

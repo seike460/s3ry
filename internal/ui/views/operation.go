@@ -11,7 +11,7 @@ type OperationView struct {
 	list   *components.List
 	region string
 	bucket string
-	
+
 	// Styles
 	headerStyle lipgloss.Style
 }
@@ -20,37 +20,37 @@ type OperationView struct {
 func NewOperationView(region, bucket string) *OperationView {
 	operations := []components.ListItem{
 		{
-			Title:       "Download files",
-			Description: "Download objects from S3 bucket to local storage",
+			Title:       "📥 Download files",
+			Description: "Download objects from S3 bucket to local storage (shortcut: d)",
 			Tag:         "Download",
 		},
 		{
-			Title:       "Upload files",
-			Description: "Upload local files to S3 bucket",
+			Title:       "📤 Upload files",
+			Description: "Upload local files to S3 bucket (shortcut: u)",
 			Tag:         "Upload",
 		},
 		{
-			Title:       "Delete objects",
-			Description: "Delete objects from S3 bucket",
+			Title:       "🗑️ Delete objects",
+			Description: "Delete objects from S3 bucket (shortcut: delete)",
 			Tag:         "Delete",
 		},
 		{
-			Title:       "Create object list",
+			Title:       "📋 Create object list",
 			Description: "Generate a list of all objects in the bucket",
 			Tag:         "List",
 		},
 		{
-			Title:       "Cloud integration",
+			Title:       "☁️ Cloud integration",
 			Description: "View related AWS services and their status",
 			Tag:         "Cloud",
 		},
 	}
-	
+
 	return &OperationView{
 		region: region,
 		bucket: bucket,
 		list:   components.NewList("Select Operation", operations),
-		
+
 		headerStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
@@ -68,7 +68,7 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.list, _ = v.list.Update(msg)
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -111,10 +111,10 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		
+
 		v.list, _ = v.list.Update(msg)
 	}
-	
+
 	return v, nil
 }
 
@@ -124,10 +124,10 @@ func (v *OperationView) View() string {
 	context := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#888")).
 		Render("Region: " + v.region + " | Bucket: " + v.bucket)
-	
+
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
 		Render("d: download • u: upload • delete: delete • ?: help • s: settings • l: logs • esc: back • q: quit")
-	
+
 	return header + "\n" + context + "\n\n" + v.list.View() + "\n\n" + footer
 }

@@ -16,14 +16,14 @@ type ZeroTrustConfig struct {
 	Enabled                 bool          `json:"enabled"`
 	RequireMutualTLS        bool          `json:"require_mutual_tls"`
 	VerifyPeerCertificates  bool          `json:"verify_peer_certificates"`
-	AllowedCertificates     []string      `json:"allowed_certificates"`      // Certificate fingerprints
-	RequiredCertificateOUs  []string      `json:"required_certificate_ous"`  // Required Organizational Units
+	AllowedCertificates     []string      `json:"allowed_certificates"`     // Certificate fingerprints
+	RequiredCertificateOUs  []string      `json:"required_certificate_ous"` // Required Organizational Units
 	NetworkPolicyEnabled    bool          `json:"network_policy_enabled"`
-	AllowedNetworks         []string      `json:"allowed_networks"`          // CIDR blocks
-	DeniedNetworks          []string      `json:"denied_networks"`           // CIDR blocks
+	AllowedNetworks         []string      `json:"allowed_networks"` // CIDR blocks
+	DeniedNetworks          []string      `json:"denied_networks"`  // CIDR blocks
 	SessionTimeout          time.Duration `json:"session_timeout"`
 	RequireReauthentication bool          `json:"require_reauthentication"`
-	MinimumTLSVersion       string        `json:"minimum_tls_version"`       // TLS 1.2, TLS 1.3
+	MinimumTLSVersion       string        `json:"minimum_tls_version"` // TLS 1.2, TLS 1.3
 	CipherSuites            []string      `json:"cipher_suites"`
 }
 
@@ -268,19 +268,19 @@ func (n *NetworkPolicy) IsAllowed(ip net.IP) bool {
 
 // SessionManager manages user sessions
 type SessionManager struct {
-	sessions      map[string]*Session
+	sessions       map[string]*Session
 	sessionTimeout time.Duration
-	mutex         sync.RWMutex
+	mutex          sync.RWMutex
 }
 
 // Session represents a user session
 type Session struct {
-	UserID      string    `json:"user_id"`
-	CreatedAt   time.Time `json:"created_at"`
-	LastAccess  time.Time `json:"last_access"`
-	IPAddress   string    `json:"ip_address"`
-	UserAgent   string    `json:"user_agent"`
-	Authenticated bool    `json:"authenticated"`
+	UserID        string    `json:"user_id"`
+	CreatedAt     time.Time `json:"created_at"`
+	LastAccess    time.Time `json:"last_access"`
+	IPAddress     string    `json:"ip_address"`
+	UserAgent     string    `json:"user_agent"`
+	Authenticated bool      `json:"authenticated"`
 }
 
 // NewSessionManager creates a new session manager

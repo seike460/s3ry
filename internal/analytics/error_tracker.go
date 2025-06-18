@@ -34,17 +34,17 @@ type ErrorEvent struct {
 
 // ErrorPattern represents patterns of similar errors
 type ErrorPattern struct {
-	Fingerprint     string            `json:"fingerprint"`
-	FirstSeen       time.Time         `json:"first_seen"`
-	LastSeen        time.Time         `json:"last_seen"`
-	Count           int64             `json:"count"`
-	ErrorType       string            `json:"error_type"`
-	CommonMessage   string            `json:"common_message"`
-	CommonContext   map[string]string `json:"common_context"`
-	Severity        ErrorSeverity     `json:"severity"`
-	AffectedCommands []string         `json:"affected_commands"`
-	TrendDirection  TrendDirection    `json:"trend_direction"`
-	RecentCount     int64             `json:"recent_count"` // Last 24 hours
+	Fingerprint      string            `json:"fingerprint"`
+	FirstSeen        time.Time         `json:"first_seen"`
+	LastSeen         time.Time         `json:"last_seen"`
+	Count            int64             `json:"count"`
+	ErrorType        string            `json:"error_type"`
+	CommonMessage    string            `json:"common_message"`
+	CommonContext    map[string]string `json:"common_context"`
+	Severity         ErrorSeverity     `json:"severity"`
+	AffectedCommands []string          `json:"affected_commands"`
+	TrendDirection   TrendDirection    `json:"trend_direction"`
+	RecentCount      int64             `json:"recent_count"` // Last 24 hours
 }
 
 // ErrorSeverity represents the severity level of an error
@@ -68,54 +68,54 @@ const (
 
 // ErrorTrackerConfig configures the error tracker
 type ErrorTrackerConfig struct {
-	MaxErrors           int           `json:"max_errors"`
-	RetentionPeriod     time.Duration `json:"retention_period"`
-	AlertThresholds     AlertThresholds `json:"alert_thresholds"`
-	IgnorePatterns      []string      `json:"ignore_patterns"`
-	EnableStackTraces   bool          `json:"enable_stack_traces"`
-	SamplingRate        float64       `json:"sampling_rate"`
+	MaxErrors         int             `json:"max_errors"`
+	RetentionPeriod   time.Duration   `json:"retention_period"`
+	AlertThresholds   AlertThresholds `json:"alert_thresholds"`
+	IgnorePatterns    []string        `json:"ignore_patterns"`
+	EnableStackTraces bool            `json:"enable_stack_traces"`
+	SamplingRate      float64         `json:"sampling_rate"`
 }
 
 // AlertThresholds defines when to trigger alerts
 type AlertThresholds struct {
-	CriticalErrorRate   float64 `json:"critical_error_rate"`   // Errors per minute
-	HighErrorCount      int64   `json:"high_error_count"`      // Total errors in window
-	NewErrorThreshold   int64   `json:"new_error_threshold"`   // New unique errors
-	SpikeMultiplier     float64 `json:"spike_multiplier"`      // Multiplier for spike detection
+	CriticalErrorRate float64 `json:"critical_error_rate"` // Errors per minute
+	HighErrorCount    int64   `json:"high_error_count"`    // Total errors in window
+	NewErrorThreshold int64   `json:"new_error_threshold"` // New unique errors
+	SpikeMultiplier   float64 `json:"spike_multiplier"`    // Multiplier for spike detection
 }
 
 // ErrorSummary provides aggregated error information
 type ErrorSummary struct {
-	TotalErrors       int64                      `json:"total_errors"`
-	UniqueErrors      int64                      `json:"unique_errors"`
-	ErrorRate         float64                    `json:"error_rate_per_minute"`
-	TopErrors         []*ErrorPattern            `json:"top_errors"`
-	RecentErrors      []ErrorEvent               `json:"recent_errors"`
-	ErrorsByType      map[string]int64           `json:"errors_by_type"`
-	ErrorsByCommand   map[string]int64           `json:"errors_by_command"`
-	ErrorsBySeverity  map[ErrorSeverity]int64    `json:"errors_by_severity"`
-	TrendAnalysis     *TrendAnalysis             `json:"trend_analysis"`
-	Alerts            []Alert                    `json:"alerts"`
+	TotalErrors      int64                   `json:"total_errors"`
+	UniqueErrors     int64                   `json:"unique_errors"`
+	ErrorRate        float64                 `json:"error_rate_per_minute"`
+	TopErrors        []*ErrorPattern         `json:"top_errors"`
+	RecentErrors     []ErrorEvent            `json:"recent_errors"`
+	ErrorsByType     map[string]int64        `json:"errors_by_type"`
+	ErrorsByCommand  map[string]int64        `json:"errors_by_command"`
+	ErrorsBySeverity map[ErrorSeverity]int64 `json:"errors_by_severity"`
+	TrendAnalysis    *TrendAnalysis          `json:"trend_analysis"`
+	Alerts           []Alert                 `json:"alerts"`
 }
 
 // TrendAnalysis provides trend information
 type TrendAnalysis struct {
-	OverallTrend      TrendDirection `json:"overall_trend"`
-	HourlyTrend       []int64        `json:"hourly_trend"`
-	DailyTrend        []int64        `json:"daily_trend"`
-	WorstPerformingCommand string    `json:"worst_performing_command"`
-	MostCommonError   string         `json:"most_common_error"`
+	OverallTrend           TrendDirection `json:"overall_trend"`
+	HourlyTrend            []int64        `json:"hourly_trend"`
+	DailyTrend             []int64        `json:"daily_trend"`
+	WorstPerformingCommand string         `json:"worst_performing_command"`
+	MostCommonError        string         `json:"most_common_error"`
 }
 
 // Alert represents an error alert
 type Alert struct {
-	ID          string        `json:"id"`
-	Type        AlertType     `json:"type"`
-	Severity    ErrorSeverity `json:"severity"`
-	Message     string        `json:"message"`
-	Timestamp   time.Time     `json:"timestamp"`
-	Pattern     *ErrorPattern `json:"pattern,omitempty"`
-	Context     map[string]interface{} `json:"context"`
+	ID        string                 `json:"id"`
+	Type      AlertType              `json:"type"`
+	Severity  ErrorSeverity          `json:"severity"`
+	Message   string                 `json:"message"`
+	Timestamp time.Time              `json:"timestamp"`
+	Pattern   *ErrorPattern          `json:"pattern,omitempty"`
+	Context   map[string]interface{} `json:"context"`
 }
 
 // AlertType represents different types of alerts
@@ -135,10 +135,10 @@ func NewErrorTracker(config *ErrorTrackerConfig) *ErrorTracker {
 			MaxErrors:       10000,
 			RetentionPeriod: 30 * 24 * time.Hour,
 			AlertThresholds: AlertThresholds{
-				CriticalErrorRate:  10.0,  // 10 errors per minute
-				HighErrorCount:     100,   // 100 errors in window
-				NewErrorThreshold:  5,     // 5 new unique errors
-				SpikeMultiplier:    3.0,   // 3x normal rate
+				CriticalErrorRate: 10.0, // 10 errors per minute
+				HighErrorCount:    100,  // 100 errors in window
+				NewErrorThreshold: 5,    // 5 new unique errors
+				SpikeMultiplier:   3.0,  // 3x normal rate
 			},
 			IgnorePatterns:    []string{},
 			EnableStackTraces: true,
@@ -224,13 +224,13 @@ func (et *ErrorTracker) GetErrorSummary() *ErrorSummary {
 		if event.Timestamp.After(hourAgo) {
 			recentErrors++
 		}
-		
+
 		// Aggregate by type
 		summary.ErrorsByType[event.ErrorType]++
-		
+
 		// Aggregate by command
 		summary.ErrorsByCommand[event.Command]++
-		
+
 		// Aggregate by severity
 		summary.ErrorsBySeverity[event.Severity]++
 	}
@@ -241,7 +241,7 @@ func (et *ErrorTracker) GetErrorSummary() *ErrorSummary {
 	for _, pattern := range et.errorPatterns {
 		patterns = append(patterns, pattern)
 	}
-	
+
 	// Sort by count (descending)
 	for i := 0; i < len(patterns)-1; i++ {
 		for j := i + 1; j < len(patterns); j++ {
@@ -250,7 +250,7 @@ func (et *ErrorTracker) GetErrorSummary() *ErrorSummary {
 			}
 		}
 	}
-	
+
 	// Take top 10
 	if len(patterns) > 10 {
 		patterns = patterns[:10]
@@ -276,7 +276,7 @@ func (et *ErrorTracker) GetErrorSummary() *ErrorSummary {
 // updateErrorPattern updates or creates error patterns
 func (et *ErrorTracker) updateErrorPattern(event ErrorEvent) {
 	pattern, exists := et.errorPatterns[event.Fingerprint]
-	
+
 	if !exists {
 		pattern = &ErrorPattern{
 			Fingerprint:      event.Fingerprint,
@@ -295,13 +295,13 @@ func (et *ErrorTracker) updateErrorPattern(event ErrorEvent) {
 	} else {
 		pattern.LastSeen = event.Timestamp
 		pattern.Count++
-		
+
 		// Update recent count (last 24 hours)
 		recentCutoff := time.Now().Add(-24 * time.Hour)
 		if event.Timestamp.After(recentCutoff) {
 			pattern.RecentCount++
 		}
-		
+
 		// Add command if not already present
 		commandExists := false
 		for _, cmd := range pattern.AffectedCommands {
@@ -313,11 +313,11 @@ func (et *ErrorTracker) updateErrorPattern(event ErrorEvent) {
 		if !commandExists {
 			pattern.AffectedCommands = append(pattern.AffectedCommands, event.Command)
 		}
-		
+
 		// Update severity if higher
-		if event.Severity == SeverityCritical || 
-		   (event.Severity == SeverityHigh && pattern.Severity != SeverityCritical) ||
-		   (event.Severity == SeverityMedium && pattern.Severity == SeverityLow) {
+		if event.Severity == SeverityCritical ||
+			(event.Severity == SeverityHigh && pattern.Severity != SeverityCritical) ||
+			(event.Severity == SeverityMedium && pattern.Severity == SeverityLow) {
 			pattern.Severity = event.Severity
 		}
 	}
@@ -326,7 +326,7 @@ func (et *ErrorTracker) updateErrorPattern(event ErrorEvent) {
 // generateTrendAnalysis creates trend analysis
 func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 	now := time.Now()
-	
+
 	// Calculate hourly trend (last 24 hours)
 	hourlyTrend := make([]int64, 24)
 	for _, event := range et.errors {
@@ -337,7 +337,7 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 			}
 		}
 	}
-	
+
 	// Calculate daily trend (last 7 days)
 	dailyTrend := make([]int64, 7)
 	for _, event := range et.errors {
@@ -348,7 +348,7 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 			}
 		}
 	}
-	
+
 	// Determine overall trend
 	overallTrend := TrendStable
 	if len(dailyTrend) >= 3 {
@@ -360,13 +360,13 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 			overallTrend = TrendDecreasing
 		}
 	}
-	
+
 	// Find worst performing command
 	commandErrors := make(map[string]int64)
 	for _, event := range et.errors {
 		commandErrors[event.Command]++
 	}
-	
+
 	worstCommand := ""
 	maxErrors := int64(0)
 	for cmd, count := range commandErrors {
@@ -375,13 +375,13 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 			worstCommand = cmd
 		}
 	}
-	
+
 	// Find most common error
 	errorTypes := make(map[string]int64)
 	for _, event := range et.errors {
 		errorTypes[event.ErrorType]++
 	}
-	
+
 	mostCommonError := ""
 	maxErrorCount := int64(0)
 	for errorType, count := range errorTypes {
@@ -390,7 +390,7 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 			mostCommonError = errorType
 		}
 	}
-	
+
 	return &TrendAnalysis{
 		OverallTrend:           overallTrend,
 		HourlyTrend:            hourlyTrend,
@@ -404,7 +404,7 @@ func (et *ErrorTracker) generateTrendAnalysis() *TrendAnalysis {
 func (et *ErrorTracker) generateAlerts() []Alert {
 	var alerts []Alert
 	now := time.Now()
-	
+
 	// Check for error rate spike
 	hourAgo := now.Add(-time.Hour)
 	recentErrors := 0
@@ -413,7 +413,7 @@ func (et *ErrorTracker) generateAlerts() []Alert {
 			recentErrors++
 		}
 	}
-	
+
 	errorRate := float64(recentErrors) / 60.0 // errors per minute
 	if errorRate > et.config.AlertThresholds.CriticalErrorRate {
 		alerts = append(alerts, Alert{
@@ -428,7 +428,7 @@ func (et *ErrorTracker) generateAlerts() []Alert {
 			},
 		})
 	}
-	
+
 	// Check for new error patterns
 	dayAgo := now.Add(-24 * time.Hour)
 	newPatterns := 0
@@ -437,7 +437,7 @@ func (et *ErrorTracker) generateAlerts() []Alert {
 			newPatterns++
 		}
 	}
-	
+
 	if int64(newPatterns) > et.config.AlertThresholds.NewErrorThreshold {
 		alerts = append(alerts, Alert{
 			ID:        generateEventID(),
@@ -451,7 +451,7 @@ func (et *ErrorTracker) generateAlerts() []Alert {
 			},
 		})
 	}
-	
+
 	// Check for critical errors
 	for _, pattern := range et.errorPatterns {
 		if pattern.Severity == SeverityCritical && pattern.RecentCount > 0 {
@@ -469,30 +469,30 @@ func (et *ErrorTracker) generateAlerts() []Alert {
 			})
 		}
 	}
-	
+
 	return alerts
 }
 
 // cleanOldErrors removes errors older than retention period
 func (et *ErrorTracker) cleanOldErrors() {
 	cutoff := time.Now().Add(-et.config.RetentionPeriod)
-	
+
 	var validErrors []ErrorEvent
 	for _, event := range et.errors {
 		if event.Timestamp.After(cutoff) {
 			validErrors = append(validErrors, event)
 		}
 	}
-	
+
 	et.errors = validErrors
-	
+
 	// Clean old patterns (no recent errors)
 	recentCutoff := time.Now().Add(-24 * time.Hour)
 	for fingerprint, pattern := range et.errorPatterns {
 		if pattern.LastSeen.Before(recentCutoff) {
 			pattern.RecentCount = 0
 		}
-		
+
 		// Remove patterns with no errors in retention period
 		if pattern.LastSeen.Before(cutoff) {
 			delete(et.errorPatterns, fingerprint)

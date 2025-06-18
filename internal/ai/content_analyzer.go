@@ -19,38 +19,38 @@ import (
 
 // ContentAnalyzer provides AI/ML-powered content analysis for automatic tagging
 type ContentAnalyzer struct {
-	config         *AnalyzerConfig
-	tagGenerators  []TagGenerator
+	config           *AnalyzerConfig
+	tagGenerators    []TagGenerator
 	contentAnalyzers []ContentTypeAnalyzer
-	patterns       *PatternMatcher
-	logger         Logger
+	patterns         *PatternMatcher
+	logger           Logger
 }
 
 // AnalyzerConfig configures the content analyzer
 type AnalyzerConfig struct {
-	MaxFileSize           int64         `json:"max_file_size"`
-	SupportedMimeTypes    []string      `json:"supported_mime_types"`
-	EnableImageAnalysis   bool          `json:"enable_image_analysis"`
-	EnableTextAnalysis    bool          `json:"enable_text_analysis"`
-	EnableMetadataExtraction bool       `json:"enable_metadata_extraction"`
-	TagConfidenceThreshold float64     `json:"tag_confidence_threshold"`
-	MaxTagsPerFile        int           `json:"max_tags_per_file"`
-	AnalysisTimeout       time.Duration `json:"analysis_timeout"`
-	CacheResults          bool          `json:"cache_results"`
+	MaxFileSize              int64         `json:"max_file_size"`
+	SupportedMimeTypes       []string      `json:"supported_mime_types"`
+	EnableImageAnalysis      bool          `json:"enable_image_analysis"`
+	EnableTextAnalysis       bool          `json:"enable_text_analysis"`
+	EnableMetadataExtraction bool          `json:"enable_metadata_extraction"`
+	TagConfidenceThreshold   float64       `json:"tag_confidence_threshold"`
+	MaxTagsPerFile           int           `json:"max_tags_per_file"`
+	AnalysisTimeout          time.Duration `json:"analysis_timeout"`
+	CacheResults             bool          `json:"cache_results"`
 }
 
 // DefaultAnalyzerConfig returns default analyzer configuration
 func DefaultAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
-		MaxFileSize:           100 * 1024 * 1024, // 100MB
-		SupportedMimeTypes:    []string{"text/*", "image/*", "application/pdf", "application/json"},
-		EnableImageAnalysis:   true,
-		EnableTextAnalysis:    true,
+		MaxFileSize:              100 * 1024 * 1024, // 100MB
+		SupportedMimeTypes:       []string{"text/*", "image/*", "application/pdf", "application/json"},
+		EnableImageAnalysis:      true,
+		EnableTextAnalysis:       true,
 		EnableMetadataExtraction: true,
-		TagConfidenceThreshold: 0.7,
-		MaxTagsPerFile:        10,
-		AnalysisTimeout:       30 * time.Second,
-		CacheResults:          true,
+		TagConfidenceThreshold:   0.7,
+		MaxTagsPerFile:           10,
+		AnalysisTimeout:          30 * time.Second,
+		CacheResults:             true,
 	}
 }
 
@@ -143,7 +143,7 @@ func NewContentAnalyzer(config *AnalyzerConfig, logger Logger) *ContentAnalyzer 
 // RegisterTagGenerator registers a tag generator
 func (ca *ContentAnalyzer) RegisterTagGenerator(generator TagGenerator) {
 	ca.tagGenerators = append(ca.tagGenerators, generator)
-	
+
 	// Sort by priority
 	sort.Slice(ca.tagGenerators, func(i, j int) bool {
 		return ca.tagGenerators[i].GetPriority() > ca.tagGenerators[j].GetPriority()
@@ -221,7 +221,7 @@ func (ca *ContentAnalyzer) AnalyzeContent(ctx context.Context, fileName string, 
 
 	// Generate tags using all registered generators
 	allTags := make([]Tag, 0)
-	
+
 	for _, generator := range ca.tagGenerators {
 		tags, err := generator.GenerateTags(ctx, contentBytes, result.Metadata)
 		if err != nil {
@@ -239,7 +239,7 @@ func (ca *ContentAnalyzer) AnalyzeContent(ctx context.Context, fileName string, 
 
 	result.AnalysisTime = time.Since(startTime)
 
-	ca.logger.Debug("Content analysis completed for %s: %d tags, confidence %.2f", 
+	ca.logger.Debug("Content analysis completed for %s: %d tags, confidence %.2f",
 		fileName, len(result.Tags), result.Confidence)
 
 	return result, nil
@@ -261,7 +261,7 @@ func (ca *ContentAnalyzer) generateSHA256Hash(content []byte) string {
 func (ca *ContentAnalyzer) detectContentType(fileName string, content []byte) string {
 	// First try to detect from content
 	contentType := http.DetectContentType(content)
-	
+
 	// If generic, try to detect from file extension
 	if contentType == "application/octet-stream" || contentType == "text/plain; charset=utf-8" {
 		ext := strings.ToLower(filepath.Ext(fileName))
@@ -375,10 +375,10 @@ func (fg *FilenameTagGenerator) GenerateTags(ctx context.Context, content []byte
 
 	// Date patterns in filename
 	datePatterns := []string{
-		`\d{4}-\d{2}-\d{2}`,     // YYYY-MM-DD
-		`\d{4}_\d{2}_\d{2}`,     // YYYY_MM_DD
-		`\d{2}-\d{2}-\d{4}`,     // MM-DD-YYYY
-		`\d{8}`,                 // YYYYMMDD
+		`\d{4}-\d{2}-\d{2}`, // YYYY-MM-DD
+		`\d{4}_\d{2}_\d{2}`, // YYYY_MM_DD
+		`\d{2}-\d{2}-\d{4}`, // MM-DD-YYYY
+		`\d{8}`,             // YYYYMMDD
 	}
 
 	baseName := strings.ToLower(filepath.Base(fileName))
@@ -396,20 +396,20 @@ func (fg *FilenameTagGenerator) GenerateTags(ctx context.Context, content []byte
 
 	// Common filename indicators
 	indicators := map[string]string{
-		"backup":     "backup",
-		"temp":       "temporary",
-		"tmp":        "temporary",
-		"log":        "log",
-		"config":     "configuration",
-		"readme":     "documentation",
-		"license":    "legal",
-		"changelog":  "documentation",
-		"test":       "testing",
-		"spec":       "specification",
-		"doc":        "documentation",
-		"img":        "image",
-		"pic":        "image",
-		"photo":      "image",
+		"backup":    "backup",
+		"temp":      "temporary",
+		"tmp":       "temporary",
+		"log":       "log",
+		"config":    "configuration",
+		"readme":    "documentation",
+		"license":   "legal",
+		"changelog": "documentation",
+		"test":      "testing",
+		"spec":      "specification",
+		"doc":       "documentation",
+		"img":       "image",
+		"pic":       "image",
+		"photo":     "image",
 	}
 
 	for keyword, category := range indicators {
@@ -426,8 +426,8 @@ func (fg *FilenameTagGenerator) GenerateTags(ctx context.Context, content []byte
 	return tags, nil
 }
 
-func (fg *FilenameTagGenerator) GetName() string    { return "filename" }
-func (fg *FilenameTagGenerator) GetPriority() int   { return 100 }
+func (fg *FilenameTagGenerator) GetName() string  { return "filename" }
+func (fg *FilenameTagGenerator) GetPriority() int { return 100 }
 
 // ContentTypeTagGenerator generates tags based on content type
 type ContentTypeTagGenerator struct{}
@@ -451,21 +451,21 @@ func (ctg *ContentTypeTagGenerator) GenerateTags(ctx context.Context, content []
 
 	// Specific mappings
 	typeMapping := map[string][]string{
-		"text/plain":            {"text", "document"},
-		"text/html":             {"html", "web", "document"},
-		"text/css":              {"css", "stylesheet", "web"},
-		"text/javascript":       {"javascript", "code", "web"},
-		"application/json":      {"json", "data", "config"},
-		"application/xml":       {"xml", "data", "config"},
-		"application/pdf":       {"pdf", "document"},
-		"image/jpeg":            {"photo", "image"},
-		"image/png":             {"image", "graphics"},
-		"image/gif":             {"image", "animation"},
-		"image/svg+xml":         {"vector", "graphics", "web"},
-		"video/mp4":             {"video", "media"},
-		"audio/mpeg":            {"audio", "music", "media"},
-		"application/zip":       {"archive", "compressed"},
-		"application/gzip":      {"archive", "compressed"},
+		"text/plain":       {"text", "document"},
+		"text/html":        {"html", "web", "document"},
+		"text/css":         {"css", "stylesheet", "web"},
+		"text/javascript":  {"javascript", "code", "web"},
+		"application/json": {"json", "data", "config"},
+		"application/xml":  {"xml", "data", "config"},
+		"application/pdf":  {"pdf", "document"},
+		"image/jpeg":       {"photo", "image"},
+		"image/png":        {"image", "graphics"},
+		"image/gif":        {"image", "animation"},
+		"image/svg+xml":    {"vector", "graphics", "web"},
+		"video/mp4":        {"video", "media"},
+		"audio/mpeg":       {"audio", "music", "media"},
+		"application/zip":  {"archive", "compressed"},
+		"application/gzip": {"archive", "compressed"},
 	}
 
 	if specificTags, exists := typeMapping[contentType]; exists {
@@ -490,7 +490,7 @@ type SizeTagGenerator struct{}
 
 func (sg *SizeTagGenerator) GenerateTags(ctx context.Context, content []byte, metadata map[string]string) ([]Tag, error) {
 	size := int64(len(content))
-	
+
 	var sizeTag string
 	var confidence float64 = 0.7
 
@@ -589,7 +589,7 @@ func NewPatternMatcher() *PatternMatcher {
 // FindPatterns finds patterns in text content
 func (pm *PatternMatcher) FindPatterns(content string) map[string]int {
 	results := make(map[string]int)
-	
+
 	for name, regex := range pm.patterns {
 		matches := regex.FindAllString(content, -1)
 		if len(matches) > 0 {

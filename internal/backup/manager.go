@@ -15,43 +15,43 @@ import (
 
 // BackupManager provides comprehensive backup and disaster recovery
 type BackupManager struct {
-	config           *BackupConfig
-	storage          BackupStorage
-	scheduler        *BackupScheduler
-	encryptionMgr    EncryptionManager
-	compressionMgr   CompressionManager
-	verificationMgr  VerificationManager
-	notificationMgr  NotificationManager
-	metadataStore    MetadataStore
-	stopCh           chan struct{}
-	running          bool
-	mutex            sync.RWMutex
+	config          *BackupConfig
+	storage         BackupStorage
+	scheduler       *BackupScheduler
+	encryptionMgr   EncryptionManager
+	compressionMgr  CompressionManager
+	verificationMgr VerificationManager
+	notificationMgr NotificationManager
+	metadataStore   MetadataStore
+	stopCh          chan struct{}
+	running         bool
+	mutex           sync.RWMutex
 }
 
 // BackupConfig holds backup configuration
 type BackupConfig struct {
-	Enabled               bool                    `json:"enabled"`
-	BackupDir             string                  `json:"backup_dir"`
-	ScheduleInterval      time.Duration           `json:"schedule_interval"`
-	RetentionPolicy       RetentionPolicy         `json:"retention_policy"`
-	CompressionEnabled    bool                    `json:"compression_enabled"`
-	EncryptionEnabled     bool                    `json:"encryption_enabled"`
-	VerificationEnabled   bool                    `json:"verification_enabled"`
-	NotificationsEnabled  bool                    `json:"notifications_enabled"`
-	BackupTypes           []BackupType            `json:"backup_types"`
-	ExcludePatterns       []string                `json:"exclude_patterns"`
-	IncludePatterns       []string                `json:"include_patterns"`
-	MaxConcurrentBackups  int                     `json:"max_concurrent_backups"`
-	DisasterRecovery      DisasterRecoveryConfig  `json:"disaster_recovery"`
-	CloudBackup           CloudBackupConfig       `json:"cloud_backup"`
+	Enabled              bool                   `json:"enabled"`
+	BackupDir            string                 `json:"backup_dir"`
+	ScheduleInterval     time.Duration          `json:"schedule_interval"`
+	RetentionPolicy      RetentionPolicy        `json:"retention_policy"`
+	CompressionEnabled   bool                   `json:"compression_enabled"`
+	EncryptionEnabled    bool                   `json:"encryption_enabled"`
+	VerificationEnabled  bool                   `json:"verification_enabled"`
+	NotificationsEnabled bool                   `json:"notifications_enabled"`
+	BackupTypes          []BackupType           `json:"backup_types"`
+	ExcludePatterns      []string               `json:"exclude_patterns"`
+	IncludePatterns      []string               `json:"include_patterns"`
+	MaxConcurrentBackups int                    `json:"max_concurrent_backups"`
+	DisasterRecovery     DisasterRecoveryConfig `json:"disaster_recovery"`
+	CloudBackup          CloudBackupConfig      `json:"cloud_backup"`
 }
 
 // DefaultBackupConfig returns default backup configuration
 func DefaultBackupConfig() *BackupConfig {
 	return &BackupConfig{
-		Enabled:              true,
-		BackupDir:            "backups",
-		ScheduleInterval:     time.Hour * 24, // Daily backups
+		Enabled:          true,
+		BackupDir:        "backups",
+		ScheduleInterval: time.Hour * 24, // Daily backups
 		RetentionPolicy: RetentionPolicy{
 			DailyRetention:   7,  // 7 days
 			WeeklyRetention:  4,  // 4 weeks
@@ -75,21 +75,21 @@ func DefaultBackupConfig() *BackupConfig {
 		},
 		MaxConcurrentBackups: 2,
 		DisasterRecovery: DisasterRecoveryConfig{
-			Enabled:               true,
-			RPO:                   time.Hour,        // Recovery Point Objective
-			RTO:                   time.Minute * 15, // Recovery Time Objective
-			ReplicationEnabled:    false,
-			ReplicationTargets:    []string{},
-			AutoFailoverEnabled:   false,
-			HealthCheckInterval:   time.Minute * 5,
+			Enabled:             true,
+			RPO:                 time.Hour,        // Recovery Point Objective
+			RTO:                 time.Minute * 15, // Recovery Time Objective
+			ReplicationEnabled:  false,
+			ReplicationTargets:  []string{},
+			AutoFailoverEnabled: false,
+			HealthCheckInterval: time.Minute * 5,
 		},
 		CloudBackup: CloudBackupConfig{
-			Enabled:         false,
-			Provider:        "aws",
-			Bucket:          "",
-			Region:          "us-east-1",
+			Enabled:          false,
+			Provider:         "aws",
+			Bucket:           "",
+			Region:           "us-east-1",
 			EncryptInTransit: true,
-			EncryptAtRest:   true,
+			EncryptAtRest:    true,
 		},
 	}
 }
@@ -118,27 +118,27 @@ type RetentionPolicy struct {
 
 // DisasterRecoveryConfig defines disaster recovery settings
 type DisasterRecoveryConfig struct {
-	Enabled               bool          `json:"enabled"`
-	RPO                   time.Duration `json:"rpo"`                     // Recovery Point Objective
-	RTO                   time.Duration `json:"rto"`                     // Recovery Time Objective
-	ReplicationEnabled    bool          `json:"replication_enabled"`
-	ReplicationTargets    []string      `json:"replication_targets"`
-	AutoFailoverEnabled   bool          `json:"auto_failover_enabled"`
-	HealthCheckInterval   time.Duration `json:"health_check_interval"`
-	NotificationChannels  []string      `json:"notification_channels"`
+	Enabled              bool          `json:"enabled"`
+	RPO                  time.Duration `json:"rpo"` // Recovery Point Objective
+	RTO                  time.Duration `json:"rto"` // Recovery Time Objective
+	ReplicationEnabled   bool          `json:"replication_enabled"`
+	ReplicationTargets   []string      `json:"replication_targets"`
+	AutoFailoverEnabled  bool          `json:"auto_failover_enabled"`
+	HealthCheckInterval  time.Duration `json:"health_check_interval"`
+	NotificationChannels []string      `json:"notification_channels"`
 }
 
 // CloudBackupConfig defines cloud backup settings
 type CloudBackupConfig struct {
 	Enabled           bool              `json:"enabled"`
-	Provider          string            `json:"provider"`           // aws, gcp, azure
+	Provider          string            `json:"provider"` // aws, gcp, azure
 	Bucket            string            `json:"bucket"`
 	Region            string            `json:"region"`
 	AccessKey         string            `json:"access_key"`
 	SecretKey         string            `json:"secret_key"`
 	EncryptInTransit  bool              `json:"encrypt_in_transit"`
 	EncryptAtRest     bool              `json:"encrypt_at_rest"`
-	StorageClass      string            `json:"storage_class"`      // standard, ia, glacier
+	StorageClass      string            `json:"storage_class"` // standard, ia, glacier
 	LifecyclePolicy   LifecyclePolicy   `json:"lifecycle_policy"`
 	CrossRegionBackup bool              `json:"cross_region_backup"`
 	Metadata          map[string]string `json:"metadata"`
@@ -146,98 +146,98 @@ type CloudBackupConfig struct {
 
 // LifecyclePolicy defines cloud storage lifecycle rules
 type LifecyclePolicy struct {
-	TransitionToIA      int `json:"transition_to_ia"`       // Days to transition to Infrequent Access
-	TransitionToGlacier int `json:"transition_to_glacier"`  // Days to transition to Glacier
-	ExpirationDays      int `json:"expiration_days"`        // Days to expire
+	TransitionToIA      int `json:"transition_to_ia"`      // Days to transition to Infrequent Access
+	TransitionToGlacier int `json:"transition_to_glacier"` // Days to transition to Glacier
+	ExpirationDays      int `json:"expiration_days"`       // Days to expire
 }
 
 // Backup represents a backup instance
 type Backup struct {
-	ID                string            `json:"id"`
-	Name              string            `json:"name"`
-	Type              BackupType        `json:"type"`
-	Status            BackupStatus      `json:"status"`
-	StartTime         time.Time         `json:"start_time"`
-	EndTime           time.Time         `json:"end_time"`
-	Duration          time.Duration     `json:"duration"`
-	Size              int64             `json:"size"`
-	CompressedSize    int64             `json:"compressed_size"`
-	CompressionRatio  float64           `json:"compression_ratio"`
-	FilePath          string            `json:"file_path"`
-	Checksum          string            `json:"checksum"`
-	Encrypted         bool              `json:"encrypted"`
-	Compressed        bool              `json:"compressed"`
-	Verified          bool              `json:"verified"`
-	CloudBackup       CloudBackupInfo   `json:"cloud_backup"`
-	Metadata          BackupMetadata    `json:"metadata"`
-	SourceInfo        SourceInfo        `json:"source_info"`
-	ErrorMessage      string            `json:"error_message,omitempty"`
-	Tags              map[string]string `json:"tags"`
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Type             BackupType        `json:"type"`
+	Status           BackupStatus      `json:"status"`
+	StartTime        time.Time         `json:"start_time"`
+	EndTime          time.Time         `json:"end_time"`
+	Duration         time.Duration     `json:"duration"`
+	Size             int64             `json:"size"`
+	CompressedSize   int64             `json:"compressed_size"`
+	CompressionRatio float64           `json:"compression_ratio"`
+	FilePath         string            `json:"file_path"`
+	Checksum         string            `json:"checksum"`
+	Encrypted        bool              `json:"encrypted"`
+	Compressed       bool              `json:"compressed"`
+	Verified         bool              `json:"verified"`
+	CloudBackup      CloudBackupInfo   `json:"cloud_backup"`
+	Metadata         BackupMetadata    `json:"metadata"`
+	SourceInfo       SourceInfo        `json:"source_info"`
+	ErrorMessage     string            `json:"error_message,omitempty"`
+	Tags             map[string]string `json:"tags"`
 }
 
 // BackupStatus represents backup status
 type BackupStatus string
 
 const (
-	BackupStatusPending    BackupStatus = "PENDING"
-	BackupStatusRunning    BackupStatus = "RUNNING"
-	BackupStatusCompleted  BackupStatus = "COMPLETED"
-	BackupStatusFailed     BackupStatus = "FAILED"
-	BackupStatusVerifying  BackupStatus = "VERIFYING"
-	BackupStatusCorrupted  BackupStatus = "CORRUPTED"
-	BackupStatusUploading  BackupStatus = "UPLOADING"
-	BackupStatusArchived   BackupStatus = "ARCHIVED"
+	BackupStatusPending   BackupStatus = "PENDING"
+	BackupStatusRunning   BackupStatus = "RUNNING"
+	BackupStatusCompleted BackupStatus = "COMPLETED"
+	BackupStatusFailed    BackupStatus = "FAILED"
+	BackupStatusVerifying BackupStatus = "VERIFYING"
+	BackupStatusCorrupted BackupStatus = "CORRUPTED"
+	BackupStatusUploading BackupStatus = "UPLOADING"
+	BackupStatusArchived  BackupStatus = "ARCHIVED"
 )
 
 // CloudBackupInfo holds cloud backup information
 type CloudBackupInfo struct {
-	Enabled   bool              `json:"enabled"`
-	Provider  string            `json:"provider"`
-	Bucket    string            `json:"bucket"`
-	Key       string            `json:"key"`
-	Region    string            `json:"region"`
-	URL       string            `json:"url"`
-	Metadata  map[string]string `json:"metadata"`
-	Uploaded  bool              `json:"uploaded"`
-	UploadTime time.Time        `json:"upload_time"`
+	Enabled    bool              `json:"enabled"`
+	Provider   string            `json:"provider"`
+	Bucket     string            `json:"bucket"`
+	Key        string            `json:"key"`
+	Region     string            `json:"region"`
+	URL        string            `json:"url"`
+	Metadata   map[string]string `json:"metadata"`
+	Uploaded   bool              `json:"uploaded"`
+	UploadTime time.Time         `json:"upload_time"`
 }
 
 // BackupMetadata holds detailed backup metadata
 type BackupMetadata struct {
-	Version         string            `json:"version"`
-	CreatedBy       string            `json:"created_by"`
-	Application     string            `json:"application"`
-	Environment     string            `json:"environment"`
-	FileCount       int               `json:"file_count"`
-	DirectoryCount  int               `json:"directory_count"`
-	IncludedPaths   []string          `json:"included_paths"`
-	ExcludedPaths   []string          `json:"excluded_paths"`
-	SystemInfo      SystemInfo        `json:"system_info"`
-	Dependencies    []Dependency      `json:"dependencies"`
-	Configuration   map[string]string `json:"configuration"`
+	Version        string            `json:"version"`
+	CreatedBy      string            `json:"created_by"`
+	Application    string            `json:"application"`
+	Environment    string            `json:"environment"`
+	FileCount      int               `json:"file_count"`
+	DirectoryCount int               `json:"directory_count"`
+	IncludedPaths  []string          `json:"included_paths"`
+	ExcludedPaths  []string          `json:"excluded_paths"`
+	SystemInfo     SystemInfo        `json:"system_info"`
+	Dependencies   []Dependency      `json:"dependencies"`
+	Configuration  map[string]string `json:"configuration"`
 }
 
 // SourceInfo holds information about backup source
 type SourceInfo struct {
-	Hostname        string    `json:"hostname"`
-	Platform        string    `json:"platform"`
-	Architecture    string    `json:"architecture"`
-	IPAddress       string    `json:"ip_address"`
-	RootPath        string    `json:"root_path"`
-	LastModified    time.Time `json:"last_modified"`
-	TotalSize       int64     `json:"total_size"`
-	AvailableSpace  int64     `json:"available_space"`
+	Hostname       string    `json:"hostname"`
+	Platform       string    `json:"platform"`
+	Architecture   string    `json:"architecture"`
+	IPAddress      string    `json:"ip_address"`
+	RootPath       string    `json:"root_path"`
+	LastModified   time.Time `json:"last_modified"`
+	TotalSize      int64     `json:"total_size"`
+	AvailableSpace int64     `json:"available_space"`
 }
 
 // SystemInfo holds system information
 type SystemInfo struct {
-	OS              string `json:"os"`
-	Kernel          string `json:"kernel"`
-	Architecture    string `json:"architecture"`
-	CPUCount        int    `json:"cpu_count"`
-	MemoryTotal     int64  `json:"memory_total"`
-	DiskTotal       int64  `json:"disk_total"`
-	UptimeSeconds   int64  `json:"uptime_seconds"`
+	OS            string `json:"os"`
+	Kernel        string `json:"kernel"`
+	Architecture  string `json:"architecture"`
+	CPUCount      int    `json:"cpu_count"`
+	MemoryTotal   int64  `json:"memory_total"`
+	DiskTotal     int64  `json:"disk_total"`
+	UptimeSeconds int64  `json:"uptime_seconds"`
 }
 
 // Dependency represents a system dependency
@@ -250,25 +250,25 @@ type Dependency struct {
 
 // RestoreRequest represents a restore request
 type RestoreRequest struct {
-	ID               string            `json:"id"`
-	BackupID         string            `json:"backup_id"`
-	TargetPath       string            `json:"target_path"`
-	RestoreType      RestoreType       `json:"restore_type"`
-	SelectiveRestore bool              `json:"selective_restore"`
-	IncludePaths     []string          `json:"include_paths"`
-	ExcludePaths     []string          `json:"exclude_paths"`
-	OverwriteExisting bool             `json:"overwrite_existing"`
-	VerifyRestore    bool              `json:"verify_restore"`
-	Status           RestoreStatus     `json:"status"`
-	StartTime        time.Time         `json:"start_time"`
-	EndTime          time.Time         `json:"end_time"`
-	Duration         time.Duration     `json:"duration"`
-	RestoredSize     int64             `json:"restored_size"`
-	RestoredFiles    int               `json:"restored_files"`
-	ErrorMessage     string            `json:"error_message,omitempty"`
-	Progress         RestoreProgress   `json:"progress"`
-	RequestedBy      string            `json:"requested_by"`
-	Tags             map[string]string `json:"tags"`
+	ID                string            `json:"id"`
+	BackupID          string            `json:"backup_id"`
+	TargetPath        string            `json:"target_path"`
+	RestoreType       RestoreType       `json:"restore_type"`
+	SelectiveRestore  bool              `json:"selective_restore"`
+	IncludePaths      []string          `json:"include_paths"`
+	ExcludePaths      []string          `json:"exclude_paths"`
+	OverwriteExisting bool              `json:"overwrite_existing"`
+	VerifyRestore     bool              `json:"verify_restore"`
+	Status            RestoreStatus     `json:"status"`
+	StartTime         time.Time         `json:"start_time"`
+	EndTime           time.Time         `json:"end_time"`
+	Duration          time.Duration     `json:"duration"`
+	RestoredSize      int64             `json:"restored_size"`
+	RestoredFiles     int               `json:"restored_files"`
+	ErrorMessage      string            `json:"error_message,omitempty"`
+	Progress          RestoreProgress   `json:"progress"`
+	RequestedBy       string            `json:"requested_by"`
+	Tags              map[string]string `json:"tags"`
 }
 
 // RestoreType defines types of restore operations
@@ -287,22 +287,22 @@ const (
 type RestoreStatus string
 
 const (
-	RestoreStatusPending    RestoreStatus = "PENDING"
-	RestoreStatusRunning    RestoreStatus = "RUNNING"
-	RestoreStatusCompleted  RestoreStatus = "COMPLETED"
-	RestoreStatusFailed     RestoreStatus = "FAILED"
-	RestoreStatusCancelled  RestoreStatus = "CANCELLED"
-	RestoreStatusVerifying  RestoreStatus = "VERIFYING"
+	RestoreStatusPending   RestoreStatus = "PENDING"
+	RestoreStatusRunning   RestoreStatus = "RUNNING"
+	RestoreStatusCompleted RestoreStatus = "COMPLETED"
+	RestoreStatusFailed    RestoreStatus = "FAILED"
+	RestoreStatusCancelled RestoreStatus = "CANCELLED"
+	RestoreStatusVerifying RestoreStatus = "VERIFYING"
 )
 
 // RestoreProgress tracks restore progress
 type RestoreProgress struct {
-	TotalFiles      int     `json:"total_files"`
-	ProcessedFiles  int     `json:"processed_files"`
-	TotalSize       int64   `json:"total_size"`
-	ProcessedSize   int64   `json:"processed_size"`
-	PercentComplete float64 `json:"percent_complete"`
-	CurrentFile     string  `json:"current_file"`
+	TotalFiles             int           `json:"total_files"`
+	ProcessedFiles         int           `json:"processed_files"`
+	TotalSize              int64         `json:"total_size"`
+	ProcessedSize          int64         `json:"processed_size"`
+	PercentComplete        float64       `json:"percent_complete"`
+	CurrentFile            string        `json:"current_file"`
 	EstimatedTimeRemaining time.Duration `json:"estimated_time_remaining"`
 }
 
@@ -387,25 +387,25 @@ const (
 
 // BackupScheduler manages backup scheduling
 type BackupScheduler struct {
-	config     *BackupConfig
-	backupMgr  *BackupManager
-	schedules  map[string]*Schedule
-	stopCh     chan struct{}
-	running    bool
-	mutex      sync.RWMutex
+	config    *BackupConfig
+	backupMgr *BackupManager
+	schedules map[string]*Schedule
+	stopCh    chan struct{}
+	running   bool
+	mutex     sync.RWMutex
 }
 
 // Schedule represents a backup schedule
 type Schedule struct {
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	Type        BackupType    `json:"type"`
-	Frequency   time.Duration `json:"frequency"`
-	NextRun     time.Time     `json:"next_run"`
-	LastRun     time.Time     `json:"last_run"`
-	Enabled     bool          `json:"enabled"`
-	MaxRetries  int           `json:"max_retries"`
-	RetryCount  int           `json:"retry_count"`
+	ID         string        `json:"id"`
+	Name       string        `json:"name"`
+	Type       BackupType    `json:"type"`
+	Frequency  time.Duration `json:"frequency"`
+	NextRun    time.Time     `json:"next_run"`
+	LastRun    time.Time     `json:"last_run"`
+	Enabled    bool          `json:"enabled"`
+	MaxRetries int           `json:"max_retries"`
+	RetryCount int           `json:"retry_count"`
 }
 
 // NewBackupManager creates a new backup manager
@@ -478,7 +478,7 @@ func (b *BackupManager) Stop() error {
 	if b.running {
 		close(b.stopCh)
 		b.running = false
-		
+
 		if b.scheduler != nil {
 			b.scheduler.Stop()
 		}
@@ -491,14 +491,14 @@ func (b *BackupManager) Stop() error {
 // CreateBackup creates a new backup
 func (b *BackupManager) CreateBackup(backupType BackupType, sourcePaths []string, name string) (*Backup, error) {
 	backup := &Backup{
-		ID:        fmt.Sprintf("backup_%d", time.Now().UnixNano()),
-		Name:      name,
-		Type:      backupType,
-		Status:    BackupStatusPending,
-		StartTime: time.Now(),
-		Encrypted: b.config.EncryptionEnabled,
+		ID:         fmt.Sprintf("backup_%d", time.Now().UnixNano()),
+		Name:       name,
+		Type:       backupType,
+		Status:     BackupStatusPending,
+		StartTime:  time.Now(),
+		Encrypted:  b.config.EncryptionEnabled,
 		Compressed: b.config.CompressionEnabled,
-		Tags:      make(map[string]string),
+		Tags:       make(map[string]string),
 		Metadata: BackupMetadata{
 			Version:       "2.0.0",
 			CreatedBy:     "s3ry-backup",
@@ -539,11 +539,11 @@ func (b *BackupManager) performBackup(backup *Backup, sourcePaths []string) {
 	defer func() {
 		backup.EndTime = time.Now()
 		backup.Duration = backup.EndTime.Sub(backup.StartTime)
-		
+
 		if backup.Status == BackupStatusRunning {
 			backup.Status = BackupStatusCompleted
 		}
-		
+
 		b.metadataStore.SaveBackupMetadata(backup)
 
 		// Send completion notification
@@ -772,7 +772,7 @@ func (b *BackupManager) gatherSourceInfo(sourcePaths []string) SourceInfo {
 		IPAddress:      "127.0.0.1",
 		RootPath:       sourcePaths[0],
 		LastModified:   time.Now(),
-		TotalSize:      0, // Will be calculated during backup
+		TotalSize:      0,                  // Will be calculated during backup
 		AvailableSpace: 1024 * 1024 * 1024, // 1GB
 	}
 }
@@ -786,16 +786,16 @@ func (b *BackupManager) RestoreBackup(backupID, targetPath string, restoreType R
 	}
 
 	restore := &RestoreRequest{
-		ID:               fmt.Sprintf("restore_%d", time.Now().UnixNano()),
-		BackupID:         backupID,
-		TargetPath:       targetPath,
-		RestoreType:      restoreType,
+		ID:                fmt.Sprintf("restore_%d", time.Now().UnixNano()),
+		BackupID:          backupID,
+		TargetPath:        targetPath,
+		RestoreType:       restoreType,
 		OverwriteExisting: false,
-		VerifyRestore:    true,
-		Status:           RestoreStatusPending,
-		StartTime:        time.Now(),
-		RequestedBy:      "admin",
-		Tags:             make(map[string]string),
+		VerifyRestore:     true,
+		Status:            RestoreStatusPending,
+		StartTime:         time.Now(),
+		RequestedBy:       "admin",
+		Tags:              make(map[string]string),
 		Progress: RestoreProgress{
 			TotalFiles: backup.Metadata.FileCount,
 			TotalSize:  backup.Size,
@@ -826,11 +826,11 @@ func (b *BackupManager) performRestore(restore *RestoreRequest, backup *Backup) 
 	defer func() {
 		restore.EndTime = time.Now()
 		restore.Duration = restore.EndTime.Sub(restore.StartTime)
-		
+
 		if restore.Status == RestoreStatusRunning {
 			restore.Status = RestoreStatusCompleted
 		}
-		
+
 		b.metadataStore.SaveRestoreRequest(restore)
 
 		// Send completion notification
@@ -896,7 +896,7 @@ func (b *BackupManager) performRestore(restore *RestoreRequest, backup *Backup) 
 
 		// Create target path
 		targetPath := filepath.Join(restore.TargetPath, header.Name)
-		
+
 		// Update progress
 		restore.Progress.ProcessedFiles++
 		restore.Progress.CurrentFile = header.Name
@@ -943,7 +943,7 @@ func (b *BackupManager) performRestore(restore *RestoreRequest, backup *Backup) 
 			}
 
 			outFile.Close()
-			
+
 			restore.Progress.ProcessedSize += written
 			restore.RestoredSize += written
 			restore.RestoredFiles++
@@ -959,7 +959,7 @@ func (b *BackupManager) performRestore(restore *RestoreRequest, backup *Backup) 
 	if restore.VerifyRestore {
 		restore.Status = RestoreStatusVerifying
 		b.metadataStore.SaveRestoreRequest(restore)
-		
+
 		// Simple verification - check file count and size
 		// In real implementation, would do more thorough verification
 		fmt.Printf("Restore verification completed\n")
@@ -1103,7 +1103,7 @@ func (b *BackupManager) performHealthCheck() {
 // triggerFailover triggers disaster recovery failover
 func (b *BackupManager) triggerFailover() {
 	fmt.Println("Disaster recovery failover triggered")
-	
+
 	// Send notification
 	if b.config.NotificationsEnabled {
 		b.notificationMgr.SendDisasterRecoveryNotification(DREventFailoverStarted)

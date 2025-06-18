@@ -20,7 +20,7 @@ func (c *Config) InitializeI18n() {
 func (c *Config) SyncI18nLanguage() {
 	currentLang := i18n.GetCurrentLanguage()
 	var langCode string
-	
+
 	switch currentLang.String() {
 	case "ja":
 		langCode = "ja"
@@ -29,7 +29,7 @@ func (c *Config) SyncI18nLanguage() {
 	default:
 		langCode = "en"
 	}
-	
+
 	if c.UI.Language != langCode {
 		c.SetLanguage(langCode)
 	}
@@ -38,7 +38,7 @@ func (c *Config) SyncI18nLanguage() {
 // ChangeLanguage changes both config and i18n language
 func (c *Config) ChangeLanguage(lang string) error {
 	normalizedLang := c.NormalizeLanguage(lang)
-	
+
 	if !c.ValidateLanguage(normalizedLang) {
 		return &ConfigError{
 			Field:   "language",
@@ -46,13 +46,13 @@ func (c *Config) ChangeLanguage(lang string) error {
 			Message: "unsupported language",
 		}
 	}
-	
+
 	// Update config
 	c.SetLanguage(normalizedLang)
-	
+
 	// Update i18n system
 	i18n.SetLanguage(normalizedLang)
-	
+
 	return nil
 }
 

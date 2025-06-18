@@ -2,14 +2,14 @@ package components
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -40,7 +40,7 @@ type Preview struct {
 	width       int
 	height      int
 	error       error
-	
+
 	// Styles
 	titleStyle   lipgloss.Style
 	contentStyle lipgloss.Style
@@ -56,16 +56,16 @@ func NewPreview() *Preview {
 			Foreground(lipgloss.Color("#7D56F4")).
 			PaddingLeft(1).
 			PaddingRight(1),
-		
+
 		contentStyle: lipgloss.NewStyle().
 			Padding(1).
 			Foreground(lipgloss.Color("#FAFAFA")),
-		
+
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FF5555")).
 			Padding(1),
-		
+
 		borderStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#7D56F4")),
@@ -78,13 +78,13 @@ func (p *Preview) Update(msg tea.Msg) (*Preview, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
-		
+
 	case PreviewMsg:
 		p.content = msg.Content
 		p.previewType = msg.PreviewType
 		p.error = msg.Error
 	}
-	
+
 	return p, nil
 }
 
@@ -93,17 +93,17 @@ func (p *Preview) View() string {
 	if p.error != nil {
 		return p.borderStyle.Render(
 			p.titleStyle.Render("❌ Preview Error") + "\n" +
-			p.errorStyle.Render(p.error.Error()),
+				p.errorStyle.Render(p.error.Error()),
 		)
 	}
-	
+
 	if p.content == "" {
 		return p.borderStyle.Render(
 			p.titleStyle.Render("📄 File Preview") + "\n" +
-			p.contentStyle.Render("No content to preview"),
+				p.contentStyle.Render("No content to preview"),
 		)
 	}
-	
+
 	var title string
 	switch p.previewType {
 	case PreviewTypeText:
@@ -117,7 +117,7 @@ func (p *Preview) View() string {
 	default:
 		title = "❓ Preview"
 	}
-	
+
 	// Truncate content if too large
 	displayContent := p.content
 	maxLines := p.height - 4 // Account for title and border
@@ -129,10 +129,10 @@ func (p *Preview) View() string {
 			displayContent = strings.Join(lines, "\n")
 		}
 	}
-	
+
 	return p.borderStyle.Render(
 		p.titleStyle.Render(title) + "\n" +
-		p.contentStyle.Render(displayContent),
+			p.contentStyle.Render(displayContent),
 	)
 }
 
@@ -140,7 +140,7 @@ func (p *Preview) View() string {
 func PreviewFile(filename string) tea.Cmd {
 	return func() tea.Msg {
 		previewType := getPreviewType(filename)
-		
+
 		switch previewType {
 		case PreviewTypeText:
 			return previewTextFile(filename)
@@ -162,7 +162,7 @@ func PreviewFile(filename string) tea.Cmd {
 // getPreviewType determines the preview type based on file extension
 func getPreviewType(filename string) PreviewType {
 	ext := strings.ToLower(filepath.Ext(filename))
-	
+
 	switch ext {
 	case ".txt", ".md", ".yaml", ".yml", ".json", ".xml", ".html", ".css", ".js", ".ts", ".go", ".py", ".sh", ".conf", ".cfg", ".ini", ".log":
 		return PreviewTypeText
@@ -186,21 +186,21 @@ func isTextFile(filename string) bool {
 		return false
 	}
 	defer file.Close()
-	
+
 	// Read first 512 bytes to check for binary content
 	buffer := make([]byte, 512)
 	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
 		return false
 	}
-	
+
 	// Check for null bytes which indicate binary content
 	for i := 0; i < n; i++ {
 		if buffer[i] == 0 {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -212,7 +212,7 @@ func previewTextFile(filename string) PreviewMsg {
 			Error: fmt.Errorf("failed to read text file: %w", err),
 		}
 	}
-	
+
 	// Limit content size
 	const maxSize = 8192 // 8KB
 	if len(content) > maxSize {
@@ -222,7 +222,7 @@ func previewTextFile(filename string) PreviewMsg {
 			PreviewType: PreviewTypeText,
 		}
 	}
-	
+
 	return PreviewMsg{
 		Content:     string(content),
 		PreviewType: PreviewTypeText,
@@ -238,7 +238,7 @@ func previewImageFile(filename string) PreviewMsg {
 		}
 	}
 	defer file.Close()
-	
+
 	// Decode image to get dimensions
 	config, format, err := image.DecodeConfig(file)
 	if err != nil {
@@ -246,7 +246,7 @@ func previewImageFile(filename string) PreviewMsg {
 			Error: fmt.Errorf("failed to decode image: %w", err),
 		}
 	}
-	
+
 	// Get file info
 	stat, err := file.Stat()
 	if err != nil {
@@ -254,7 +254,7 @@ func previewImageFile(filename string) PreviewMsg {
 			Error: fmt.Errorf("failed to get file info: %w", err),
 		}
 	}
-	
+
 	content := fmt.Sprintf(`Image Information:
 ┌─────────────────────────────────┐
 │ Format:     %-20s │
@@ -265,12 +265,12 @@ func previewImageFile(filename string) PreviewMsg {
 📸 Image preview is available in terminal
    that supports image display.
    
-   File: %s`, 
+   File: %s`,
 		strings.ToUpper(format),
 		config.Width, config.Height,
 		formatBytesPreview(stat.Size()),
 		filename)
-	
+
 	return PreviewMsg{
 		Content:     content,
 		PreviewType: PreviewTypeImage,
@@ -285,7 +285,7 @@ func previewPDFFile(filename string) PreviewMsg {
 			Error: fmt.Errorf("failed to get PDF file info: %w", err),
 		}
 	}
-	
+
 	content := fmt.Sprintf(`PDF Document Information:
 ┌─────────────────────────────────┐
 │ File Size: %-20s │
@@ -303,7 +303,7 @@ func previewPDFFile(filename string) PreviewMsg {
 		formatBytesPreview(stat.Size()),
 		stat.ModTime().Format("2006-01-02 15:04:05"),
 		filename, filename, filename)
-	
+
 	return PreviewMsg{
 		Content:     content,
 		PreviewType: PreviewTypePDF,
@@ -318,7 +318,7 @@ func previewBinaryFile(filename string) PreviewMsg {
 			Error: fmt.Errorf("failed to get binary file info: %w", err),
 		}
 	}
-	
+
 	// Read first few bytes for hex preview
 	file, err := os.Open(filename)
 	if err != nil {
@@ -327,10 +327,10 @@ func previewBinaryFile(filename string) PreviewMsg {
 		}
 	}
 	defer file.Close()
-	
+
 	buffer := make([]byte, 64) // Read first 64 bytes
 	n, _ := file.Read(buffer)
-	
+
 	var hexPreview strings.Builder
 	hexPreview.WriteString("Hex dump (first 64 bytes):\n")
 	for i := 0; i < n; i += 16 {
@@ -338,20 +338,20 @@ func previewBinaryFile(filename string) PreviewMsg {
 		if end > n {
 			end = n
 		}
-		
+
 		// Offset
 		hexPreview.WriteString(fmt.Sprintf("%08x  ", i))
-		
+
 		// Hex values
 		for j := i; j < end; j++ {
 			hexPreview.WriteString(fmt.Sprintf("%02x ", buffer[j]))
 		}
-		
+
 		// Padding for alignment
 		for j := end; j < i+16; j++ {
 			hexPreview.WriteString("   ")
 		}
-		
+
 		// ASCII representation
 		hexPreview.WriteString(" |")
 		for j := i; j < end; j++ {
@@ -363,7 +363,7 @@ func previewBinaryFile(filename string) PreviewMsg {
 		}
 		hexPreview.WriteString("|\n")
 	}
-	
+
 	content := fmt.Sprintf(`Binary File Information:
 ┌─────────────────────────────────┐
 │ File Size: %-20s │
@@ -380,7 +380,7 @@ func previewBinaryFile(filename string) PreviewMsg {
 		stat.ModTime().Format("2006-01-02 15:04:05"),
 		hexPreview.String(),
 		filename)
-	
+
 	return PreviewMsg{
 		Content:     content,
 		PreviewType: PreviewTypeBinary,

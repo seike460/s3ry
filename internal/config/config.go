@@ -22,9 +22,11 @@ type Config struct {
 	} `yaml:"ui" json:"ui"`
 
 	Performance struct {
-		Workers   int `yaml:"workers" json:"workers"`
-		ChunkSize int `yaml:"chunk_size" json:"chunk_size"`
-		Timeout   int `yaml:"timeout" json:"timeout"`
+		Workers                int `yaml:"workers" json:"workers"`
+		ChunkSize              int `yaml:"chunk_size" json:"chunk_size"`
+		Timeout                int `yaml:"timeout" json:"timeout"`
+		MaxConcurrentDownloads int `yaml:"max_concurrent_downloads" json:"max_concurrent_downloads"`
+		MaxConcurrentUploads   int `yaml:"max_concurrent_uploads" json:"max_concurrent_uploads"`
 	} `yaml:"performance" json:"performance"`
 
 	Logging struct {
@@ -32,6 +34,16 @@ type Config struct {
 		Format string `yaml:"format" json:"format"` // "text", "json"
 		File   string `yaml:"file,omitempty" json:"file,omitempty"`
 	} `yaml:"logging" json:"logging"`
+
+	// Enhanced fields for compatibility
+	LogLevel    string `yaml:"log_level" json:"log_level"`
+	LogFormat   string `yaml:"log_format" json:"log_format"`
+	LogFile     string `yaml:"log_file" json:"log_file"`
+	DebugLevel  string `yaml:"debug_level" json:"debug_level"`
+	DebugFile   string `yaml:"debug_file" json:"debug_file"`
+	ProfileDir  string `yaml:"profile_dir" json:"profile_dir"`
+	Environment string `yaml:"environment" json:"environment"`
+	Version     string `yaml:"version" json:"version"`
 }
 
 // Default returns a configuration with sensible defaults
@@ -55,13 +67,17 @@ func Default() *Config {
 			Theme:    "default",
 		},
 		Performance: struct {
-			Workers   int `yaml:"workers" json:"workers"`
-			ChunkSize int `yaml:"chunk_size" json:"chunk_size"`
-			Timeout   int `yaml:"timeout" json:"timeout"`
+			Workers                int `yaml:"workers" json:"workers"`
+			ChunkSize              int `yaml:"chunk_size" json:"chunk_size"`
+			Timeout                int `yaml:"timeout" json:"timeout"`
+			MaxConcurrentDownloads int `yaml:"max_concurrent_downloads" json:"max_concurrent_downloads"`
+			MaxConcurrentUploads   int `yaml:"max_concurrent_uploads" json:"max_concurrent_uploads"`
 		}{
-			Workers:   4,
-			ChunkSize: 1024 * 1024 * 5, // 5MB
-			Timeout:   30,              // 30 seconds
+			Workers:                4,
+			ChunkSize:              1024 * 1024 * 5, // 5MB
+			Timeout:                30,              // 30 seconds
+			MaxConcurrentDownloads: 10,
+			MaxConcurrentUploads:   10,
 		},
 		Logging: struct {
 			Level  string `yaml:"level" json:"level"`
@@ -71,6 +87,16 @@ func Default() *Config {
 			Level:  "info",
 			Format: "text",
 		},
+
+		// Initialize enhanced fields
+		LogLevel:    "INFO",
+		LogFormat:   "text",
+		LogFile:     "",
+		DebugLevel:  "OFF",
+		DebugFile:   "",
+		ProfileDir:  "./profiles",
+		Environment: "development",
+		Version:     "2.0.0",
 	}
 }
 

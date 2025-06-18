@@ -14,7 +14,7 @@ import (
 
 // AdvancedTelemetryCollector は高度なテレメトリ収集システム
 type AdvancedTelemetryCollector struct {
-	mu               sync.RWMutex
+	mu              sync.RWMutex
 	config          *config.Config
 	enabledFeatures map[string]bool
 	metrics         *PerformanceMetrics
@@ -46,17 +46,17 @@ type TelemetryEvent struct {
 
 // PerformanceMetrics はパフォーマンス指標
 type PerformanceMetrics struct {
-	mu                   sync.RWMutex
-	OperationsCount      int64   `json:"operations_count"`
-	TotalDuration        int64   `json:"total_duration_ms"`
-	AverageThroughput    float64 `json:"average_throughput_mbps"`
-	PeakThroughput       float64 `json:"peak_throughput_mbps"`
-	TotalBytesTransfer   int64   `json:"total_bytes_transferred"`
-	SuccessRate          float64 `json:"success_rate"`
-	AverageWorkerCount   float64 `json:"average_worker_count"`
-	MemoryUsagePeak      int64   `json:"memory_usage_peak_mb"`
-	CPUUtilizationPeak   float64 `json:"cpu_utilization_peak"`
-	PerformanceImprove   float64 `json:"performance_improvement_factor"`
+	mu                 sync.RWMutex
+	OperationsCount    int64   `json:"operations_count"`
+	TotalDuration      int64   `json:"total_duration_ms"`
+	AverageThroughput  float64 `json:"average_throughput_mbps"`
+	PeakThroughput     float64 `json:"peak_throughput_mbps"`
+	TotalBytesTransfer int64   `json:"total_bytes_transferred"`
+	SuccessRate        float64 `json:"success_rate"`
+	AverageWorkerCount float64 `json:"average_worker_count"`
+	MemoryUsagePeak    int64   `json:"memory_usage_peak_mb"`
+	CPUUtilizationPeak float64 `json:"cpu_utilization_peak"`
+	PerformanceImprove float64 `json:"performance_improvement_factor"`
 }
 
 // UsageStatistics は使用統計
@@ -82,29 +82,29 @@ type ErrorTracker struct {
 
 // ErrorStat はエラー統計
 type ErrorStat struct {
-	Count       int64     `json:"count"`
-	FirstSeen   time.Time `json:"first_seen"`
-	LastSeen    time.Time `json:"last_seen"`
-	Frequency   float64   `json:"frequency"`
-	Severity    string    `json:"severity"`
-	Resolution  string    `json:"resolution,omitempty"`
+	Count      int64     `json:"count"`
+	FirstSeen  time.Time `json:"first_seen"`
+	LastSeen   time.Time `json:"last_seen"`
+	Frequency  float64   `json:"frequency"`
+	Severity   string    `json:"severity"`
+	Resolution string    `json:"resolution,omitempty"`
 }
 
 // ErrorInfo はエラー情報
 type ErrorInfo struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Operation   string    `json:"operation"`
-	ErrorCode   string    `json:"error_code"`
-	ErrorMsg    string    `json:"error_message"`
-	StackTrace  string    `json:"stack_trace,omitempty"`
-	Context     string    `json:"context"`
-	Severity    string    `json:"severity"`
+	Timestamp  time.Time `json:"timestamp"`
+	Operation  string    `json:"operation"`
+	ErrorCode  string    `json:"error_code"`
+	ErrorMsg   string    `json:"error_message"`
+	StackTrace string    `json:"stack_trace,omitempty"`
+	Context    string    `json:"context"`
+	Severity   string    `json:"severity"`
 }
 
 // NewAdvancedTelemetryCollector は高度テレメトリコレクターを作成
 func NewAdvancedTelemetryCollector(cfg *config.Config) *AdvancedTelemetryCollector {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	collector := &AdvancedTelemetryCollector{
 		config:          cfg,
 		enabledFeatures: make(map[string]bool),
@@ -157,7 +157,7 @@ func (a *AdvancedTelemetryCollector) Start() error {
 func (a *AdvancedTelemetryCollector) Stop() error {
 	a.cancel()
 	a.wg.Wait()
-	
+
 	// 最終フラッシュ
 	return a.flush()
 }
@@ -236,10 +236,10 @@ func (a *AdvancedTelemetryCollector) RecordPerformanceImprovement(operation stri
 		Duration:  optimizedDuration,
 		Success:   true,
 		Metadata: map[string]interface{}{
-			"improvement_factor":  improvementFactor,
-			"baseline_duration":   baselineDuration.Milliseconds(),
-			"optimized_duration":  optimizedDuration.Milliseconds(),
-			"performance_gain":    baselineDuration.Milliseconds() - optimizedDuration.Milliseconds(),
+			"improvement_factor": improvementFactor,
+			"baseline_duration":  baselineDuration.Milliseconds(),
+			"optimized_duration": optimizedDuration.Milliseconds(),
+			"performance_gain":   baselineDuration.Milliseconds() - optimizedDuration.Milliseconds(),
 		},
 	}
 
@@ -254,10 +254,10 @@ func (a *AdvancedTelemetryCollector) GetMetrics() *PerformanceMetrics {
 	// 現在のシステム情報を追加
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	metrics := *a.metrics
 	metrics.MemoryUsagePeak = int64(m.HeapInuse / 1024 / 1024) // MB
-	
+
 	return &metrics
 }
 
@@ -265,7 +265,7 @@ func (a *AdvancedTelemetryCollector) GetMetrics() *PerformanceMetrics {
 func (a *AdvancedTelemetryCollector) GetUsageStats() *UsageStatistics {
 	a.usageStats.mu.RLock()
 	defer a.usageStats.mu.RUnlock()
-	
+
 	stats := *a.usageStats
 	return &stats
 }
@@ -274,7 +274,7 @@ func (a *AdvancedTelemetryCollector) GetUsageStats() *UsageStatistics {
 func (a *AdvancedTelemetryCollector) GetErrorStats() *ErrorTracker {
 	a.errorTracking.mu.RLock()
 	defer a.errorTracking.mu.RUnlock()
-	
+
 	tracker := *a.errorTracking
 	return &tracker
 }
@@ -282,7 +282,7 @@ func (a *AdvancedTelemetryCollector) GetErrorStats() *ErrorTracker {
 // flushWorker は定期的にバッファをフラッシュ
 func (a *AdvancedTelemetryCollector) flushWorker() {
 	defer a.wg.Done()
-	
+
 	ticker := time.NewTicker(a.flushInterval)
 	defer ticker.Stop()
 
@@ -299,7 +299,7 @@ func (a *AdvancedTelemetryCollector) flushWorker() {
 // metricsCollector はシステムメトリクスを収集
 func (a *AdvancedTelemetryCollector) metricsCollector() {
 	defer a.wg.Done()
-	
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -320,7 +320,7 @@ func (a *AdvancedTelemetryCollector) flush() error {
 		a.mu.Unlock()
 		return nil
 	}
-	
+
 	events := make([]TelemetryEvent, len(a.buffer))
 	copy(events, a.buffer)
 	a.buffer = a.buffer[:0]
@@ -379,12 +379,12 @@ func (a *AdvancedTelemetryCollector) updateMetrics(event TelemetryEvent) {
 		if event.Throughput > a.metrics.PeakThroughput {
 			a.metrics.PeakThroughput = event.Throughput
 		}
-		
+
 		// 移動平均でスループットを更新
 		if a.metrics.AverageThroughput == 0 {
 			a.metrics.AverageThroughput = event.Throughput
 		} else {
-			a.metrics.AverageThroughput = (a.metrics.AverageThroughput*0.9) + (event.Throughput*0.1)
+			a.metrics.AverageThroughput = (a.metrics.AverageThroughput * 0.9) + (event.Throughput * 0.1)
 		}
 	}
 
@@ -392,7 +392,7 @@ func (a *AdvancedTelemetryCollector) updateMetrics(event TelemetryEvent) {
 		if a.metrics.AverageWorkerCount == 0 {
 			a.metrics.AverageWorkerCount = float64(event.WorkerCount)
 		} else {
-			a.metrics.AverageWorkerCount = (a.metrics.AverageWorkerCount*0.9) + (float64(event.WorkerCount)*0.1)
+			a.metrics.AverageWorkerCount = (a.metrics.AverageWorkerCount * 0.9) + (float64(event.WorkerCount) * 0.1)
 		}
 	}
 
@@ -408,7 +408,7 @@ func (a *AdvancedTelemetryCollector) updateMetrics(event TelemetryEvent) {
 		if a.metrics.PerformanceImprove == 0 {
 			a.metrics.PerformanceImprove = improvementFactor
 		} else {
-			a.metrics.PerformanceImprove = (a.metrics.PerformanceImprove*0.9) + (improvementFactor*0.1)
+			a.metrics.PerformanceImprove = (a.metrics.PerformanceImprove * 0.9) + (improvementFactor * 0.1)
 		}
 	}
 }
@@ -506,11 +506,11 @@ func (a *AdvancedTelemetryCollector) collectSystemMetrics() {
 		Operation: "metrics_collection",
 		Success:   true,
 		Metadata: map[string]interface{}{
-			"memory_usage_mb":    memoryUsageMB,
-			"goroutines_count":   runtime.NumGoroutine(),
-			"gc_cycles":          m.NumGC,
-			"heap_objects":       m.HeapObjects,
-			"stack_inuse_mb":     m.StackInuse / 1024 / 1024,
+			"memory_usage_mb":  memoryUsageMB,
+			"goroutines_count": runtime.NumGoroutine(),
+			"gc_cycles":        m.NumGC,
+			"heap_objects":     m.HeapObjects,
+			"stack_inuse_mb":   m.StackInuse / 1024 / 1024,
 		},
 	}
 
@@ -565,12 +565,12 @@ func (a *AdvancedTelemetryCollector) ExportMetrics(format string) ([]byte, error
 	errors := a.GetErrorStats()
 
 	data := map[string]interface{}{
-		"timestamp":          time.Now(),
+		"timestamp":           time.Now(),
 		"performance_metrics": metrics,
-		"usage_statistics":   usage,
-		"error_tracking":     errors,
-		"version":            a.config.Version,
-		"platform":           fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH),
+		"usage_statistics":    usage,
+		"error_tracking":      errors,
+		"version":             a.config.Version,
+		"platform":            fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH),
 	}
 
 	switch format {

@@ -14,13 +14,13 @@ import (
 // HistoryView represents the history and bookmarks view
 type HistoryView struct {
 	historyManager *history.Manager
-	list          *components.List
-	currentTab    int // 0: History, 1: Bookmarks, 2: Frequent Locations
-	filter        history.HistoryFilter
-	searchTerm    string
-	width         int
-	height        int
-	
+	list           *components.List
+	currentTab     int // 0: History, 1: Bookmarks, 2: Frequent Locations
+	filter         history.HistoryFilter
+	searchTerm     string
+	width          int
+	height         int
+
 	// Styles
 	titleStyle     lipgloss.Style
 	tabStyle       lipgloss.Style
@@ -42,33 +42,33 @@ func NewHistoryView() *HistoryView {
 		historyManager: historyManager,
 		currentTab:     0,
 		filter:         history.HistoryFilter{Limit: 50},
-		
+
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(1),
-		
+
 		tabStyle: lipgloss.NewStyle().
 			Padding(0, 2).
 			Background(lipgloss.Color("#F0F0F0")).
 			Foreground(lipgloss.Color("#666")).
 			MarginRight(1),
-		
+
 		activeTabStyle: lipgloss.NewStyle().
 			Padding(0, 2).
 			Background(lipgloss.Color("#7D56F4")).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			MarginRight(1),
-		
+
 		subtitleStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888")).
 			MarginBottom(1),
-		
+
 		helpStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666")).
 			MarginTop(1),
 	}
-	
+
 	view.updateList()
 	return view
 }
@@ -81,7 +81,7 @@ func (v *HistoryView) Init() tea.Cmd {
 // Update handles messages for the history view
 func (v *HistoryView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.width = msg.Width
@@ -89,7 +89,7 @@ func (v *HistoryView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -129,12 +129,12 @@ func (v *HistoryView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		
+
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
 	}
-	
+
 	return v, tea.Batch(cmds...)
 }
 
@@ -143,10 +143,10 @@ func (v *HistoryView) View() string {
 	if v.historyManager == nil {
 		return v.renderError("History manager not available")
 	}
-	
+
 	// Render tabs
 	tabs := v.renderTabs()
-	
+
 	// Render current tab content
 	var content string
 	if v.list != nil {
@@ -154,17 +154,17 @@ func (v *HistoryView) View() string {
 	} else {
 		content = "No data available"
 	}
-	
+
 	// Render help
 	help := v.renderHelp()
-	
+
 	return tabs + "\n\n" + content + "\n" + help
 }
 
 // renderTabs renders the tab navigation
 func (v *HistoryView) renderTabs() string {
 	tabNames := []string{"📚 History", "🔖 Bookmarks", "📍 Frequent"}
-	
+
 	var tabs []string
 	for i, name := range tabNames {
 		if i == v.currentTab {
@@ -173,7 +173,7 @@ func (v *HistoryView) renderTabs() string {
 			tabs = append(tabs, v.tabStyle.Render(name))
 		}
 	}
-	
+
 	return v.titleStyle.Render("S3ry History & Bookmarks") + "\n" +
 		strings.Join(tabs, "")
 }
@@ -183,36 +183,36 @@ func (v *HistoryView) updateList() {
 	if v.historyManager == nil {
 		return
 	}
-	
+
 	var items []components.ListItem
 	var title string
-	
+
 	switch v.currentTab {
 	case 0: // History
 		title = "📚 Operation History"
 		entries := v.historyManager.GetHistory(v.filter)
 		items = make([]components.ListItem, len(entries))
-		
+
 		for i, entry := range entries {
 			status := "✅"
 			if !entry.Success {
 				status = "❌"
 			}
-			
+
 			description := fmt.Sprintf("%s | %s | %s",
 				entry.Timestamp.Format("2006-01-02 15:04:05"),
 				entry.Bucket,
 				entry.Key,
 			)
-			
+
 			if entry.Duration > 0 {
 				description += fmt.Sprintf(" | %v", entry.Duration)
 			}
-			
+
 			if entry.Size > 0 {
 				description += fmt.Sprintf(" | %s", formatBytesHistory(entry.Size))
 			}
-			
+
 			items[i] = components.ListItem{
 				Title:       fmt.Sprintf("%s %s", status, strings.Title(string(entry.Action))),
 				Description: description,
@@ -220,12 +220,12 @@ func (v *HistoryView) updateList() {
 				Data:        entry,
 			}
 		}
-		
+
 	case 1: // Bookmarks
 		title = "🔖 Saved Bookmarks"
 		bookmarks := v.historyManager.GetBookmarks(history.BookmarkFilter{})
 		items = make([]components.ListItem, len(bookmarks))
-		
+
 		for i, bookmark := range bookmarks {
 			typeIcon := "📁"
 			switch bookmark.Type {
@@ -234,18 +234,18 @@ func (v *HistoryView) updateList() {
 			case history.BookmarkQuery:
 				typeIcon = "🔍"
 			}
-			
+
 			description := fmt.Sprintf("%s/%s | Used %d times | %s",
 				bookmark.Bucket,
 				bookmark.Prefix,
 				bookmark.UseCount,
 				bookmark.LastUsed.Format("2006-01-02"),
 			)
-			
+
 			if len(bookmark.Tags) > 0 {
 				description += " | Tags: " + strings.Join(bookmark.Tags, ", ")
 			}
-			
+
 			items[i] = components.ListItem{
 				Title:       fmt.Sprintf("%s %s", typeIcon, bookmark.Name),
 				Description: description,
@@ -253,18 +253,18 @@ func (v *HistoryView) updateList() {
 				Data:        bookmark,
 			}
 		}
-		
+
 	case 2: // Frequent Locations
 		title = "📍 Frequently Accessed Locations"
 		locations := v.historyManager.GetFrequentLocations(20)
 		items = make([]components.ListItem, len(locations))
-		
+
 		for i, location := range locations {
 			description := fmt.Sprintf("Accessed %d times | Last: %s",
 				location.AccessCount,
 				location.LastAccess.Format("2006-01-02 15:04"),
 			)
-			
+
 			items[i] = components.ListItem{
 				Title:       "📂 " + location.Location,
 				Description: description,
@@ -273,7 +273,7 @@ func (v *HistoryView) updateList() {
 			}
 		}
 	}
-	
+
 	if len(items) == 0 {
 		items = []components.ListItem{
 			{
@@ -283,7 +283,7 @@ func (v *HistoryView) updateList() {
 			},
 		}
 	}
-	
+
 	v.list = components.NewList(title, items)
 }
 
@@ -294,9 +294,9 @@ func (v *HistoryView) handleSelection(item *components.ListItem) (tea.Model, tea
 		entry := item.Data.(history.HistoryEntry)
 		// Navigate to the bucket/location from history
 		if entry.Bucket != "" {
-			return NewBucketView("", entry.Bucket), nil
+			return NewBucketView(""), nil
 		}
-		
+
 	case "Bookmark":
 		bookmark := item.Data.(history.Bookmark)
 		// Use the bookmark (increment usage count)
@@ -305,18 +305,18 @@ func (v *HistoryView) handleSelection(item *components.ListItem) (tea.Model, tea
 		}
 		// Navigate to bookmarked location
 		if bookmark.Bucket != "" {
-			return NewBucketView("", bookmark.Bucket), nil
+			return NewBucketView(""), nil
 		}
-		
+
 	case "Location":
 		location := item.Data.(history.LocationStats)
 		// Parse location and navigate
 		parts := strings.SplitN(location.Location, "/", 2)
 		if len(parts) > 0 {
-			return NewBucketView("", parts[0]), nil
+			return NewBucketView(""), nil
 		}
 	}
-	
+
 	return v, nil
 }
 
@@ -340,7 +340,7 @@ func (v *HistoryView) renderError(message string) string {
 		Foreground(lipgloss.Color("#FF5555")).
 		MarginTop(2).
 		MarginBottom(2)
-	
+
 	return v.titleStyle.Render("📚 History & Bookmarks") + "\n\n" +
 		errorStyle.Render("⚠️ Error: "+message) + "\n\n" +
 		v.helpStyle.Render("esc: back • q: quit")
@@ -362,14 +362,14 @@ func formatBytesHistory(bytes int64) string {
 
 // BookmarkCreateView represents a view for creating bookmarks
 type BookmarkCreateView struct {
-	name        string
-	description string
-	bucket      string
-	prefix      string
-	tags        string
+	name         string
+	description  string
+	bucket       string
+	prefix       string
+	tags         string
 	bookmarkType history.BookmarkType
 	currentField int
-	
+
 	// Styles
 	titleStyle lipgloss.Style
 	fieldStyle lipgloss.Style
@@ -383,17 +383,17 @@ func NewBookmarkCreateView(bucket, prefix string) *BookmarkCreateView {
 		prefix:       prefix,
 		bookmarkType: history.BookmarkLocation,
 		currentField: 0,
-		
+
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(2),
-		
+
 		fieldStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			Padding(1).
 			MarginBottom(1),
-		
+
 		helpStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666")).
 			MarginTop(2),
@@ -428,14 +428,14 @@ func (v *BookmarkCreateView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	return v, nil
 }
 
 // View renders the bookmark create view
 func (v *BookmarkCreateView) View() string {
 	title := v.titleStyle.Render("🔖 Create New Bookmark")
-	
+
 	fields := []string{
 		v.renderField("Name:", v.name, 0),
 		v.renderField("Description:", v.description, 1),
@@ -444,9 +444,9 @@ func (v *BookmarkCreateView) View() string {
 		v.renderField("Tags (comma-separated):", v.tags, 4),
 		v.renderSaveButton(),
 	}
-	
+
 	help := v.helpStyle.Render("tab: next field • shift+tab: previous field • enter: save • esc: cancel")
-	
+
 	return title + "\n\n" + strings.Join(fields, "\n") + "\n" + help
 }
 
@@ -456,12 +456,12 @@ func (v *BookmarkCreateView) renderField(label, value string, fieldIndex int) st
 	if v.currentField == fieldIndex {
 		style = style.BorderForeground(lipgloss.Color("#7D56F4"))
 	}
-	
+
 	content := fmt.Sprintf("%s\n%s", label, value)
 	if v.currentField == fieldIndex {
 		content += "_" // Cursor
 	}
-	
+
 	return style.Render(content)
 }
 
@@ -472,11 +472,11 @@ func (v *BookmarkCreateView) renderSaveButton() string {
 		Foreground(lipgloss.Color("#FFFFFF")).
 		Padding(1, 2).
 		MarginTop(1)
-	
+
 	if v.currentField == 5 {
 		style = style.Background(lipgloss.Color("#9333EA"))
 	}
-	
+
 	return style.Render("💾 Save Bookmark")
 }
 
@@ -528,7 +528,7 @@ func (v *BookmarkCreateView) saveBookmark() (tea.Model, tea.Cmd) {
 		// Show error - name and bucket are required
 		return v, nil
 	}
-	
+
 	// Create bookmark
 	bookmark := history.Bookmark{
 		Name:        v.name,
@@ -540,7 +540,7 @@ func (v *BookmarkCreateView) saveBookmark() (tea.Model, tea.Cmd) {
 		CreatedAt:   time.Now(),
 		LastUsed:    time.Now(),
 	}
-	
+
 	// Clean up tags
 	var cleanTags []string
 	for _, tag := range bookmark.Tags {
@@ -550,12 +550,12 @@ func (v *BookmarkCreateView) saveBookmark() (tea.Model, tea.Cmd) {
 		}
 	}
 	bookmark.Tags = cleanTags
-	
+
 	// Save to history manager
 	historyManager, err := history.NewManager("")
 	if err == nil {
 		historyManager.AddBookmark(bookmark)
 	}
-	
+
 	return NewHistoryView(), nil
 }

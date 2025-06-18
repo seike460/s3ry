@@ -20,7 +20,7 @@ func TestFlags_Structure(t *testing.T) {
 		Language:   "ja",
 		LogLevel:   "debug",
 	}
-	
+
 	assert.True(t, flags.NewUI)
 	assert.Equal(t, "us-west-2", flags.Region)
 	assert.Equal(t, "test", flags.Profile)
@@ -37,7 +37,7 @@ func TestGetVersion_Default(t *testing.T) {
 	originalVersion := version
 	version = ""
 	defer func() { version = originalVersion }()
-	
+
 	result := getVersion()
 	assert.Equal(t, "dev", result)
 }
@@ -47,7 +47,7 @@ func TestGetVersion_Set(t *testing.T) {
 	originalVersion := version
 	version = "1.0.0"
 	defer func() { version = originalVersion }()
-	
+
 	result := getVersion()
 	assert.Equal(t, "1.0.0", result)
 }
@@ -57,7 +57,7 @@ func TestGetCommit_Default(t *testing.T) {
 	originalCommit := commit
 	commit = ""
 	defer func() { commit = originalCommit }()
-	
+
 	result := getCommit()
 	assert.Equal(t, "unknown", result)
 }
@@ -67,7 +67,7 @@ func TestGetCommit_Set(t *testing.T) {
 	originalCommit := commit
 	commit = "abc123"
 	defer func() { commit = originalCommit }()
-	
+
 	result := getCommit()
 	assert.Equal(t, "abc123", result)
 }
@@ -77,7 +77,7 @@ func TestGetDate_Default(t *testing.T) {
 	originalDate := date
 	date = ""
 	defer func() { date = originalDate }()
-	
+
 	result := getDate()
 	assert.Equal(t, "unknown", result)
 }
@@ -87,7 +87,7 @@ func TestGetDate_Set(t *testing.T) {
 	originalDate := date
 	date = "2024-01-01"
 	defer func() { date = originalDate }()
-	
+
 	result := getDate()
 	assert.Equal(t, "2024-01-01", result)
 }
@@ -98,7 +98,7 @@ func TestFlagsCreation(t *testing.T) {
 	oldCommandLine := flag.CommandLine
 	defer func() { flag.CommandLine = oldCommandLine }()
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	
+
 	// Test that parseFlags creates the right structure
 	// Note: We can't easily test the actual parsing without mocking os.Args
 	// but we can test that the function doesn't panic
@@ -107,7 +107,7 @@ func TestFlagsCreation(t *testing.T) {
 		oldArgs := os.Args
 		os.Args = []string{"test"}
 		defer func() { os.Args = oldArgs }()
-		
+
 		// This would normally parse flags, but with empty args it should work
 		flags := &Flags{}
 		assert.NotNil(t, flags)
@@ -119,7 +119,7 @@ func TestVersionInformation(t *testing.T) {
 	assert.IsType(t, "", version)
 	assert.IsType(t, "", commit)
 	assert.IsType(t, "", date)
-	
+
 	// Test that getters return strings
 	assert.IsType(t, "", getVersion())
 	assert.IsType(t, "", getCommit())
@@ -150,13 +150,13 @@ func BenchmarkVersionGetters(b *testing.B) {
 			_ = getVersion()
 		}
 	})
-	
+
 	b.Run("getCommit", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = getCommit()
 		}
 	})
-	
+
 	b.Run("getDate", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = getDate()

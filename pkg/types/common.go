@@ -23,16 +23,16 @@ type Object struct {
 
 // TransferJob represents a file transfer job between local filesystem and S3
 type TransferJob struct {
-	ID        string         `json:"id"`
-	Type      TransferType   `json:"type"`
-	Source    string         `json:"source"`
-	Target    string         `json:"target"`
-	Size      int64          `json:"size"`
-	BytesTransferred int64   `json:"bytes_transferred"`
-	Status    TransferStatus `json:"status"`
-	Error     error          `json:"error,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID               string         `json:"id"`
+	Type             TransferType   `json:"type"`
+	Source           string         `json:"source"`
+	Target           string         `json:"target"`
+	Size             int64          `json:"size"`
+	BytesTransferred int64          `json:"bytes_transferred"`
+	Status           TransferStatus `json:"status"`
+	Error            error          `json:"error,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 }
 
 // TransferType represents the type of transfer operation
@@ -133,13 +133,13 @@ func (tj *TransferJob) CanRetry() bool {
 
 // TransferStats represents statistics for transfer operations
 type TransferStats struct {
-	TotalJobs     int           `json:"total_jobs"`
-	CompletedJobs int           `json:"completed_jobs"`
-	FailedJobs    int           `json:"failed_jobs"`
-	TotalBytes    int64         `json:"total_bytes"`
-	TransferredBytes int64      `json:"transferred_bytes"`
-	Duration      time.Duration `json:"duration"`
-	Speed         int64         `json:"speed"` // bytes per second
+	TotalJobs        int           `json:"total_jobs"`
+	CompletedJobs    int           `json:"completed_jobs"`
+	FailedJobs       int           `json:"failed_jobs"`
+	TotalBytes       int64         `json:"total_bytes"`
+	TransferredBytes int64         `json:"transferred_bytes"`
+	Duration         time.Duration `json:"duration"`
+	Speed            int64         `json:"speed"` // bytes per second
 }
 
 // Progress calculates the overall progress percentage

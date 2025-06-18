@@ -11,7 +11,7 @@ import (
 
 func TestDefaultBatchConfig(t *testing.T) {
 	config := DefaultBatchConfig()
-	
+
 	assert.Equal(t, 10, config.ConcurrentOperations)
 	assert.Equal(t, 100, config.BatchSize)
 	assert.Equal(t, 3, config.RetryCount)
@@ -24,12 +24,12 @@ func TestNewBatchProcessor(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultBatchConfig()
 	processor := NewBatchProcessor(client, config)
-	
+
 	assert.NotNil(t, processor)
 	assert.NotNil(t, processor.client)
 	assert.NotNil(t, processor.pool)
 	assert.Equal(t, client, processor.client)
-	
+
 	// Clean up
 	processor.Close()
 }
@@ -38,7 +38,7 @@ func TestBatchProcessor_Close(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultBatchConfig()
 	processor := NewBatchProcessor(client, config)
-	
+
 	// Should not panic
 	assert.NotPanics(t, func() {
 		processor.Close()
@@ -56,7 +56,7 @@ func TestBatchConfig_CustomValues(t *testing.T) {
 			// Custom progress callback
 		},
 	}
-	
+
 	assert.Equal(t, 20, config.ConcurrentOperations)
 	assert.Equal(t, 50, config.BatchSize)
 	assert.Equal(t, 5, config.RetryCount)
@@ -72,7 +72,7 @@ func TestBatchOperation_Creation(t *testing.T) {
 		Success:   true,
 		Error:     nil,
 	}
-	
+
 	assert.Equal(t, "delete", operation.Operation)
 	assert.Equal(t, "test-key", operation.Key)
 	assert.True(t, operation.Success)
@@ -87,7 +87,7 @@ func TestBatchOperation_WithError(t *testing.T) {
 		Success:   false,
 		Error:     testError,
 	}
-	
+
 	assert.Equal(t, "upload", operation.Operation)
 	assert.Equal(t, "failed-key", operation.Key)
 	assert.False(t, operation.Success)
@@ -98,7 +98,7 @@ func TestCopyOperation_Creation(t *testing.T) {
 	metadata := map[string]*string{
 		"author": stringPtr("test-user"),
 	}
-	
+
 	operation := CopyOperation{
 		SourceBucket: "source-bucket",
 		SourceKey:    "source/key",
@@ -106,7 +106,7 @@ func TestCopyOperation_Creation(t *testing.T) {
 		DestKey:      "dest/key",
 		Metadata:     metadata,
 	}
-	
+
 	assert.Equal(t, "source-bucket", operation.SourceBucket)
 	assert.Equal(t, "source/key", operation.SourceKey)
 	assert.Equal(t, "dest-bucket", operation.DestBucket)
@@ -119,12 +119,12 @@ func TestMetadataUpdate_Creation(t *testing.T) {
 		"author":  stringPtr("updated-user"),
 		"version": stringPtr("2.0"),
 	}
-	
+
 	update := MetadataUpdate{
 		Key:      "test-key",
 		Metadata: metadata,
 	}
-	
+
 	assert.Equal(t, "test-key", update.Key)
 	assert.Equal(t, metadata, update.Metadata)
 	assert.Equal(t, "updated-user", *update.Metadata["author"])
@@ -136,7 +136,7 @@ func TestPermissionUpdate_Creation(t *testing.T) {
 		Key: "test-key",
 		ACL: "public-read",
 	}
-	
+
 	assert.Equal(t, "test-key", update.Key)
 	assert.Equal(t, "public-read", update.ACL)
 }
@@ -146,7 +146,7 @@ func TestPermissionUpdate_PrivateACL(t *testing.T) {
 		Key: "private-key",
 		ACL: "private",
 	}
-	
+
 	assert.Equal(t, "private-key", update.Key)
 	assert.Equal(t, "private", update.ACL)
 }
@@ -157,11 +157,11 @@ func TestBatchProcessor_DryRunMode(t *testing.T) {
 	config.DryRun = true
 	processor := NewBatchProcessor(client, config)
 	defer processor.Close()
-	
+
 	// Test dry run for delete operations
 	keys := []string{"key1", "key2", "key3"}
 	operations := processor.DeleteBatch(context.Background(), "test-bucket", keys, config)
-	
+
 	assert.Len(t, operations, 3)
 	for i, op := range operations {
 		assert.Equal(t, "delete", op.Operation)
@@ -177,7 +177,7 @@ func TestBatchProcessor_CopyOperationsDryRun(t *testing.T) {
 	config.DryRun = true
 	processor := NewBatchProcessor(client, config)
 	defer processor.Close()
-	
+
 	copyOps := []CopyOperation{
 		{
 			SourceBucket: "source1",
@@ -192,9 +192,9 @@ func TestBatchProcessor_CopyOperationsDryRun(t *testing.T) {
 			DestKey:      "new-key2",
 		},
 	}
-	
+
 	operations := processor.CopyBatch(context.Background(), copyOps, config)
-	
+
 	assert.Len(t, operations, 2)
 	for i, op := range operations {
 		assert.Equal(t, "copy", op.Operation)
@@ -210,7 +210,7 @@ func TestBatchProcessor_MetadataUpdatesDryRun(t *testing.T) {
 	config.DryRun = true
 	processor := NewBatchProcessor(client, config)
 	defer processor.Close()
-	
+
 	updates := []MetadataUpdate{
 		{
 			Key: "key1",
@@ -225,9 +225,9 @@ func TestBatchProcessor_MetadataUpdatesDryRun(t *testing.T) {
 			},
 		},
 	}
-	
+
 	operations := processor.UpdateMetadataBatch(context.Background(), "test-bucket", updates, config)
-	
+
 	assert.Len(t, operations, 2)
 	for i, op := range operations {
 		assert.Equal(t, "metadata_update", op.Operation)
@@ -243,14 +243,14 @@ func TestBatchProcessor_PermissionUpdatesDryRun(t *testing.T) {
 	config.DryRun = true
 	processor := NewBatchProcessor(client, config)
 	defer processor.Close()
-	
+
 	permissions := []PermissionUpdate{
 		{Key: "key1", ACL: "private"},
 		{Key: "key2", ACL: "public-read"},
 	}
-	
+
 	operations := processor.SetPermissionsBatch(context.Background(), "test-bucket", permissions, config)
-	
+
 	assert.Len(t, operations, 2)
 	for i, op := range operations {
 		assert.Equal(t, "permission_update", op.Operation)
@@ -262,7 +262,7 @@ func TestBatchProcessor_PermissionUpdatesDryRun(t *testing.T) {
 
 func TestBatchProcessor_ProgressCallback(t *testing.T) {
 	client := NewClient("us-east-1")
-	
+
 	var capturedCompleted, capturedTotal int
 	config := BatchConfig{
 		ConcurrentOperations: 5,
@@ -271,10 +271,10 @@ func TestBatchProcessor_ProgressCallback(t *testing.T) {
 			capturedTotal = total
 		},
 	}
-	
+
 	processor := NewBatchProcessor(client, config)
 	defer processor.Close()
-	
+
 	// Test that progress callback is properly stored
 	assert.NotNil(t, config.OnProgress)
 	config.OnProgress(5, 10)
@@ -288,17 +288,17 @@ func TestBatchProcessor_BatchSizeLogic(t *testing.T) {
 	for i := range keys {
 		keys[i] = "key" + string(rune(i))
 	}
-	
+
 	maxBatchSize := 1000
 	batchSize := 500
-	
+
 	if batchSize > 0 && batchSize < maxBatchSize {
 		maxBatchSize = batchSize
 	}
-	
+
 	// Calculate expected number of batches
 	expectedBatches := (len(keys) + maxBatchSize - 1) / maxBatchSize
-	
+
 	assert.Equal(t, 500, maxBatchSize)
 	assert.Equal(t, 5, expectedBatches) // 2500 / 500 = 5 batches
 }
@@ -307,7 +307,7 @@ func TestBatchProcessor_WaitForCompletion(t *testing.T) {
 	// Test the completion waiting logic
 	operations := []BatchOperation{}
 	var mutex sync.Mutex
-	
+
 	// Simulate adding operations concurrently
 	go func() {
 		for i := 0; i < 5; i++ {
@@ -321,12 +321,12 @@ func TestBatchProcessor_WaitForCompletion(t *testing.T) {
 			mutex.Unlock()
 		}
 	}()
-	
+
 	// Wait for operations to complete (simplified version)
 	timeout := time.After(1 * time.Second)
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	expectedCount := 5
 	for {
 		select {
@@ -347,7 +347,7 @@ func TestBatchProcessor_WaitForCompletion(t *testing.T) {
 func TestBatchProcessor_ResourceCleanup(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultBatchConfig()
-	
+
 	// Create and close multiple processors to test resource cleanup
 	for i := 0; i < 3; i++ {
 		processor := NewBatchProcessor(client, config)
@@ -358,14 +358,14 @@ func TestBatchProcessor_ResourceCleanup(t *testing.T) {
 
 func TestBatchJob_Interface(t *testing.T) {
 	client := NewClient("us-east-1")
-	
+
 	// Test that job types implement the interface correctly
 	deleteJob := &BatchDeleteJob{
 		client: client,
 		keys:   []string{"test-key"},
 	}
 	assert.NotNil(t, deleteJob)
-	
+
 	copyJob := &BatchCopyJob{
 		client: client,
 		operation: CopyOperation{
@@ -376,7 +376,7 @@ func TestBatchJob_Interface(t *testing.T) {
 		},
 	}
 	assert.NotNil(t, copyJob)
-	
+
 	metadataJob := &BatchMetadataUpdateJob{
 		client: client,
 		bucket: "test-bucket",
@@ -385,7 +385,7 @@ func TestBatchJob_Interface(t *testing.T) {
 		},
 	}
 	assert.NotNil(t, metadataJob)
-	
+
 	permissionJob := &BatchPermissionUpdateJob{
 		client: client,
 		bucket: "test-bucket",
@@ -401,7 +401,7 @@ func TestBatchJob_Interface(t *testing.T) {
 func BenchmarkNewBatchProcessor(b *testing.B) {
 	client := NewClient("us-east-1")
 	config := DefaultBatchConfig()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		processor := NewBatchProcessor(client, config)
@@ -434,7 +434,7 @@ func BenchmarkCopyOperation_Creation(b *testing.B) {
 	metadata := map[string]*string{
 		"author": stringPtr("test-user"),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		operation := CopyOperation{
@@ -453,7 +453,7 @@ func BenchmarkMetadataUpdate_Creation(b *testing.B) {
 		"author":  stringPtr("test-user"),
 		"version": stringPtr("1.0"),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		update := MetadataUpdate{
@@ -469,16 +469,16 @@ func BenchmarkBatchSizeCalculation(b *testing.B) {
 	for i := range keys {
 		keys[i] = "key"
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		maxBatchSize := 1000
 		batchSize := 500
-		
+
 		if batchSize > 0 && batchSize < maxBatchSize {
 			maxBatchSize = batchSize
 		}
-		
+
 		// Calculate number of batches
 		_ = (len(keys) + maxBatchSize - 1) / maxBatchSize
 	}

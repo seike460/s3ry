@@ -24,67 +24,67 @@ type CostAnalyzer struct {
 
 // AnalyzerConfig holds cost analyzer configuration
 type AnalyzerConfig struct {
-	CollectionInterval  time.Duration         `json:"collection_interval"`
-	RetentionPeriod     time.Duration         `json:"retention_period"`
-	Currency           string                `json:"currency"`
-	BillingPeriod      string                `json:"billing_period"`      // monthly, quarterly, annual
-	CostThresholds     map[string]float64    `json:"cost_thresholds"`
-	OptimizationRules  []OptimizationRule    `json:"optimization_rules"`
-	ForecastHorizon    time.Duration         `json:"forecast_horizon"`
-	AlertEnabled       bool                  `json:"alert_enabled"`
-	ReportsEnabled     bool                  `json:"reports_enabled"`
-	ReportSchedule     []ReportSchedule      `json:"report_schedule"`
+	CollectionInterval time.Duration      `json:"collection_interval"`
+	RetentionPeriod    time.Duration      `json:"retention_period"`
+	Currency           string             `json:"currency"`
+	BillingPeriod      string             `json:"billing_period"` // monthly, quarterly, annual
+	CostThresholds     map[string]float64 `json:"cost_thresholds"`
+	OptimizationRules  []OptimizationRule `json:"optimization_rules"`
+	ForecastHorizon    time.Duration      `json:"forecast_horizon"`
+	AlertEnabled       bool               `json:"alert_enabled"`
+	ReportsEnabled     bool               `json:"reports_enabled"`
+	ReportSchedule     []ReportSchedule   `json:"report_schedule"`
 }
 
 // UsageCollector collects usage metrics for cost calculation
 type UsageCollector struct {
-	config   *CollectorConfig
-	metrics  map[string]*UsageMetric
-	mutex    sync.RWMutex
-	stopCh   chan struct{}
-	running  bool
+	config  *CollectorConfig
+	metrics map[string]*UsageMetric
+	mutex   sync.RWMutex
+	stopCh  chan struct{}
+	running bool
 }
 
 // CollectorConfig holds usage collector configuration
 type CollectorConfig struct {
-	S3Pricing        S3PricingConfig       `json:"s3_pricing"`
-	ComputePricing   ComputePricingConfig  `json:"compute_pricing"`
-	NetworkPricing   NetworkPricingConfig  `json:"network_pricing"`
-	StoragePricing   StoragePricingConfig  `json:"storage_pricing"`
-	SamplingRate     float64               `json:"sampling_rate"`
+	S3Pricing         S3PricingConfig      `json:"s3_pricing"`
+	ComputePricing    ComputePricingConfig `json:"compute_pricing"`
+	NetworkPricing    NetworkPricingConfig `json:"network_pricing"`
+	StoragePricing    StoragePricingConfig `json:"storage_pricing"`
+	SamplingRate      float64              `json:"sampling_rate"`
 	AggregationWindow time.Duration        `json:"aggregation_window"`
 }
 
 // S3PricingConfig holds S3 service pricing configuration
 type S3PricingConfig struct {
-	StoragePerGB     map[string]float64 `json:"storage_per_gb"`     // Storage class -> price per GB
-	RequestPricing   map[string]float64 `json:"request_pricing"`    // Request type -> price per 1000
-	DataTransferOut  map[string]float64 `json:"data_transfer_out"`  // Region -> price per GB
-	DataTransferIn   float64            `json:"data_transfer_in"`   // Usually free
-	Region           string             `json:"region"`
+	StoragePerGB    map[string]float64 `json:"storage_per_gb"`    // Storage class -> price per GB
+	RequestPricing  map[string]float64 `json:"request_pricing"`   // Request type -> price per 1000
+	DataTransferOut map[string]float64 `json:"data_transfer_out"` // Region -> price per GB
+	DataTransferIn  float64            `json:"data_transfer_in"`  // Usually free
+	Region          string             `json:"region"`
 }
 
 // ComputePricingConfig holds compute pricing configuration
 type ComputePricingConfig struct {
-	CPUHourly    float64 `json:"cpu_hourly"`     // Price per CPU hour
-	MemoryHourly float64 `json:"memory_hourly"`  // Price per GB memory hour
-	Instances    map[string]float64 `json:"instances"` // Instance type -> hourly rate
+	CPUHourly    float64            `json:"cpu_hourly"`    // Price per CPU hour
+	MemoryHourly float64            `json:"memory_hourly"` // Price per GB memory hour
+	Instances    map[string]float64 `json:"instances"`     // Instance type -> hourly rate
 }
 
 // NetworkPricingConfig holds network pricing configuration
 type NetworkPricingConfig struct {
-	InboundFree    bool               `json:"inbound_free"`
-	OutboundTiers  []PricingTier      `json:"outbound_tiers"`
-	InterRegion    map[string]float64 `json:"inter_region"`
-	CrossAZ        float64            `json:"cross_az"`
+	InboundFree   bool               `json:"inbound_free"`
+	OutboundTiers []PricingTier      `json:"outbound_tiers"`
+	InterRegion   map[string]float64 `json:"inter_region"`
+	CrossAZ       float64            `json:"cross_az"`
 }
 
 // StoragePricingConfig holds storage pricing configuration
 type StoragePricingConfig struct {
-	StandardStorage  float64 `json:"standard_storage"`   // Per GB/month
-	RedundantStorage float64 `json:"redundant_storage"`  // Per GB/month
-	ArchivalStorage  float64 `json:"archival_storage"`   // Per GB/month
-	BackupStorage    float64 `json:"backup_storage"`     // Per GB/month
+	StandardStorage  float64 `json:"standard_storage"`  // Per GB/month
+	RedundantStorage float64 `json:"redundant_storage"` // Per GB/month
+	ArchivalStorage  float64 `json:"archival_storage"`  // Per GB/month
+	BackupStorage    float64 `json:"backup_storage"`    // Per GB/month
 }
 
 // PricingTier represents a pricing tier with usage thresholds
@@ -95,48 +95,48 @@ type PricingTier struct {
 
 // UsageMetric represents a usage measurement
 type UsageMetric struct {
-	Service     string                 `json:"service"`
-	MetricType  string                 `json:"metric_type"`
-	Value       float64                `json:"value"`
-	Unit        string                 `json:"unit"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Tags        map[string]string      `json:"tags"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Service    string                 `json:"service"`
+	MetricType string                 `json:"metric_type"`
+	Value      float64                `json:"value"`
+	Unit       string                 `json:"unit"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Tags       map[string]string      `json:"tags"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // CostCalculator calculates costs from usage metrics
 type CostCalculator struct {
-	config   *CalculatorConfig
+	config        *CalculatorConfig
 	pricingEngine *PricingEngine
 }
 
 // CalculatorConfig holds cost calculator configuration
 type CalculatorConfig struct {
-	TaxRate         float64           `json:"tax_rate"`
-	DiscountRules   []DiscountRule    `json:"discount_rules"`
+	TaxRate          float64            `json:"tax_rate"`
+	DiscountRules    []DiscountRule     `json:"discount_rules"`
 	ReservedCapacity map[string]float64 `json:"reserved_capacity"`
-	VolumeDiscounts []VolumeDiscount  `json:"volume_discounts"`
+	VolumeDiscounts  []VolumeDiscount   `json:"volume_discounts"`
 }
 
 // DiscountRule represents a discount rule
 type DiscountRule struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Service     string            `json:"service"`
-	Condition   string            `json:"condition"`   // Expression to evaluate
-	Discount    float64           `json:"discount"`    // Percentage or fixed amount
-	Type        string            `json:"type"`        // percentage, fixed
-	ValidFrom   time.Time         `json:"valid_from"`
-	ValidTo     time.Time         `json:"valid_to"`
-	Tags        map[string]string `json:"tags"`
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Service   string            `json:"service"`
+	Condition string            `json:"condition"` // Expression to evaluate
+	Discount  float64           `json:"discount"`  // Percentage or fixed amount
+	Type      string            `json:"type"`      // percentage, fixed
+	ValidFrom time.Time         `json:"valid_from"`
+	ValidTo   time.Time         `json:"valid_to"`
+	Tags      map[string]string `json:"tags"`
 }
 
 // VolumeDiscount represents volume-based discounts
 type VolumeDiscount struct {
-	Service     string  `json:"service"`
-	Threshold   float64 `json:"threshold"`
-	Discount    float64 `json:"discount"`
-	Type        string  `json:"type"`
+	Service   string  `json:"service"`
+	Threshold float64 `json:"threshold"`
+	Discount  float64 `json:"discount"`
+	Type      string  `json:"type"`
 }
 
 // PricingEngine calculates actual costs
@@ -146,29 +146,29 @@ type PricingEngine struct {
 
 // CostBreakdown represents detailed cost breakdown
 type CostBreakdown struct {
-	TotalCost       float64                    `json:"total_cost"`
-	Currency        string                     `json:"currency"`
-	Period          string                     `json:"period"`
-	ServiceCosts    map[string]ServiceCost     `json:"service_costs"`
-	ResourceCosts   map[string]ResourceCost    `json:"resource_costs"`
-	TagCosts        map[string]float64         `json:"tag_costs"`
-	RegionCosts     map[string]float64         `json:"region_costs"`
-	Discounts       []AppliedDiscount          `json:"discounts"`
-	TotalDiscount   float64                    `json:"total_discount"`
-	TaxAmount       float64                    `json:"tax_amount"`
-	NetCost         float64                    `json:"net_cost"`
-	Timestamp       time.Time                  `json:"timestamp"`
-	BillingPeriod   BillingPeriod              `json:"billing_period"`
+	TotalCost     float64                 `json:"total_cost"`
+	Currency      string                  `json:"currency"`
+	Period        string                  `json:"period"`
+	ServiceCosts  map[string]ServiceCost  `json:"service_costs"`
+	ResourceCosts map[string]ResourceCost `json:"resource_costs"`
+	TagCosts      map[string]float64      `json:"tag_costs"`
+	RegionCosts   map[string]float64      `json:"region_costs"`
+	Discounts     []AppliedDiscount       `json:"discounts"`
+	TotalDiscount float64                 `json:"total_discount"`
+	TaxAmount     float64                 `json:"tax_amount"`
+	NetCost       float64                 `json:"net_cost"`
+	Timestamp     time.Time               `json:"timestamp"`
+	BillingPeriod BillingPeriod           `json:"billing_period"`
 }
 
 // ServiceCost represents cost breakdown by service
 type ServiceCost struct {
-	Service      string             `json:"service"`
-	Cost         float64            `json:"cost"`
-	Usage        float64            `json:"usage"`
-	Unit         string             `json:"unit"`
-	Components   map[string]float64 `json:"components"`
-	Trend        CostTrend          `json:"trend"`
+	Service    string             `json:"service"`
+	Cost       float64            `json:"cost"`
+	Usage      float64            `json:"usage"`
+	Unit       string             `json:"unit"`
+	Components map[string]float64 `json:"components"`
+	Trend      CostTrend          `json:"trend"`
 }
 
 // ResourceCost represents cost by individual resource
@@ -184,19 +184,19 @@ type ResourceCost struct {
 
 // AppliedDiscount represents a discount that was applied
 type AppliedDiscount struct {
-	RuleID      string  `json:"rule_id"`
-	Name        string  `json:"name"`
-	Amount      float64 `json:"amount"`
-	Type        string  `json:"type"`
-	Service     string  `json:"service"`
+	RuleID  string  `json:"rule_id"`
+	Name    string  `json:"name"`
+	Amount  float64 `json:"amount"`
+	Type    string  `json:"type"`
+	Service string  `json:"service"`
 }
 
 // CostTrend represents cost trend analysis
 type CostTrend struct {
-	Direction    string  `json:"direction"`    // increasing, decreasing, stable
+	Direction     string  `json:"direction"` // increasing, decreasing, stable
 	ChangePercent float64 `json:"change_percent"`
-	Confidence   float64 `json:"confidence"`
-	Period       string  `json:"period"`
+	Confidence    float64 `json:"confidence"`
+	Period        string  `json:"period"`
 }
 
 // BillingPeriod represents a billing period
@@ -214,10 +214,10 @@ type CostOptimizer struct {
 
 // OptimizerConfig holds optimizer configuration
 type OptimizerConfig struct {
-	MinSavingsThreshold float64 `json:"min_savings_threshold"`
+	MinSavingsThreshold float64       `json:"min_savings_threshold"`
 	AnalysisWindow      time.Duration `json:"analysis_window"`
-	ConfidenceThreshold float64 `json:"confidence_threshold"`
-	EnabledCategories   []string `json:"enabled_categories"`
+	ConfidenceThreshold float64       `json:"confidence_threshold"`
+	EnabledCategories   []string      `json:"enabled_categories"`
 }
 
 // OptimizationRule represents a cost optimization rule
@@ -235,32 +235,32 @@ type OptimizationRule struct {
 
 // OptimizationImpact represents the impact of an optimization
 type OptimizationImpact struct {
-	CostSavings       float64 `json:"cost_savings"`
-	SavingsPercent    float64 `json:"savings_percent"`
-	Implementation    string  `json:"implementation"`  // auto, manual, approval_required
-	Risk              string  `json:"risk"`            // low, medium, high
-	Effort            string  `json:"effort"`          // low, medium, high
+	CostSavings    float64 `json:"cost_savings"`
+	SavingsPercent float64 `json:"savings_percent"`
+	Implementation string  `json:"implementation"` // auto, manual, approval_required
+	Risk           string  `json:"risk"`           // low, medium, high
+	Effort         string  `json:"effort"`         // low, medium, high
 }
 
 // Recommendation represents a cost optimization recommendation
 type Recommendation struct {
-	ID            string             `json:"id"`
-	Type          string             `json:"type"`
-	Priority      string             `json:"priority"`
-	Title         string             `json:"title"`
-	Description   string             `json:"description"`
-	ResourceID    string             `json:"resource_id"`
-	Service       string             `json:"service"`
-	CurrentCost   float64            `json:"current_cost"`
-	OptimizedCost float64            `json:"optimized_cost"`
-	Savings       float64            `json:"savings"`
-	SavingsPercent float64           `json:"savings_percent"`
-	Impact        OptimizationImpact `json:"impact"`
-	Actions       []string           `json:"actions"`
-	Evidence      []Evidence         `json:"evidence"`
-	CreatedAt     time.Time          `json:"created_at"`
-	ValidUntil    time.Time          `json:"valid_until"`
-	Status        string             `json:"status"`
+	ID             string             `json:"id"`
+	Type           string             `json:"type"`
+	Priority       string             `json:"priority"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	ResourceID     string             `json:"resource_id"`
+	Service        string             `json:"service"`
+	CurrentCost    float64            `json:"current_cost"`
+	OptimizedCost  float64            `json:"optimized_cost"`
+	Savings        float64            `json:"savings"`
+	SavingsPercent float64            `json:"savings_percent"`
+	Impact         OptimizationImpact `json:"impact"`
+	Actions        []string           `json:"actions"`
+	Evidence       []Evidence         `json:"evidence"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ValidUntil     time.Time          `json:"valid_until"`
+	Status         string             `json:"status"`
 }
 
 // Evidence represents supporting evidence for a recommendation
@@ -279,7 +279,7 @@ type CostForecaster struct {
 
 // ForecastConfig holds forecasting configuration
 type ForecastConfig struct {
-	Models          []string      `json:"models"`          // linear, exponential, seasonal
+	Models          []string      `json:"models"` // linear, exponential, seasonal
 	LookbackPeriod  time.Duration `json:"lookback_period"`
 	ForecastHorizon time.Duration `json:"forecast_horizon"`
 	ConfidenceLevel float64       `json:"confidence_level"`
@@ -317,9 +317,9 @@ type ConfidenceRange struct {
 
 // ForecastTrend represents forecast trend
 type ForecastTrend struct {
-	Direction     string  `json:"direction"`
-	Growth        float64 `json:"growth"`
-	Acceleration  float64 `json:"acceleration"`
+	Direction    string  `json:"direction"`
+	Growth       float64 `json:"growth"`
+	Acceleration float64 `json:"acceleration"`
 }
 
 // SeasonalFactor represents seasonal cost factors
@@ -347,28 +347,28 @@ type CostAlertManager interface {
 
 // CostAlert represents a cost alert
 type CostAlert struct {
-	ID          string                 `json:"id"`
-	Type        string                 `json:"type"`
-	Severity    string                 `json:"severity"`
-	Service     string                 `json:"service"`
-	Threshold   float64                `json:"threshold"`
-	ActualCost  float64                `json:"actual_cost"`
-	Percentage  float64                `json:"percentage"`
-	Period      string                 `json:"period"`
-	Message     string                 `json:"message"`
-	Recipients  []string               `json:"recipients"`
-	CreatedAt   time.Time              `json:"created_at"`
-	Status      string                 `json:"status"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID         string                 `json:"id"`
+	Type       string                 `json:"type"`
+	Severity   string                 `json:"severity"`
+	Service    string                 `json:"service"`
+	Threshold  float64                `json:"threshold"`
+	ActualCost float64                `json:"actual_cost"`
+	Percentage float64                `json:"percentage"`
+	Period     string                 `json:"period"`
+	Message    string                 `json:"message"`
+	Recipients []string               `json:"recipients"`
+	CreatedAt  time.Time              `json:"created_at"`
+	Status     string                 `json:"status"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // ReportSchedule defines when to generate cost reports
 type ReportSchedule struct {
 	Name       string   `json:"name"`
-	Frequency  string   `json:"frequency"`   // daily, weekly, monthly
+	Frequency  string   `json:"frequency"` // daily, weekly, monthly
 	Recipients []string `json:"recipients"`
-	Format     string   `json:"format"`     // json, csv, pdf
-	Sections   []string `json:"sections"`   // breakdown, trends, recommendations
+	Format     string   `json:"format"`   // json, csv, pdf
+	Sections   []string `json:"sections"` // breakdown, trends, recommendations
 }
 
 // DefaultAnalyzerConfig returns default cost analyzer configuration
@@ -376,13 +376,13 @@ func DefaultAnalyzerConfig() *AnalyzerConfig {
 	return &AnalyzerConfig{
 		CollectionInterval: time.Minute * 15,
 		RetentionPeriod:    time.Hour * 24 * 90, // 90 days
-		Currency:          "USD",
-		BillingPeriod:     "monthly",
+		Currency:           "USD",
+		BillingPeriod:      "monthly",
 		CostThresholds: map[string]float64{
-			"total_monthly":    1000.0,
-			"s3_monthly":       500.0,
-			"compute_monthly":  300.0,
-			"network_monthly":  200.0,
+			"total_monthly":   1000.0,
+			"s3_monthly":      500.0,
+			"compute_monthly": 300.0,
+			"network_monthly": 200.0,
 		},
 		ForecastHorizon: time.Hour * 24 * 30, // 30 days
 		AlertEnabled:    true,
@@ -498,10 +498,10 @@ func NewCostOptimizer(config *OptimizerConfig) *CostOptimizer {
 		config: config,
 		rules:  make([]OptimizationRule, 0),
 	}
-	
+
 	// Initialize default optimization rules
 	optimizer.initializeDefaultRules()
-	
+
 	return optimizer
 }
 
@@ -788,7 +788,7 @@ func (c *CostCalculator) applyVolumeDiscounts(breakdown *CostBreakdown) {
 					Service: discount.Service,
 				})
 				breakdown.TotalDiscount += discountAmount
-				
+
 				// Update service cost
 				serviceCost.Cost -= discountAmount
 				breakdown.ServiceCosts[discount.Service] = serviceCost
@@ -874,11 +874,11 @@ func (o *CostOptimizer) initializeDefaultRules() {
 			Condition:   "last_accessed > 30d AND cost > 10",
 			Action:      "move_to_archive",
 			Impact: OptimizationImpact{
-				CostSavings:       50.0,
-				SavingsPercent:    70.0,
-				Implementation:    "auto",
-				Risk:              "low",
-				Effort:            "low",
+				CostSavings:    50.0,
+				SavingsPercent: 70.0,
+				Implementation: "auto",
+				Risk:           "low",
+				Effort:         "low",
 			},
 			Confidence: 0.9,
 		},
@@ -890,11 +890,11 @@ func (o *CostOptimizer) initializeDefaultRules() {
 			Condition:   "cpu_utilization < 20% AND memory_utilization < 30%",
 			Action:      "downsize_instance",
 			Impact: OptimizationImpact{
-				CostSavings:       100.0,
-				SavingsPercent:    40.0,
-				Implementation:    "manual",
-				Risk:              "medium",
-				Effort:            "medium",
+				CostSavings:    100.0,
+				SavingsPercent: 40.0,
+				Implementation: "manual",
+				Risk:           "medium",
+				Effort:         "medium",
 			},
 			Confidence: 0.8,
 		},
@@ -906,11 +906,11 @@ func (o *CostOptimizer) initializeDefaultRules() {
 			Condition:   "cross_region_transfer > 100GB AND same_region_alternative_exists",
 			Action:      "optimize_data_locality",
 			Impact: OptimizationImpact{
-				CostSavings:       75.0,
-				SavingsPercent:    60.0,
-				Implementation:    "manual",
-				Risk:              "low",
-				Effort:            "high",
+				CostSavings:    75.0,
+				SavingsPercent: 60.0,
+				Implementation: "manual",
+				Risk:           "low",
+				Effort:         "high",
 			},
 			Confidence: 0.7,
 		},
@@ -950,7 +950,7 @@ func (o *CostOptimizer) evaluateRule(rule OptimizationRule, history []*CostBreak
 	}
 
 	latest := history[len(history)-1]
-	
+
 	switch rule.Category {
 	case "storage":
 		if serviceCost, exists := latest.ServiceCosts["s3"]; exists && serviceCost.Cost > 50 {

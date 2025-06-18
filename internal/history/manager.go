@@ -14,14 +14,14 @@ import (
 type ActionType string
 
 const (
-	ActionDownload    ActionType = "download"
-	ActionUpload      ActionType = "upload"
-	ActionDelete      ActionType = "delete"
-	ActionCopy        ActionType = "copy"
-	ActionMove        ActionType = "move"
-	ActionList        ActionType = "list"
-	ActionView        ActionType = "view"
-	ActionBrowse      ActionType = "browse"
+	ActionDownload     ActionType = "download"
+	ActionUpload       ActionType = "upload"
+	ActionDelete       ActionType = "delete"
+	ActionCopy         ActionType = "copy"
+	ActionMove         ActionType = "move"
+	ActionList         ActionType = "list"
+	ActionView         ActionType = "view"
+	ActionBrowse       ActionType = "browse"
 	ActionCreateBucket ActionType = "create_bucket"
 	ActionDeleteBucket ActionType = "delete_bucket"
 )
@@ -70,12 +70,12 @@ const (
 
 // Manager manages history and bookmarks
 type Manager struct {
-	historyFile   string
-	bookmarkFile  string
-	maxHistory    int
-	history       []HistoryEntry
-	bookmarks     []Bookmark
-	autoSave      bool
+	historyFile  string
+	bookmarkFile string
+	maxHistory   int
+	history      []HistoryEntry
+	bookmarks    []Bookmark
+	autoSave     bool
 }
 
 // NewManager creates a new history and bookmark manager
@@ -540,13 +540,13 @@ func min(a, b int) int {
 
 // Filter types and helper methods
 type HistoryFilter struct {
-	Actions     []ActionType  `json:"actions,omitempty"`
-	Buckets     []string      `json:"buckets,omitempty"`
-	TimeFrom    *time.Time    `json:"time_from,omitempty"`
-	TimeTo      *time.Time    `json:"time_to,omitempty"`
-	SuccessOnly bool          `json:"success_only,omitempty"`
-	SearchText  string        `json:"search_text,omitempty"`
-	Limit       int           `json:"limit,omitempty"`
+	Actions     []ActionType `json:"actions,omitempty"`
+	Buckets     []string     `json:"buckets,omitempty"`
+	TimeFrom    *time.Time   `json:"time_from,omitempty"`
+	TimeTo      *time.Time   `json:"time_to,omitempty"`
+	SuccessOnly bool         `json:"success_only,omitempty"`
+	SearchText  string       `json:"search_text,omitempty"`
+	Limit       int          `json:"limit,omitempty"`
 }
 
 func (f HistoryFilter) matches(entry HistoryEntry) bool {
@@ -679,10 +679,10 @@ type LocationStats struct {
 }
 
 type Stats struct {
-	TotalHistoryEntries int                  `json:"total_history_entries"`
-	TotalBookmarks      int                  `json:"total_bookmarks"`
-	ActionCounts        map[ActionType]int   `json:"action_counts"`
-	BucketCounts        map[string]int       `json:"bucket_counts"`
-	FirstActivity       time.Time            `json:"first_activity"`
-	LastActivity        time.Time            `json:"last_activity"`
+	TotalHistoryEntries int                `json:"total_history_entries"`
+	TotalBookmarks      int                `json:"total_bookmarks"`
+	ActionCounts        map[ActionType]int `json:"action_counts"`
+	BucketCounts        map[string]int     `json:"bucket_counts"`
+	FirstActivity       time.Time          `json:"first_activity"`
+	LastActivity        time.Time          `json:"last_activity"`
 }

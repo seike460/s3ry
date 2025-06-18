@@ -22,29 +22,29 @@ const (
 
 // AuditEvent represents an audit log entry
 type AuditEvent struct {
-	ID         string                 `json:"id"`
-	Timestamp  time.Time              `json:"timestamp"`
-	Level      AuditLevel             `json:"level"`
-	UserID     string                 `json:"user_id,omitempty"`
-	SessionID  string                 `json:"session_id,omitempty"`
-	Action     string                 `json:"action"`
-	Resource   string                 `json:"resource,omitempty"`
-	Result     string                 `json:"result"`
-	IPAddress  string                 `json:"ip_address,omitempty"`
-	UserAgent  string                 `json:"user_agent,omitempty"`
-	Details    map[string]interface{} `json:"details,omitempty"`
-	Duration   time.Duration          `json:"duration,omitempty"`
-	Error      string                 `json:"error,omitempty"`
+	ID        string                 `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	Level     AuditLevel             `json:"level"`
+	UserID    string                 `json:"user_id,omitempty"`
+	SessionID string                 `json:"session_id,omitempty"`
+	Action    string                 `json:"action"`
+	Resource  string                 `json:"resource,omitempty"`
+	Result    string                 `json:"result"`
+	IPAddress string                 `json:"ip_address,omitempty"`
+	UserAgent string                 `json:"user_agent,omitempty"`
+	Details   map[string]interface{} `json:"details,omitempty"`
+	Duration  time.Duration          `json:"duration,omitempty"`
+	Error     string                 `json:"error,omitempty"`
 }
 
 // AuditLogger handles audit logging
 type AuditLogger struct {
-	config   *AuditConfig
-	logFile  *os.File
-	mutex    sync.Mutex
-	buffer   []*AuditEvent
-	stopCh   chan struct{}
-	flushCh  chan struct{}
+	config  *AuditConfig
+	logFile *os.File
+	mutex   sync.Mutex
+	buffer  []*AuditEvent
+	stopCh  chan struct{}
+	flushCh chan struct{}
 }
 
 // AuditConfig holds audit logging configuration
@@ -52,14 +52,14 @@ type AuditConfig struct {
 	Enabled         bool          `json:"enabled"`
 	LogLevel        AuditLevel    `json:"log_level"`
 	LogFile         string        `json:"log_file"`
-	MaxFileSize     int64         `json:"max_file_size"`     // in bytes
-	MaxFiles        int           `json:"max_files"`         // number of rotated files to keep
-	BufferSize      int           `json:"buffer_size"`       // number of events to buffer
-	FlushInterval   time.Duration `json:"flush_interval"`    // how often to flush buffer
-	IncludeRequest  bool          `json:"include_request"`   // include request details
-	IncludeResponse bool          `json:"include_response"`  // include response details
-	RetentionDays   int           `json:"retention_days"`    // how long to keep logs
-	Compression     bool          `json:"compression"`       // compress rotated logs
+	MaxFileSize     int64         `json:"max_file_size"`    // in bytes
+	MaxFiles        int           `json:"max_files"`        // number of rotated files to keep
+	BufferSize      int           `json:"buffer_size"`      // number of events to buffer
+	FlushInterval   time.Duration `json:"flush_interval"`   // how often to flush buffer
+	IncludeRequest  bool          `json:"include_request"`  // include request details
+	IncludeResponse bool          `json:"include_response"` // include response details
+	RetentionDays   int           `json:"retention_days"`   // how long to keep logs
+	Compression     bool          `json:"compression"`      // compress rotated logs
 }
 
 // DefaultAuditConfig returns default audit configuration
@@ -380,18 +380,18 @@ func generateEventID() string {
 
 // Query represents an audit log query
 type Query struct {
-	StartTime  time.Time         `json:"start_time"`
-	EndTime    time.Time         `json:"end_time"`
-	UserID     string            `json:"user_id,omitempty"`
-	Action     string            `json:"action,omitempty"`
-	Resource   string            `json:"resource,omitempty"`
-	Level      AuditLevel        `json:"level,omitempty"`
-	Result     string            `json:"result,omitempty"`
-	IPAddress  string            `json:"ip_address,omitempty"`
-	Limit      int               `json:"limit,omitempty"`
-	Offset     int               `json:"offset,omitempty"`
-	SortBy     string            `json:"sort_by,omitempty"`
-	SortOrder  string            `json:"sort_order,omitempty"`
+	StartTime time.Time  `json:"start_time"`
+	EndTime   time.Time  `json:"end_time"`
+	UserID    string     `json:"user_id,omitempty"`
+	Action    string     `json:"action,omitempty"`
+	Resource  string     `json:"resource,omitempty"`
+	Level     AuditLevel `json:"level,omitempty"`
+	Result    string     `json:"result,omitempty"`
+	IPAddress string     `json:"ip_address,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
+	SortBy    string     `json:"sort_by,omitempty"`
+	SortOrder string     `json:"sort_order,omitempty"`
 }
 
 // AuditReader provides methods to read and query audit logs
@@ -411,7 +411,7 @@ func NewAuditReader(config *AuditConfig) *AuditReader {
 func (r *AuditReader) QueryEvents(query *Query) ([]*AuditEvent, error) {
 	// This is a basic implementation that reads from the current log file
 	// A production implementation would use a proper database or search engine
-	
+
 	file, err := os.Open(r.config.LogFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit log: %w", err)

@@ -17,46 +17,46 @@ import (
 
 // RealtimeDashboard はリアルタイム分析ダッシュボード
 type RealtimeDashboard struct {
-	mu               sync.RWMutex
+	mu                 sync.RWMutex
 	telemetryCollector *telemetry.AdvancedTelemetryCollector
-	server           *http.Server
-	upgrader         websocket.Upgrader
-	clients          map[*websocket.Conn]bool
-	broadcast        chan []byte
-	register         chan *websocket.Conn
-	unregister       chan *websocket.Conn
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
-	port             int
-	updateInterval   time.Duration
-	
+	server             *http.Server
+	upgrader           websocket.Upgrader
+	clients            map[*websocket.Conn]bool
+	broadcast          chan []byte
+	register           chan *websocket.Conn
+	unregister         chan *websocket.Conn
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	port               int
+	updateInterval     time.Duration
+
 	// リアルタイム統計
-	currentMetrics   *RealtimeMetrics
-	trendData        *TrendData
-	alerts           []Alert
-	insights         []Insight
+	currentMetrics *RealtimeMetrics
+	trendData      *TrendData
+	alerts         []Alert
+	insights       []Insight
 }
 
 // RealtimeMetrics はリアルタイムメトリクス
 type RealtimeMetrics struct {
-	Timestamp           time.Time   `json:"timestamp"`
-	ThroughputMBps      float64     `json:"throughput_mbps"`
-	OperationsPerSecond float64     `json:"operations_per_second"`
-	ActiveWorkers       int         `json:"active_workers"`
-	QueueLength         int         `json:"queue_length"`
-	MemoryUsageMB       int64       `json:"memory_usage_mb"`
-	CPUUtilization      float64     `json:"cpu_utilization"`
-	ErrorRate           float64     `json:"error_rate"`
-	SuccessRate         float64     `json:"success_rate"`
-	AverageLatency      float64     `json:"average_latency_ms"`
-	PeakThroughput      float64     `json:"peak_throughput_mbps"`
-	TotalOperations     int64       `json:"total_operations"`
-	TotalBytesTransfer  int64       `json:"total_bytes_transferred"`
-	UniqueUsers         int64       `json:"unique_users"`
-	ActiveSessions      int64       `json:"active_sessions"`
-	PerformanceScore    float64     `json:"performance_score"`
-	HealthStatus        string      `json:"health_status"`
+	Timestamp           time.Time `json:"timestamp"`
+	ThroughputMBps      float64   `json:"throughput_mbps"`
+	OperationsPerSecond float64   `json:"operations_per_second"`
+	ActiveWorkers       int       `json:"active_workers"`
+	QueueLength         int       `json:"queue_length"`
+	MemoryUsageMB       int64     `json:"memory_usage_mb"`
+	CPUUtilization      float64   `json:"cpu_utilization"`
+	ErrorRate           float64   `json:"error_rate"`
+	SuccessRate         float64   `json:"success_rate"`
+	AverageLatency      float64   `json:"average_latency_ms"`
+	PeakThroughput      float64   `json:"peak_throughput_mbps"`
+	TotalOperations     int64     `json:"total_operations"`
+	TotalBytesTransfer  int64     `json:"total_bytes_transferred"`
+	UniqueUsers         int64     `json:"unique_users"`
+	ActiveSessions      int64     `json:"active_sessions"`
+	PerformanceScore    float64   `json:"performance_score"`
+	HealthStatus        string    `json:"health_status"`
 }
 
 // TrendData はトレンドデータ
@@ -73,40 +73,40 @@ type TrendData struct {
 
 // Alert はアラート情報
 type Alert struct {
-	ID          string    `json:"id"`
-	Timestamp   time.Time `json:"timestamp"`
-	Severity    string    `json:"severity"`
-	Title       string    `json:"title"`
-	Message     string    `json:"message"`
-	Metric      string    `json:"metric"`
-	Value       float64   `json:"value"`
-	Threshold   float64   `json:"threshold"`
-	Resolved    bool      `json:"resolved"`
-	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
+	ID         string     `json:"id"`
+	Timestamp  time.Time  `json:"timestamp"`
+	Severity   string     `json:"severity"`
+	Title      string     `json:"title"`
+	Message    string     `json:"message"`
+	Metric     string     `json:"metric"`
+	Value      float64    `json:"value"`
+	Threshold  float64    `json:"threshold"`
+	Resolved   bool       `json:"resolved"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
 }
 
 // Insight は洞察情報
 type Insight struct {
-	ID          string    `json:"id"`
-	Timestamp   time.Time `json:"timestamp"`
-	Type        string    `json:"type"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Recommendation string `json:"recommendation"`
-	Impact      string    `json:"impact"`
-	Confidence  float64   `json:"confidence"`
+	ID             string    `json:"id"`
+	Timestamp      time.Time `json:"timestamp"`
+	Type           string    `json:"type"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description"`
+	Recommendation string    `json:"recommendation"`
+	Impact         string    `json:"impact"`
+	Confidence     float64   `json:"confidence"`
 }
 
 // DashboardConfig はダッシュボード設定
 type DashboardConfig struct {
-	Port              int           `json:"port"`
-	UpdateInterval    time.Duration `json:"update_interval"`
-	MaxTrendPoints    int           `json:"max_trend_points"`
-	EnableAlerts      bool          `json:"enable_alerts"`
-	EnableInsights    bool          `json:"enable_insights"`
-	ThroughputThreshold float64     `json:"throughput_threshold"`
-	ErrorRateThreshold  float64     `json:"error_rate_threshold"`
-	MemoryThreshold     int64       `json:"memory_threshold_mb"`
+	Port                int           `json:"port"`
+	UpdateInterval      time.Duration `json:"update_interval"`
+	MaxTrendPoints      int           `json:"max_trend_points"`
+	EnableAlerts        bool          `json:"enable_alerts"`
+	EnableInsights      bool          `json:"enable_insights"`
+	ThroughputThreshold float64       `json:"throughput_threshold"`
+	ErrorRateThreshold  float64       `json:"error_rate_threshold"`
+	MemoryThreshold     int64         `json:"memory_threshold_mb"`
 }
 
 // NewRealtimeDashboard は新しいダッシュボードを作成
@@ -149,14 +149,14 @@ func NewRealtimeDashboard(collector *telemetry.AdvancedTelemetryCollector, confi
 		updateInterval: config.UpdateInterval,
 		currentMetrics: &RealtimeMetrics{},
 		trendData: &TrendData{
-			maxDataPoints: config.MaxTrendPoints,
-			TimePoints:    make([]time.Time, 0, config.MaxTrendPoints),
-			ThroughputHistory: make([]float64, 0, config.MaxTrendPoints),
-			OperationsHistory: make([]int64, 0, config.MaxTrendPoints),
-			ErrorRateHistory: make([]float64, 0, config.MaxTrendPoints),
+			maxDataPoints:      config.MaxTrendPoints,
+			TimePoints:         make([]time.Time, 0, config.MaxTrendPoints),
+			ThroughputHistory:  make([]float64, 0, config.MaxTrendPoints),
+			OperationsHistory:  make([]int64, 0, config.MaxTrendPoints),
+			ErrorRateHistory:   make([]float64, 0, config.MaxTrendPoints),
 			MemoryUsageHistory: make([]int64, 0, config.MaxTrendPoints),
 			WorkerCountHistory: make([]int, 0, config.MaxTrendPoints),
-			LatencyHistory: make([]float64, 0, config.MaxTrendPoints),
+			LatencyHistory:     make([]float64, 0, config.MaxTrendPoints),
 		},
 		alerts:   make([]Alert, 0),
 		insights: make([]Insight, 0),
@@ -168,7 +168,7 @@ func NewRealtimeDashboard(collector *telemetry.AdvancedTelemetryCollector, confi
 // Start はダッシュボードを開始
 func (d *RealtimeDashboard) Start() error {
 	router := mux.NewRouter()
-	
+
 	// 静的ファイルとテンプレート
 	router.HandleFunc("/", d.handleDashboard).Methods("GET")
 	router.HandleFunc("/api/metrics", d.handleMetrics).Methods("GET")
@@ -210,10 +210,10 @@ func (d *RealtimeDashboard) Start() error {
 func (d *RealtimeDashboard) Stop() error {
 	d.cancel()
 	d.wg.Wait()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return d.server.Shutdown(ctx)
 }
 
@@ -473,13 +473,17 @@ func (d *RealtimeDashboard) handleDashboard(w http.ResponseWriter, r *http.Reque
                 return;
             }
             
-            alertsList.innerHTML = alerts.map(alert => `
-                <div class="alert-${alert.severity} p-3 rounded border-l-4">
-                    <div class="font-semibold">${alert.title}</div>
-                    <div class="text-sm">${alert.message}</div>
-                    <div class="text-xs opacity-75 mt-1">${new Date(alert.timestamp).toLocaleString()}</div>
-                </div>
-            `).join('');
+            // Template for alerts rendering
+            var alertTemplate = '';
+            for (var i = 0; i < alerts.length; i++) {
+                var alert = alerts[i];
+                alertTemplate += '<div class="alert-' + alert.severity + ' p-3 rounded border-l-4">';
+                alertTemplate += '<div class="font-semibold">' + alert.title + '</div>';
+                alertTemplate += '<div class="text-sm">' + alert.message + '</div>';
+                alertTemplate += '<div class="text-xs opacity-75 mt-1">' + new Date(alert.timestamp).toLocaleString() + '</div>';
+                alertTemplate += '</div>';
+            }
+            alertsList.innerHTML = alertTemplate;
         }
         
         function updateInsights(insights) {
@@ -490,14 +494,18 @@ func (d *RealtimeDashboard) handleDashboard(w http.ResponseWriter, r *http.Reque
                 return;
             }
             
-            insightsList.innerHTML = insights.map(insight => `
-                <div class="bg-blue-50 p-3 rounded border border-blue-200">
-                    <div class="font-semibold text-blue-800">${insight.title}</div>
-                    <div class="text-sm text-blue-700 mt-1">${insight.description}</div>
-                    <div class="text-xs text-blue-600 mt-2">推奨: ${insight.recommendation}</div>
-                    <div class="text-xs text-blue-500 mt-1">信頼度: ${(insight.confidence * 100).toFixed(0)}%</div>
-                </div>
-            `).join('');
+            // Template for insights rendering
+            var template = '';
+            for (var i = 0; i < insights.length; i++) {
+                var insight = insights[i];
+                template += '<div class="bg-blue-50 p-3 rounded border border-blue-200">';
+                template += '<div class="font-semibold text-blue-800">' + insight.title + '</div>';
+                template += '<div class="text-sm text-blue-700 mt-1">' + insight.description + '</div>';
+                template += '<div class="text-xs text-blue-600 mt-2">推奨: ' + insight.recommendation + '</div>';
+                template += '<div class="text-xs text-blue-500 mt-1">信頼度: ' + (insight.confidence * 100).toFixed(0) + '%</div>';
+                template += '</div>';
+            }
+            insightsList.innerHTML = template;
         }
         
         ws.onerror = function(error) {
@@ -694,22 +702,22 @@ func (d *RealtimeDashboard) updateTrendData(timestamp time.Time, metrics *teleme
 // calculatePerformanceScore はパフォーマンススコアを計算
 func (d *RealtimeDashboard) calculatePerformanceScore(metrics *telemetry.PerformanceMetrics) float64 {
 	baseScore := 100.0
-	
+
 	// スループットスコア (0-40点)
 	throughputScore := (metrics.AverageThroughput / 1000.0) * 40 // 1GB/s = 40点
 	if throughputScore > 40 {
 		throughputScore = 40
 	}
-	
+
 	// 成功率スコア (0-30点)
 	successScore := (metrics.SuccessRate / 100.0) * 30
-	
+
 	// 効率性スコア (0-20点)
 	efficiencyScore := 20.0
 	if metrics.MemoryUsagePeak > 2048 { // 2GB超過でペナルティ
 		efficiencyScore *= 0.5
 	}
-	
+
 	// パフォーマンス改善スコア (0-10点)
 	improvementScore := 10.0
 	if metrics.PerformanceImprove > 100000 { // 10万倍超改善で満点
@@ -717,12 +725,12 @@ func (d *RealtimeDashboard) calculatePerformanceScore(metrics *telemetry.Perform
 	} else {
 		improvementScore = (metrics.PerformanceImprove / 100000.0) * 10
 	}
-	
+
 	totalScore := throughputScore + successScore + efficiencyScore + improvementScore
 	if totalScore > 100 {
 		totalScore = 100
 	}
-	
+
 	return totalScore
 }
 
@@ -875,28 +883,28 @@ func (d *RealtimeDashboard) generateInsights() {
 	// パフォーマンス最適化インサイト
 	if metrics.AverageThroughput < 500 && metrics.AverageWorkerCount < 50 {
 		d.insights = append(d.insights, Insight{
-			ID:          fmt.Sprintf("perf_worker_%d", now.Unix()),
-			Timestamp:   now,
-			Type:        "performance",
-			Title:       "ワーカー数増加推奨",
-			Description: "現在のワーカー数が少なく、スループットが最適ではありません。",
+			ID:             fmt.Sprintf("perf_worker_%d", now.Unix()),
+			Timestamp:      now,
+			Type:           "performance",
+			Title:          "ワーカー数増加推奨",
+			Description:    "現在のワーカー数が少なく、スループットが最適ではありません。",
 			Recommendation: "ワーカー数を50-100に増やすことで、スループットが2-3倍向上する可能性があります。",
-			Impact:      "high",
-			Confidence:  0.85,
+			Impact:         "high",
+			Confidence:     0.85,
 		})
 	}
 
 	// メモリ効率インサイト
 	if metrics.MemoryUsagePeak > 1024 {
 		d.insights = append(d.insights, Insight{
-			ID:          fmt.Sprintf("memory_opt_%d", now.Unix()),
-			Timestamp:   now,
-			Type:        "optimization",
-			Title:       "メモリ使用量最適化",
-			Description: "メモリ使用量が高めです。チューニングの余地があります。",
+			ID:             fmt.Sprintf("memory_opt_%d", now.Unix()),
+			Timestamp:      now,
+			Type:           "optimization",
+			Title:          "メモリ使用量最適化",
+			Description:    "メモリ使用量が高めです。チューニングの余地があります。",
 			Recommendation: "チャンクサイズを調整するか、バッファプールサイズを見直してください。",
-			Impact:      "medium",
-			Confidence:  0.75,
+			Impact:         "medium",
+			Confidence:     0.75,
 		})
 	}
 
@@ -912,28 +920,28 @@ func (d *RealtimeDashboard) generateInsights() {
 		}
 
 		d.insights = append(d.insights, Insight{
-			ID:          fmt.Sprintf("usage_pattern_%d", now.Unix()),
-			Timestamp:   now,
-			Type:        "usage",
-			Title:       "主要操作パターン分析",
-			Description: fmt.Sprintf("最も使用される操作は '%s' です (%d回)。", mostUsedOp, maxCount),
+			ID:             fmt.Sprintf("usage_pattern_%d", now.Unix()),
+			Timestamp:      now,
+			Type:           "usage",
+			Title:          "主要操作パターン分析",
+			Description:    fmt.Sprintf("最も使用される操作は '%s' です (%d回)。", mostUsedOp, maxCount),
 			Recommendation: "この操作に特化した最適化設定を検討してください。",
-			Impact:      "medium",
-			Confidence:  0.90,
+			Impact:         "medium",
+			Confidence:     0.90,
 		})
 	}
 
 	// パフォーマンス改善実績インサイト
 	if metrics.PerformanceImprove > 100000 {
 		d.insights = append(d.insights, Insight{
-			ID:          fmt.Sprintf("achievement_%d", now.Unix()),
-			Timestamp:   now,
-			Type:        "achievement",
-			Title:       "🏆 革命的パフォーマンス達成",
-			Description: fmt.Sprintf("驚異的な %.0f 倍のパフォーマンス改善を達成しています！", metrics.PerformanceImprove),
+			ID:             fmt.Sprintf("achievement_%d", now.Unix()),
+			Timestamp:      now,
+			Type:           "achievement",
+			Title:          "🏆 革命的パフォーマンス達成",
+			Description:    fmt.Sprintf("驚異的な %.0f 倍のパフォーマンス改善を達成しています！", metrics.PerformanceImprove),
 			Recommendation: "この設定を他のワークロードにも適用することをお勧めします。",
-			Impact:      "high",
-			Confidence:  1.0,
+			Impact:         "high",
+			Confidence:     1.0,
 		})
 	}
 }

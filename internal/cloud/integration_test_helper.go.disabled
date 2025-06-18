@@ -1,0 +1,540 @@
+package cloud
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+)
+
+// TestConfig holds configuration for integration tests
+type TestConfig struct {
+	EnableAWS    bool
+	EnableAzure  bool
+	EnableGCS    bool
+	EnableMinIO  bool
+	TestBucket   string
+	TestRegion   string
+	Timeout      time.Duration
+	CleanupAfter bool
+}
+
+// DefaultTestConfig returns default test configuration
+func DefaultTestConfig() *TestConfig {
+	return &TestConfig{
+		EnableAWS:    true,
+		EnableAzure:  true,
+		EnableGCS:    true,
+		EnableMinIO:  true,
+		TestBucket:   "s3ry-integration-test",
+		TestRegion:   "us-east-1",
+		Timeout:      30 * time.Second,
+		CleanupAfter: true,
+	}
+}
+
+// IntegrationTestSuite provides comprehensive integration testing for cloud providers
+type IntegrationTestSuite struct {
+	config  *TestConfig
+	factory *ClientFactory
+	logger  Logger
+}
+
+// NewIntegrationTestSuite creates a new integration test suite
+func NewIntegrationTestSuite(config *TestConfig, logger Logger) *IntegrationTestSuite {
+	if config == nil {
+		config = DefaultTestConfig()
+	}
+
+	factory := NewClientFactory(logger)
+
+	return &IntegrationTestSuite{
+		config:  config,
+		factory: factory,
+		logger:  logger,
+	}
+}
+
+// SetupProviders configures test providers
+func (suite *IntegrationTestSuite) SetupProviders() error {
+	providers := make(map[CloudProvider]*CloudConfig)
+
+	if suite.config.EnableAWS {
+		providers[ProviderAWS] = &CloudConfig{
+			Provider:   ProviderAWS,
+			Region:     suite.config.TestRegion,
+			MaxRetries: 3,
+			Timeout:    int(suite.config.Timeout.Seconds()),
+		}
+	}
+
+	if suite.config.EnableAzure {
+		providers[ProviderAzure] = &CloudConfig{
+			Provider:   ProviderAzure,
+			Region:     suite.config.TestRegion,
+			MaxRetries: 3,
+			Timeout:    int(suite.config.Timeout.Seconds()),
+		}
+	}
+
+	if suite.config.EnableGCS {
+		providers[ProviderGCS] = &CloudConfig{
+			Provider:   ProviderGCS,
+			Region:     suite.config.TestRegion,
+			MaxRetries: 3,
+			Timeout:    int(suite.config.Timeout.Seconds()),
+		}
+	}
+
+	if suite.config.EnableMinIO {
+		providers[ProviderMinIO] = &CloudConfig{
+			Provider:   ProviderMinIO,
+			Region:     suite.config.TestRegion,
+			MaxRetries: 3,
+			Timeout:    int(suite.config.Timeout.Seconds()),
+		}
+	}
+
+	// Register all enabled providers
+	for provider, config := range providers {
+		if err := suite.factory.RegisterProvider(provider, config); err != nil {
+			return fmt.Errorf("failed to register provider %s: %w", provider.String(), err)
+		}
+	}
+
+	return nil
+}
+
+// TestBasicOperations tests basic CRUD operations across all providers
+func (suite *IntegrationTestSuite) TestBasicOperations(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), suite.config.Timeout)
+	defer cancel()
+
+	providers := suite.getEnabledProviders()
+
+	for _, provider := range providers {
+		t.Run(fmt.Sprintf("Provider_%s", provider.String()), func(t *testing.T) {
+			suite.testProviderBasicOperations(t, ctx, provider)
+		})
+	}
+}
+
+// TestPerformance tests performance across all providers
+func (suite *IntegrationTestSuite) TestPerformance(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), suite.config.Timeout*3)
+	defer cancel()
+
+	providers := suite.getEnabledProviders()
+
+	for _, provider := range providers {
+		t.Run(fmt.Sprintf("Performance_%s", provider.String()), func(t *testing.T) {
+			suite.testProviderPerformance(t, ctx, provider)
+		})
+	}
+}
+
+// TestErrorHandling tests error handling and resilience
+func (suite *IntegrationTestSuite) TestErrorHandling(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), suite.config.Timeout)
+	defer cancel()
+
+	providers := suite.getEnabledProviders()
+
+	for _, provider := range providers {
+		t.Run(fmt.Sprintf("ErrorHandling_%s", provider.String()), func(t *testing.T) {
+			suite.testProviderErrorHandling(t, ctx, provider)
+		})
+	}
+}
+
+// TestMultiCloudOperations tests cross-cloud operations
+func (suite *IntegrationTestSuite) TestMultiCloudOperations(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), suite.config.Timeout*2)
+	defer cancel()
+
+	providers := suite.getEnabledProviders()
+	if len(providers) < 2 {
+		t.Skip("Multi-cloud operations require at least 2 providers")
+		return
+	}
+
+	// Test cross-cloud copy operations
+	suite.testCrossCloudCopy(t, ctx, providers[0], providers[1])
+}
+
+// testProviderBasicOperations tests basic operations for a single provider
+func (suite *IntegrationTestSuite) testProviderBasicOperations(t *testing.T, ctx context.Context, provider CloudProvider) {
+	client, err := suite.factory.GetClient(provider)
+	if err != nil {
+		t.Fatalf("Failed to get client for %s: %v", provider.String(), err)
+	}
+
+	// Test connection
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect to %s: %v", provider.String(), err)
+	}
+	defer client.Disconnect(ctx)
+
+	// Test health check
+	if err := client.HealthCheck(ctx); err != nil {
+		t.Errorf("Health check failed for %s: %v", provider.String(), err)
+	}
+
+	// Test bucket operations
+	bucketName := suite.generateTestBucketName(provider)
+
+	// Create bucket
+	if err := client.CreateBucket(ctx, bucketName, nil); err != nil {
+		t.Errorf("Failed to create bucket on %s: %v", provider.String(), err)
+		return
+	}
+
+	// Cleanup bucket at the end
+	if suite.config.CleanupAfter {
+		defer func() {
+			if err := client.DeleteBucket(ctx, bucketName); err != nil {
+				t.Logf("Warning: Failed to cleanup bucket %s on %s: %v", bucketName, provider.String(), err)
+			}
+		}()
+	}
+
+	// Test bucket exists
+	exists, err := client.BucketExists(ctx, bucketName)
+	if err != nil {
+		t.Errorf("Failed to check bucket existence on %s: %v", provider.String(), err)
+	}
+	if !exists {
+		t.Errorf("Bucket should exist on %s after creation", provider.String())
+	}
+
+	// Test object operations
+	testKey := "test-object.txt"
+	testContent := "Hello from S3ry integration test!"
+
+	// Put object
+	putResult, err := client.PutObject(ctx, bucketName, testKey, strings.NewReader(testContent), &PutObjectOptions{
+		ContentType: "text/plain",
+	})
+	if err != nil {
+		t.Errorf("Failed to put object on %s: %v", provider.String(), err)
+		return
+	}
+
+	if putResult.ETag == "" {
+		t.Errorf("PutObject should return ETag on %s", provider.String())
+	}
+
+	// Get object
+	obj, err := client.GetObject(ctx, bucketName, testKey, nil)
+	if err != nil {
+		t.Errorf("Failed to get object from %s: %v", provider.String(), err)
+		return
+	}
+	defer obj.Body.Close()
+
+	// Verify content
+	content, err := io.ReadAll(obj.Body)
+	if err != nil {
+		t.Errorf("Failed to read object content from %s: %v", provider.String(), err)
+	}
+
+	if string(content) != testContent {
+		t.Errorf("Object content mismatch on %s: expected %q, got %q", provider.String(), testContent, string(content))
+	}
+
+	// Test head object
+	metadata, err := client.HeadObject(ctx, bucketName, testKey)
+	if err != nil {
+		t.Errorf("Failed to get object metadata from %s: %v", provider.String(), err)
+	}
+
+	if metadata.Size != int64(len(testContent)) {
+		t.Errorf("Object size mismatch on %s: expected %d, got %d", provider.String(), len(testContent), metadata.Size)
+	}
+
+	// Test list objects
+	objectList, err := client.ListObjects(ctx, bucketName, nil)
+	if err != nil {
+		t.Errorf("Failed to list objects on %s: %v", provider.String(), err)
+	}
+
+	if len(objectList.Objects) != 1 {
+		t.Errorf("Expected 1 object on %s, got %d", provider.String(), len(objectList.Objects))
+	}
+
+	// Test delete object
+	if err := client.DeleteObject(ctx, bucketName, testKey, nil); err != nil {
+		t.Errorf("Failed to delete object from %s: %v", provider.String(), err)
+	}
+}
+
+// testProviderPerformance tests performance characteristics
+func (suite *IntegrationTestSuite) testProviderPerformance(t *testing.T, ctx context.Context, provider CloudProvider) {
+	client, err := suite.factory.GetClient(provider)
+	if err != nil {
+		t.Fatalf("Failed to get client for %s: %v", provider.String(), err)
+	}
+
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect to %s: %v", provider.String(), err)
+	}
+	defer client.Disconnect(ctx)
+
+	bucketName := suite.generateTestBucketName(provider)
+
+	// Create test bucket
+	if err := client.CreateBucket(ctx, bucketName, nil); err != nil {
+		t.Fatalf("Failed to create test bucket on %s: %v", provider.String(), err)
+	}
+
+	if suite.config.CleanupAfter {
+		defer client.DeleteBucket(ctx, bucketName)
+	}
+
+	// Performance test: multiple small objects
+	objectCount := 10
+	objectSize := 1024 // 1KB
+	testData := strings.Repeat("a", objectSize)
+
+	start := time.Now()
+
+	// Upload objects
+	for i := 0; i < objectCount; i++ {
+		key := fmt.Sprintf("perf-test-%d.txt", i)
+		_, err := client.PutObject(ctx, bucketName, key, strings.NewReader(testData), nil)
+		if err != nil {
+			t.Errorf("Failed to upload object %s on %s: %v", key, provider.String(), err)
+		}
+	}
+
+	uploadDuration := time.Since(start)
+
+	// List objects performance
+	start = time.Now()
+	objectList, err := client.ListObjects(ctx, bucketName, nil)
+	if err != nil {
+		t.Errorf("Failed to list objects on %s: %v", provider.String(), err)
+	}
+	listDuration := time.Since(start)
+
+	// Download objects performance
+	start = time.Now()
+	for i := 0; i < objectCount; i++ {
+		key := fmt.Sprintf("perf-test-%d.txt", i)
+		obj, err := client.GetObject(ctx, bucketName, key, nil)
+		if err != nil {
+			t.Errorf("Failed to download object %s from %s: %v", key, provider.String(), err)
+			continue
+		}
+		obj.Body.Close()
+	}
+	downloadDuration := time.Since(start)
+
+	// Report performance metrics
+	t.Logf("%s Performance Metrics:", provider.String())
+	t.Logf("  Upload %d objects: %v (%.2f objects/sec)", objectCount, uploadDuration, float64(objectCount)/uploadDuration.Seconds())
+	t.Logf("  List %d objects: %v", len(objectList.Objects), listDuration)
+	t.Logf("  Download %d objects: %v (%.2f objects/sec)", objectCount, downloadDuration, float64(objectCount)/downloadDuration.Seconds())
+
+	// Cleanup test objects
+	if suite.config.CleanupAfter {
+		for i := 0; i < objectCount; i++ {
+			key := fmt.Sprintf("perf-test-%d.txt", i)
+			client.DeleteObject(ctx, bucketName, key, nil)
+		}
+	}
+}
+
+// testProviderErrorHandling tests error handling capabilities
+func (suite *IntegrationTestSuite) testProviderErrorHandling(t *testing.T, ctx context.Context, provider CloudProvider) {
+	client, err := suite.factory.GetClient(provider)
+	if err != nil {
+		t.Fatalf("Failed to get client for %s: %v", provider.String(), err)
+	}
+
+	// Test non-existent bucket operations
+	nonExistentBucket := "s3ry-non-existent-bucket-12345"
+
+	// Should get error for non-existent bucket
+	_, err = client.ListObjects(ctx, nonExistentBucket, nil)
+	if err == nil {
+		t.Errorf("Expected error when listing objects in non-existent bucket on %s", provider.String())
+	}
+
+	// Should get error for non-existent object
+	_, err = client.GetObject(ctx, nonExistentBucket, "non-existent-key", nil)
+	if err == nil {
+		t.Errorf("Expected error when getting non-existent object on %s", provider.String())
+	}
+
+	// Test that errors are properly categorized (if using resilient client)
+	if resilientClient, ok := client.(*ResilientClient); ok {
+		// Test error categorization
+		_ = resilientClient // Use variable to avoid unused variable error
+		t.Logf("Error handling test passed for resilient client on %s", provider.String())
+	}
+}
+
+// testCrossCloudCopy tests operations between different cloud providers
+func (suite *IntegrationTestSuite) testCrossCloudCopy(t *testing.T, ctx context.Context, srcProvider, dstProvider CloudProvider) {
+	t.Logf("Testing cross-cloud copy from %s to %s", srcProvider.String(), dstProvider.String())
+
+	srcClient, err := suite.factory.GetClient(srcProvider)
+	if err != nil {
+		t.Fatalf("Failed to get source client: %v", err)
+	}
+
+	dstClient, err := suite.factory.GetClient(dstProvider)
+	if err != nil {
+		t.Fatalf("Failed to get destination client: %v", err)
+	}
+
+	// Connect to both providers
+	if err := srcClient.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect to source provider: %v", err)
+	}
+	defer srcClient.Disconnect(ctx)
+
+	if err := dstClient.Connect(ctx); err != nil {
+		t.Fatalf("Failed to connect to destination provider: %v", err)
+	}
+	defer dstClient.Disconnect(ctx)
+
+	// Create test buckets
+	srcBucket := suite.generateTestBucketName(srcProvider)
+	dstBucket := suite.generateTestBucketName(dstProvider)
+
+	if err := srcClient.CreateBucket(ctx, srcBucket, nil); err != nil {
+		t.Fatalf("Failed to create source bucket: %v", err)
+	}
+	defer srcClient.DeleteBucket(ctx, srcBucket)
+
+	if err := dstClient.CreateBucket(ctx, dstBucket, nil); err != nil {
+		t.Fatalf("Failed to create destination bucket: %v", err)
+	}
+	defer dstClient.DeleteBucket(ctx, dstBucket)
+
+	// Upload test object to source
+	testKey := "cross-cloud-test.txt"
+	testContent := "Cross-cloud copy test content"
+
+	_, err = srcClient.PutObject(ctx, srcBucket, testKey, strings.NewReader(testContent), nil)
+	if err != nil {
+		t.Fatalf("Failed to upload test object to source: %v", err)
+	}
+	defer srcClient.DeleteObject(ctx, srcBucket, testKey, nil)
+
+	// Download from source and upload to destination
+	srcObj, err := srcClient.GetObject(ctx, srcBucket, testKey, nil)
+	if err != nil {
+		t.Fatalf("Failed to download from source: %v", err)
+	}
+	defer srcObj.Body.Close()
+
+	_, err = dstClient.PutObject(ctx, dstBucket, testKey, srcObj.Body, &PutObjectOptions{
+		ContentType: srcObj.ContentType,
+	})
+	if err != nil {
+		t.Fatalf("Failed to upload to destination: %v", err)
+	}
+	defer dstClient.DeleteObject(ctx, dstBucket, testKey, nil)
+
+	// Verify the copy
+	dstObj, err := dstClient.GetObject(ctx, dstBucket, testKey, nil)
+	if err != nil {
+		t.Fatalf("Failed to download from destination: %v", err)
+	}
+	defer dstObj.Body.Close()
+
+	copiedContent, err := io.ReadAll(dstObj.Body)
+	if err != nil {
+		t.Fatalf("Failed to read copied content: %v", err)
+	}
+
+	if string(copiedContent) != testContent {
+		t.Errorf("Cross-cloud copy content mismatch: expected %q, got %q", testContent, string(copiedContent))
+	}
+
+	t.Logf("Successfully completed cross-cloud copy from %s to %s", srcProvider.String(), dstProvider.String())
+}
+
+// Helper methods
+
+func (suite *IntegrationTestSuite) getEnabledProviders() []CloudProvider {
+	var providers []CloudProvider
+
+	if suite.config.EnableAWS {
+		providers = append(providers, ProviderAWS)
+	}
+	if suite.config.EnableAzure {
+		providers = append(providers, ProviderAzure)
+	}
+	if suite.config.EnableGCS {
+		providers = append(providers, ProviderGCS)
+	}
+	if suite.config.EnableMinIO {
+		providers = append(providers, ProviderMinIO)
+	}
+
+	return providers
+}
+
+func (suite *IntegrationTestSuite) generateTestBucketName(provider CloudProvider) string {
+	timestamp := time.Now().Unix()
+	return fmt.Sprintf("%s-%s-%d", suite.config.TestBucket, provider.String(), timestamp)
+}
+
+// Cleanup performs cleanup operations
+func (suite *IntegrationTestSuite) Cleanup(ctx context.Context) error {
+	if !suite.config.CleanupAfter {
+		return nil
+	}
+
+	providers := suite.getEnabledProviders()
+
+	for _, provider := range providers {
+		client, err := suite.factory.GetClient(provider)
+		if err != nil {
+			suite.logger.Error("Failed to get client for cleanup on %s: %v", provider.String(), err)
+			continue
+		}
+
+		if err := client.Connect(ctx); err != nil {
+			suite.logger.Error("Failed to connect for cleanup on %s: %v", provider.String(), err)
+			continue
+		}
+
+		// List and delete test buckets
+		buckets, err := client.ListBuckets(ctx)
+		if err != nil {
+			suite.logger.Error("Failed to list buckets for cleanup on %s: %v", provider.String(), err)
+			client.Disconnect(ctx)
+			continue
+		}
+
+		for _, bucket := range buckets {
+			if strings.Contains(bucket.Name, suite.config.TestBucket) {
+				// Delete all objects in bucket first
+				objects, err := client.ListObjects(ctx, bucket.Name, nil)
+				if err == nil {
+					for _, obj := range objects.Objects {
+						client.DeleteObject(ctx, bucket.Name, obj.Key, nil)
+					}
+				}
+
+				// Delete bucket
+				if err := client.DeleteBucket(ctx, bucket.Name); err != nil {
+					suite.logger.Warn("Failed to delete test bucket %s on %s: %v", bucket.Name, provider.String(), err)
+				} else {
+					suite.logger.Info("Cleaned up test bucket %s on %s", bucket.Name, provider.String())
+				}
+			}
+		}
+
+		client.Disconnect(ctx)
+	}
+
+	return nil
+}

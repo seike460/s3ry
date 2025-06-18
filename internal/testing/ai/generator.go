@@ -22,26 +22,26 @@ type TestGenerator struct {
 
 // GeneratorConfig holds configuration for test generation
 type GeneratorConfig struct {
-	OutputDir         string   `json:"output_dir"`
-	TestSuffix        string   `json:"test_suffix"`
-	PackagePattern    string   `json:"package_pattern"`
-	ExcludePatterns   []string `json:"exclude_patterns"`
-	CoverageTarget    float64  `json:"coverage_target"`
-	MaxTestsPerFunc   int      `json:"max_tests_per_func"`
-	GenerateEdgeCases bool     `json:"generate_edge_cases"`
-	GenerateBenchmarks bool    `json:"generate_benchmarks"`
+	OutputDir          string   `json:"output_dir"`
+	TestSuffix         string   `json:"test_suffix"`
+	PackagePattern     string   `json:"package_pattern"`
+	ExcludePatterns    []string `json:"exclude_patterns"`
+	CoverageTarget     float64  `json:"coverage_target"`
+	MaxTestsPerFunc    int      `json:"max_tests_per_func"`
+	GenerateEdgeCases  bool     `json:"generate_edge_cases"`
+	GenerateBenchmarks bool     `json:"generate_benchmarks"`
 }
 
 // DefaultGeneratorConfig returns default configuration
 func DefaultGeneratorConfig() *GeneratorConfig {
 	return &GeneratorConfig{
-		OutputDir:         ".",
-		TestSuffix:        "_ai_test.go",
-		PackagePattern:    "**/*.go",
-		ExcludePatterns:   []string{"*_test.go", "vendor/**", ".git/**"},
-		CoverageTarget:    80.0,
-		MaxTestsPerFunc:   5,
-		GenerateEdgeCases: true,
+		OutputDir:          ".",
+		TestSuffix:         "_ai_test.go",
+		PackagePattern:     "**/*.go",
+		ExcludePatterns:    []string{"*_test.go", "vendor/**", ".git/**"},
+		CoverageTarget:     80.0,
+		MaxTestsPerFunc:    5,
+		GenerateEdgeCases:  true,
 		GenerateBenchmarks: true,
 	}
 }
@@ -85,7 +85,7 @@ type ReturnInfo struct {
 
 // TestPatterns contains patterns for generating different types of tests
 type TestPatterns struct {
-	unitTestTemplate       *template.Template
+	unitTestTemplate      *template.Template
 	benchmarkTestTemplate *template.Template
 	edgeCaseTemplate      *template.Template
 }
@@ -163,7 +163,7 @@ func NewTestPatterns() (*TestPatterns, error) {
 	}
 
 	return &TestPatterns{
-		unitTestTemplate:       unitTest,
+		unitTestTemplate:      unitTest,
 		benchmarkTestTemplate: benchmarkTest,
 		edgeCaseTemplate:      edgeCase,
 	}, nil
@@ -182,7 +182,7 @@ func (a *CodeAnalyzer) AnalyzeFile(filename string) ([]*FunctionInfo, error) {
 	}
 
 	var functions []*FunctionInfo
-	
+
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.FuncDecl:
@@ -309,13 +309,13 @@ func (g *TestGenerator) GenerateTestsForFile(filename string) error {
 // generateTestsForFunction generates tests for a specific function
 func (g *TestGenerator) generateTestsForFunction(function *FunctionInfo, sourceFile string) error {
 	testCases := g.generateTestCases(function)
-	
+
 	// Generate output filename
 	dir := filepath.Dir(sourceFile)
 	base := filepath.Base(sourceFile)
 	ext := filepath.Ext(base)
 	name := strings.TrimSuffix(base, ext)
-	
+
 	outputFile := filepath.Join(dir, name+g.config.TestSuffix)
 
 	// Generate test content
@@ -360,14 +360,14 @@ func (g *TestGenerator) generateTestCases(function *FunctionInfo) []*TestCase {
 // generateSetup creates setup code for a test case
 func (g *TestGenerator) generateSetup(function *FunctionInfo, caseIndex int) string {
 	var setup strings.Builder
-	
+
 	setup.WriteString("// Setup test data\n")
-	
+
 	for _, param := range function.Params {
 		value := g.generateTestValue(param.Type, caseIndex)
 		setup.WriteString(fmt.Sprintf("\t%s := %s\n", param.Name, value))
 	}
-	
+
 	return setup.String()
 }
 
@@ -377,37 +377,37 @@ func (g *TestGenerator) generateCall(function *FunctionInfo, caseIndex int) stri
 	for _, param := range function.Params {
 		args = append(args, param.Name)
 	}
-	
+
 	if len(function.Returns) > 0 {
 		var returnVars []string
 		for i := range function.Returns {
 			returnVars = append(returnVars, fmt.Sprintf("result%d", i))
 		}
-		return fmt.Sprintf("%s := %s(%s)", 
-			strings.Join(returnVars, ", "), 
-			function.Name, 
+		return fmt.Sprintf("%s := %s(%s)",
+			strings.Join(returnVars, ", "),
+			function.Name,
 			strings.Join(args, ", "))
 	}
-	
+
 	return fmt.Sprintf("%s(%s)", function.Name, strings.Join(args, ", "))
 }
 
 // generateAssertions creates assertions for a test case
 func (g *TestGenerator) generateAssertions(function *FunctionInfo, caseIndex int) string {
 	var assertions strings.Builder
-	
+
 	assertions.WriteString("// Verify results\n")
-	
+
 	for i, returnInfo := range function.Returns {
 		varName := fmt.Sprintf("result%d", i)
 		assertion := g.generateAssertion(returnInfo.Type, varName, caseIndex)
 		assertions.WriteString(fmt.Sprintf("\t%s\n", assertion))
 	}
-	
+
 	if len(function.Returns) == 0 {
 		assertions.WriteString("\t// Function has no return values to verify\n")
 	}
-	
+
 	return assertions.String()
 }
 
@@ -463,7 +463,7 @@ func (g *TestGenerator) generateAssertion(returnType, varName string, caseIndex 
 // generateEdgeCases creates edge case test scenarios
 func (g *TestGenerator) generateEdgeCases(function *FunctionInfo) []*TestCase {
 	var edgeCases []*TestCase
-	
+
 	// Nil parameter cases
 	edgeCases = append(edgeCases, &TestCase{
 		Name:       "edge_case_nil_params",
@@ -471,7 +471,7 @@ func (g *TestGenerator) generateEdgeCases(function *FunctionInfo) []*TestCase {
 		Call:       g.generateCall(function, 0),
 		Assertions: g.generateErrorAssertion(),
 	})
-	
+
 	// Empty/zero value cases
 	edgeCases = append(edgeCases, &TestCase{
 		Name:       "edge_case_empty_values",
@@ -479,7 +479,7 @@ func (g *TestGenerator) generateEdgeCases(function *FunctionInfo) []*TestCase {
 		Call:       g.generateCall(function, 0),
 		Assertions: g.generateEmptyAssertion(function),
 	})
-	
+
 	return edgeCases
 }
 
@@ -487,7 +487,7 @@ func (g *TestGenerator) generateEdgeCases(function *FunctionInfo) []*TestCase {
 func (g *TestGenerator) generateNilSetup(function *FunctionInfo) string {
 	var setup strings.Builder
 	setup.WriteString("// Setup with nil parameters\n")
-	
+
 	for _, param := range function.Params {
 		if strings.Contains(param.Type, "*") || strings.Contains(param.Type, "interface") {
 			setup.WriteString(fmt.Sprintf("\tvar %s %s // nil value\n", param.Name, param.Type))
@@ -495,7 +495,7 @@ func (g *TestGenerator) generateNilSetup(function *FunctionInfo) string {
 			setup.WriteString(fmt.Sprintf("\t%s := %s\n", param.Name, g.generateTestValue(param.Type, 0)))
 		}
 	}
-	
+
 	return setup.String()
 }
 
@@ -503,7 +503,7 @@ func (g *TestGenerator) generateNilSetup(function *FunctionInfo) string {
 func (g *TestGenerator) generateEmptySetup(function *FunctionInfo) string {
 	var setup strings.Builder
 	setup.WriteString("// Setup with empty/zero values\n")
-	
+
 	for _, param := range function.Params {
 		var value string
 		switch param.Type {
@@ -524,7 +524,7 @@ func (g *TestGenerator) generateEmptySetup(function *FunctionInfo) string {
 		}
 		setup.WriteString(fmt.Sprintf("\t%s := %s\n", param.Name, value))
 	}
-	
+
 	return setup.String()
 }
 
@@ -541,17 +541,17 @@ func (g *TestGenerator) generateEmptyAssertion(function *FunctionInfo) string {
 // generateTestFileContent generates the complete test file content
 func (g *TestGenerator) generateTestFileContent(function *FunctionInfo, testCases []*TestCase) (string, error) {
 	var content strings.Builder
-	
+
 	// Package declaration
 	content.WriteString(fmt.Sprintf("package %s\n\n", function.Package))
-	
+
 	// Imports
 	content.WriteString("import (\n\t\"testing\"\n)\n\n")
-	
+
 	// Generated timestamp comment
 	content.WriteString(fmt.Sprintf("// Generated by AI Test Generator on %s\n", time.Now().Format(time.RFC3339)))
 	content.WriteString("// This file contains automatically generated tests\n\n")
-	
+
 	// Generate unit tests
 	for _, testCase := range testCases {
 		content.WriteString(fmt.Sprintf("func Test%s_%s(t *testing.T) {\n", function.Name, strings.Title(testCase.Name)))
@@ -562,19 +562,19 @@ func (g *TestGenerator) generateTestFileContent(function *FunctionInfo, testCase
 		content.WriteString(testCase.Assertions)
 		content.WriteString("}\n\n")
 	}
-	
+
 	// Generate benchmark test if enabled
 	if g.config.GenerateBenchmarks {
 		content.WriteString(g.generateBenchmarkTest(function))
 	}
-	
+
 	return content.String(), nil
 }
 
 // generateBenchmarkTest creates a benchmark test for the function
 func (g *TestGenerator) generateBenchmarkTest(function *FunctionInfo) string {
 	var benchmark strings.Builder
-	
+
 	benchmark.WriteString(fmt.Sprintf("func Benchmark%s(b *testing.B) {\n", function.Name))
 	benchmark.WriteString(g.generateSetup(function, 0))
 	benchmark.WriteString("\n\tb.ResetTimer()\n")
@@ -582,7 +582,7 @@ func (g *TestGenerator) generateBenchmarkTest(function *FunctionInfo) string {
 	benchmark.WriteString("\t\t" + g.generateCall(function, 0) + "\n")
 	benchmark.WriteString("\t}\n")
 	benchmark.WriteString("}\n\n")
-	
+
 	return benchmark.String()
 }
 
@@ -592,21 +592,21 @@ func (g *TestGenerator) GenerateTestsForDirectory(dir string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		
+
 		// Check exclude patterns
 		for _, pattern := range g.config.ExcludePatterns {
 			if matched, _ := filepath.Match(pattern, path); matched {
 				return nil
 			}
 		}
-		
+
 		return g.GenerateTestsForFile(path)
 	})
-	
+
 	return err
 }
 

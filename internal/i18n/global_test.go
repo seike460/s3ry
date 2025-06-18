@@ -12,9 +12,9 @@ func TestGlobalPrinter(t *testing.T) {
 
 func TestPrinterWrapper_Sprintf(t *testing.T) {
 	wrapper := &PrinterWrapper{}
-	
+
 	result := wrapper.Sprintf("Test %s %d", "message", 42)
-	
+
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "Test")
 	assert.Contains(t, result, "message")
@@ -23,7 +23,7 @@ func TestPrinterWrapper_Sprintf(t *testing.T) {
 
 func TestGlobalPrinter_Sprintf(t *testing.T) {
 	result := GlobalPrinter.Sprintf("Global test %s", "message")
-	
+
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "Global test")
 	assert.Contains(t, result, "message")
@@ -32,7 +32,7 @@ func TestGlobalPrinter_Sprintf(t *testing.T) {
 func TestGlobalPrinter_Integration_WithMainPackage(t *testing.T) {
 	// This tests that GlobalPrinter works as expected for backward compatibility
 	// when used from the main package (simulating legacy i18nPrinter usage)
-	
+
 	// Test various format strings
 	testCases := []struct {
 		format   string
@@ -44,7 +44,7 @@ func TestGlobalPrinter_Integration_WithMainPackage(t *testing.T) {
 		{"Number: %d", []interface{}{42}, "Number: 42"},
 		{"Float: %.2f", []interface{}{3.14159}, "Float: 3.14"},
 	}
-	
+
 	for _, tc := range testCases {
 		var result string
 		if tc.args == nil {
@@ -52,7 +52,7 @@ func TestGlobalPrinter_Integration_WithMainPackage(t *testing.T) {
 		} else {
 			result = GlobalPrinter.Sprintf(tc.format, tc.args...)
 		}
-		
+
 		assert.Contains(t, result, tc.expected)
 	}
 }
@@ -68,7 +68,7 @@ func BenchmarkGlobalPrinter_Sprintf(b *testing.B) {
 
 func BenchmarkPrinterWrapper_Sprintf(b *testing.B) {
 	wrapper := &PrinterWrapper{}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		result := wrapper.Sprintf("Benchmark test %d", i)

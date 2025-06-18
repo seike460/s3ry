@@ -5,14 +5,14 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/seike460/s3ry/internal/ui/components"
 )
 
@@ -34,21 +34,21 @@ type CloudMetrics struct {
 
 // CloudIntegrationView represents the cloud services integration view
 type CloudIntegrationView struct {
-	list       *components.List
-	spinner    *components.Spinner
-	loading    bool
-	region     string
-	bucket     string
-	session    *session.Session
-	services   []CloudService
-	
+	list     *components.List
+	spinner  *components.Spinner
+	loading  bool
+	region   string
+	bucket   string
+	session  *session.Session
+	services []CloudService
+
 	// Styles
-	headerStyle    lipgloss.Style
-	metricStyle    lipgloss.Style
-	statusStyle    lipgloss.Style
-	healthyStyle   lipgloss.Style
-	warningStyle   lipgloss.Style
-	errorStyle     lipgloss.Style
+	headerStyle  lipgloss.Style
+	metricStyle  lipgloss.Style
+	statusStyle  lipgloss.Style
+	healthyStyle lipgloss.Style
+	warningStyle lipgloss.Style
+	errorStyle   lipgloss.Style
 }
 
 // NewCloudIntegrationView creates a new cloud integration view
@@ -57,38 +57,38 @@ func NewCloudIntegrationView(region, bucket string) *CloudIntegrationView {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(region),
 	}))
-	
+
 	return &CloudIntegrationView{
 		region:  region,
 		bucket:  bucket,
 		session: sess,
 		loading: true,
 		spinner: components.NewSpinner("Loading cloud services..."),
-		
+
 		headerStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(2),
-		
+
 		metricStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888")).
 			PaddingLeft(4),
-		
+
 		statusStyle: lipgloss.NewStyle().
 			Bold(true).
 			PaddingLeft(1).
 			PaddingRight(1),
-		
+
 		healthyStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#00FF87")).
 			Background(lipgloss.Color("#1A1A1A")),
-		
+
 		warningStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FFD700")).
 			Background(lipgloss.Color("#1A1A1A")),
-		
+
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FF5555")).
@@ -107,18 +107,18 @@ func (v *CloudIntegrationView) Init() tea.Cmd {
 // Update handles messages for the cloud integration view
 func (v *CloudIntegrationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case CloudServicesLoadedMsg:
 		v.loading = false
 		v.spinner.Stop()
 		v.services = msg.Services
-		
+
 		// Convert services to list items
 		items := make([]components.ListItem, len(v.services))
 		for i, service := range v.services {
@@ -130,15 +130,15 @@ func (v *CloudIntegrationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Data:        service,
 			}
 		}
-		
+
 		v.list = components.NewList("☁️ Cloud Services Integration", items)
 		return v, nil
-		
+
 	case tea.KeyMsg:
 		if v.loading {
 			break
 		}
-		
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return v, tea.Quit
@@ -162,18 +162,18 @@ func (v *CloudIntegrationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		
+
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case components.SpinnerTickMsg:
 		if v.loading {
 			v.spinner, _ = v.spinner.Update(msg)
 			cmds = append(cmds, v.spinner.Start())
 		}
 	}
-	
+
 	return v, tea.Batch(cmds...)
 }
 
@@ -182,19 +182,19 @@ func (v *CloudIntegrationView) View() string {
 	if v.loading {
 		return v.headerStyle.Render("☁️ Cloud Services") + "\n\n" + v.spinner.View()
 	}
-	
+
 	if v.list == nil {
 		return v.errorStyle.Render("Failed to load cloud services")
 	}
-	
+
 	context := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#888")).
 		Render("Region: " + v.region + " | Bucket: " + v.bucket)
-	
+
 	help := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
 		Render("r: refresh • enter: details • esc: back • q: quit")
-	
+
 	return context + "\n\n" + v.list.View() + "\n\n" + help
 }
 
@@ -208,23 +208,23 @@ type CloudServicesLoadedMsg struct {
 func (v *CloudIntegrationView) loadCloudServices() tea.Cmd {
 	return func() tea.Msg {
 		var services []CloudService
-		
+
 		// Check S3 service
 		s3Status := v.checkS3Service()
 		services = append(services, s3Status)
-		
+
 		// Check CloudFormation stacks
 		cfStatus := v.checkCloudFormationStacks()
 		services = append(services, cfStatus)
-		
+
 		// Check IAM roles and policies
 		iamStatus := v.checkIAMResources()
 		services = append(services, iamStatus)
-		
+
 		// Check CloudWatch metrics
 		cwStatus := v.checkCloudWatchMetrics()
 		services = append(services, cwStatus)
-		
+
 		return CloudServicesLoadedMsg{Services: services}
 	}
 }
@@ -232,20 +232,20 @@ func (v *CloudIntegrationView) loadCloudServices() tea.Cmd {
 // checkS3Service checks the status of S3 service
 func (v *CloudIntegrationView) checkS3Service() CloudService {
 	svc := s3.New(v.session)
-	
+
 	// Try to head the bucket
 	_, err := svc.HeadBucket(&s3.HeadBucketInput{
 		Bucket: aws.String(v.bucket),
 	})
-	
+
 	status := "Healthy"
 	description := fmt.Sprintf("S3 bucket '%s' is accessible", v.bucket)
-	
+
 	if err != nil {
 		status = "Error"
 		description = fmt.Sprintf("S3 bucket '%s' is not accessible: %v", v.bucket, err)
 	}
-	
+
 	return CloudService{
 		Name:        "Amazon S3",
 		Status:      status,
@@ -256,7 +256,7 @@ func (v *CloudIntegrationView) checkS3Service() CloudService {
 // checkCloudFormationStacks checks for related CloudFormation stacks
 func (v *CloudIntegrationView) checkCloudFormationStacks() CloudService {
 	cfSvc := cloudformation.New(v.session)
-	
+
 	// List stacks that might be related to S3
 	result, err := cfSvc.ListStacks(&cloudformation.ListStacksInput{
 		StackStatusFilter: []*string{
@@ -265,17 +265,17 @@ func (v *CloudIntegrationView) checkCloudFormationStacks() CloudService {
 			aws.String("UPDATE_ROLLBACK_COMPLETE"),
 		},
 	})
-	
+
 	status := "Healthy"
 	description := "No related CloudFormation stacks found"
-	
+
 	if err != nil {
 		status = "Warning"
 		description = fmt.Sprintf("Cannot access CloudFormation: %v", err)
 	} else if len(result.StackSummaries) > 0 {
 		description = fmt.Sprintf("Found %d active CloudFormation stacks", len(result.StackSummaries))
 	}
-	
+
 	return CloudService{
 		Name:        "CloudFormation",
 		Status:      status,
@@ -287,28 +287,28 @@ func (v *CloudIntegrationView) checkCloudFormationStacks() CloudService {
 // checkIAMResources checks for IAM roles and policies
 func (v *CloudIntegrationView) checkIAMResources() CloudService {
 	iamSvc := iam.New(v.session)
-	
+
 	// List roles that might be related to S3
 	roles, err := iamSvc.ListRoles(&iam.ListRolesInput{})
-	
+
 	status := "Healthy"
 	description := "IAM service is accessible"
-	
+
 	if err != nil {
 		status = "Warning"
 		description = fmt.Sprintf("Cannot access IAM: %v", err)
 	} else {
 		s3Roles := 0
 		for _, role := range roles.Roles {
-			if role.RoleName != nil && 
-				(containsIgnoreCase(*role.RoleName, "s3") || 
-				 containsIgnoreCase(*role.RoleName, v.bucket)) {
+			if role.RoleName != nil &&
+				(containsIgnoreCase(*role.RoleName, "s3") ||
+					containsIgnoreCase(*role.RoleName, v.bucket)) {
 				s3Roles++
 			}
 		}
 		description = fmt.Sprintf("Found %d S3-related IAM roles", s3Roles)
 	}
-	
+
 	return CloudService{
 		Name:        "IAM",
 		Status:      status,
@@ -319,11 +319,11 @@ func (v *CloudIntegrationView) checkIAMResources() CloudService {
 // checkCloudWatchMetrics checks CloudWatch metrics for the bucket
 func (v *CloudIntegrationView) checkCloudWatchMetrics() CloudService {
 	cwSvc := cloudwatch.New(v.session)
-	
+
 	// Get S3 metrics for the bucket
 	endTime := time.Now()
 	startTime := endTime.Add(-24 * time.Hour)
-	
+
 	input := &cloudwatch.GetMetricStatisticsInput{
 		Namespace:  aws.String("AWS/S3"),
 		MetricName: aws.String("NumberOfObjects"),
@@ -338,17 +338,17 @@ func (v *CloudIntegrationView) checkCloudWatchMetrics() CloudService {
 		Period:     aws.Int64(3600), // 1 hour
 		Statistics: []*string{aws.String("Average")},
 	}
-	
+
 	_, err := cwSvc.GetMetricStatistics(input)
-	
+
 	status := "Healthy"
 	description := "CloudWatch metrics available"
-	
+
 	if err != nil {
 		status = "Warning"
 		description = fmt.Sprintf("CloudWatch metrics not available: %v", err)
 	}
-	
+
 	return CloudService{
 		Name:        "CloudWatch",
 		Status:      status,
@@ -381,4 +381,3 @@ func (v *CloudIntegrationView) showServiceDetails(service CloudService) (tea.Mod
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
-

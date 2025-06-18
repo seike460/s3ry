@@ -6,8 +6,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"golang.org/x/crypto/scrypt"
+	"io"
 )
 
 // EncryptionProvider defines the interface for encryption operations
@@ -199,10 +199,10 @@ func HashPassword(password string, salt []byte) []byte {
 // EncryptionConfig holds encryption configuration
 type EncryptionConfig struct {
 	Enabled         bool   `json:"enabled"`
-	Algorithm       string `json:"algorithm"`        // AES-256-GCM, AES-256-CTR
-	KeySize         int    `json:"key_size"`         // Key size in bits
-	UseClientSide   bool   `json:"use_client_side"`  // Enable client-side encryption
-	KeyRotationDays int    `json:"key_rotation_days"`// Days between key rotations
+	Algorithm       string `json:"algorithm"`         // AES-256-GCM, AES-256-CTR
+	KeySize         int    `json:"key_size"`          // Key size in bits
+	UseClientSide   bool   `json:"use_client_side"`   // Enable client-side encryption
+	KeyRotationDays int    `json:"key_rotation_days"` // Days between key rotations
 }
 
 // DefaultEncryptionConfig returns default encryption configuration
@@ -230,14 +230,14 @@ func NewEncryptionManager(config *EncryptionConfig, password string) (*Encryptio
 	}
 
 	keyManager := NewKeyManager()
-	
+
 	var provider EncryptionProvider
 	if config.UseClientSide && password != "" {
 		salt, err := GenerateSalt()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate salt: %w", err)
 		}
-		
+
 		cse, err := NewClientSideEncryption(password, salt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client-side encryption: %w", err)

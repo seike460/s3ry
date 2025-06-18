@@ -15,9 +15,9 @@ import (
 type SecurityConfig struct {
 	AllowedFileExtensions []string
 	BlockedFileExtensions []string
-	MaxFileSize          int64 // in bytes
-	MaxFilenameLength    int
-	ScanForSecrets       bool
+	MaxFileSize           int64 // in bytes
+	MaxFilenameLength     int
+	ScanForSecrets        bool
 }
 
 // DefaultSecurityConfig returns a default security configuration
@@ -25,9 +25,9 @@ func DefaultSecurityConfig() *SecurityConfig {
 	return &SecurityConfig{
 		AllowedFileExtensions: []string{".txt", ".csv", ".json", ".xml", ".log", ".md", ".pdf", ".jpg", ".png", ".gif"},
 		BlockedFileExtensions: []string{".exe", ".bat", ".cmd", ".sh", ".ps1", ".scr", ".com", ".pif"},
-		MaxFileSize:          100 * 1024 * 1024, // 100MB
-		MaxFilenameLength:    255,
-		ScanForSecrets:       true,
+		MaxFileSize:           100 * 1024 * 1024, // 100MB
+		MaxFilenameLength:     255,
+		ScanForSecrets:        true,
 	}
 }
 
@@ -50,17 +50,17 @@ func (v *Validator) ValidateFilename(filename string) error {
 	if len(filename) > v.config.MaxFilenameLength {
 		return fmt.Errorf("filename too long: %d characters (max: %d)", len(filename), v.config.MaxFilenameLength)
 	}
-	
+
 	// Check for null bytes and control characters
 	if strings.ContainsAny(filename, "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f") {
 		return fmt.Errorf("filename contains invalid control characters")
 	}
-	
+
 	// Check for path traversal attempts
 	if strings.Contains(filename, "..") || strings.Contains(filename, "//") {
 		return fmt.Errorf("filename contains path traversal patterns")
 	}
-	
+
 	// Check for reserved Windows filenames
 	reservedNames := []string{"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
 	baseName := strings.ToUpper(strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename)))
@@ -69,7 +69,7 @@ func (v *Validator) ValidateFilename(filename string) error {
 			return fmt.Errorf("filename uses reserved name: %s", reserved)
 		}
 	}
-	
+
 	// Check file extension
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != "" {
@@ -79,7 +79,7 @@ func (v *Validator) ValidateFilename(filename string) error {
 				return fmt.Errorf("file extension not allowed: %s", ext)
 			}
 		}
-		
+
 		// Check allowed extensions (if specified)
 		if len(v.config.AllowedFileExtensions) > 0 {
 			allowed := false
@@ -94,7 +94,7 @@ func (v *Validator) ValidateFilename(filename string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -115,15 +115,15 @@ func (v *Validator) ValidateFilePath(filePath string) error {
 	if IsPathTraversal(filePath) {
 		return fmt.Errorf("path traversal detected: %s", filePath)
 	}
-	
+
 	// Clean the path
 	cleanPath := filepath.Clean(filePath)
-	
+
 	// Check for absolute paths (should be relative)
 	if filepath.IsAbs(cleanPath) {
 		return fmt.Errorf("absolute paths not allowed: %s", filePath)
 	}
-	
+
 	// Validate each component of the path
 	components := strings.Split(cleanPath, string(filepath.Separator))
 	for _, component := range components {
@@ -134,7 +134,7 @@ func (v *Validator) ValidateFilePath(filePath string) error {
 			return fmt.Errorf("invalid path component '%s': %w", component, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -186,11 +186,11 @@ func (v *Validator) ScanForSecrets(content []byte) []SecretMatch {
 	if !v.config.ScanForSecrets {
 		return nil
 	}
-	
+
 	var matches []SecretMatch
 	patterns := GetSecretPatterns()
 	contentStr := string(content)
-	
+
 	for _, pattern := range patterns {
 		if pattern.Pattern.MatchString(contentStr) {
 			match := SecretMatch{
@@ -201,7 +201,7 @@ func (v *Validator) ScanForSecrets(content []byte) []SecretMatch {
 			matches = append(matches, match)
 		}
 	}
-	
+
 	return matches
 }
 
@@ -236,16 +236,16 @@ func HashContent(content []byte) string {
 func SanitizeForLogging(input string) string {
 	// Remove common secret patterns
 	patterns := []string{
-		`AKIA[0-9A-Z]{16}`,           // AWS Access Keys
+		`AKIA[0-9A-Z]{16}`, // AWS Access Keys
 		`eyJ[0-9a-zA-Z_-]*\.eyJ[0-9a-zA-Z_-]*\.[0-9a-zA-Z_-]*`, // JWT tokens
 	}
-	
+
 	sanitized := input
 	for _, pattern := range patterns {
 		re := regexp.MustCompile(pattern)
 		sanitized = re.ReplaceAllString(sanitized, "[REDACTED]")
 	}
-	
+
 	return sanitized
 }
 
@@ -258,7 +258,7 @@ func IsPathTraversal(path string) bool {
 	if strings.Contains(path, "/..") || strings.Contains(path, "\\..") {
 		return true
 	}
-	
+
 	cleanPath := filepath.Clean(path)
 	// Check for direct .. at start or .. followed by separator
 	if strings.HasPrefix(cleanPath, "..") {
@@ -268,7 +268,7 @@ func IsPathTraversal(path string) bool {
 	if strings.Contains(cleanPath, string(filepath.Separator)+"..") || strings.Contains(cleanPath, ".."+string(filepath.Separator)) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -277,24 +277,24 @@ func ValidateS3BucketName(bucketName string) error {
 	if len(bucketName) < 3 || len(bucketName) > 63 {
 		return fmt.Errorf("bucket name must be between 3 and 63 characters")
 	}
-	
+
 	// Check for valid characters and patterns
 	validBucketName := regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*[a-z0-9]$`)
 	if !validBucketName.MatchString(bucketName) {
 		return fmt.Errorf("bucket name contains invalid characters")
 	}
-	
+
 	// Check for consecutive periods
 	if strings.Contains(bucketName, "..") {
 		return fmt.Errorf("bucket name cannot contain consecutive periods")
 	}
-	
+
 	// Check for IP address format
 	ipPattern := regexp.MustCompile(`^\d+\.\d+\.\d+\.\d+$`)
 	if ipPattern.MatchString(bucketName) {
 		return fmt.Errorf("bucket name cannot be formatted as an IP address")
 	}
-	
+
 	return nil
 }
 
@@ -303,11 +303,11 @@ func ValidateS3ObjectKey(objectKey string) error {
 	if len(objectKey) == 0 {
 		return fmt.Errorf("object key cannot be empty")
 	}
-	
+
 	if len(objectKey) > 1024 {
 		return fmt.Errorf("object key too long: %d characters (max: 1024)", len(objectKey))
 	}
-	
+
 	// Check for invalid characters
 	invalidChars := []string{"\x00", "\x7F"}
 	for _, char := range invalidChars {
@@ -315,6 +315,6 @@ func ValidateS3ObjectKey(objectKey string) error {
 			return fmt.Errorf("object key contains invalid character")
 		}
 	}
-	
+
 	return nil
 }

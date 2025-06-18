@@ -20,11 +20,11 @@ type EnterpriseSecurityManager struct {
 
 // EnterpriseConfig holds the overall enterprise security configuration
 type EnterpriseConfig struct {
-	MFA         *MFAConfig         `json:"mfa"`
-	Audit       *AuditConfig       `json:"audit"`
-	Encryption  *EncryptionConfig  `json:"encryption"`
-	ZeroTrust   *ZeroTrustConfig   `json:"zero_trust"`
-	Compliance  *ComplianceConfig  `json:"compliance"`
+	MFA        *MFAConfig        `json:"mfa"`
+	Audit      *AuditConfig      `json:"audit"`
+	Encryption *EncryptionConfig `json:"encryption"`
+	ZeroTrust  *ZeroTrustConfig  `json:"zero_trust"`
+	Compliance *ComplianceConfig `json:"compliance"`
 }
 
 // ComplianceConfig holds compliance-related configuration
@@ -130,7 +130,7 @@ func (e *EnterpriseSecurityManager) AuthenticateUser(userID, password, mfaToken,
 	if e.config.ZeroTrust.Enabled && e.config.ZeroTrust.NetworkPolicyEnabled {
 		ip := net.ParseIP(ipAddress)
 		if ip != nil && !e.zeroTrustManager.networkPolicy.IsAllowed(ip) {
-			e.auditLogger.LogSecurityEvent(AuditLevelWarning, userID, "network_policy_violation", 
+			e.auditLogger.LogSecurityEvent(AuditLevelWarning, userID, "network_policy_violation",
 				fmt.Sprintf("Access denied from IP %s", ipAddress))
 			result.Reason = "Network policy violation"
 			return result, nil
@@ -354,13 +354,13 @@ type AuthenticationResult struct {
 
 // ComplianceReport holds compliance status information
 type ComplianceReport struct {
-	GeneratedAt      time.Time         `json:"generated_at"`
-	SOC2             ComplianceStatus  `json:"soc2"`
-	ISO27001         ComplianceStatus  `json:"iso27001"`
-	GDPR             ComplianceStatus  `json:"gdpr"`
-	CCPA             ComplianceStatus  `json:"ccpa"`
-	AuditStatus      string            `json:"audit_status"`
-	EncryptionStatus string            `json:"encryption_status"`
+	GeneratedAt      time.Time        `json:"generated_at"`
+	SOC2             ComplianceStatus `json:"soc2"`
+	ISO27001         ComplianceStatus `json:"iso27001"`
+	GDPR             ComplianceStatus `json:"gdpr"`
+	CCPA             ComplianceStatus `json:"ccpa"`
+	AuditStatus      string           `json:"audit_status"`
+	EncryptionStatus string           `json:"encryption_status"`
 }
 
 // ComplianceStatus holds status for a specific compliance standard

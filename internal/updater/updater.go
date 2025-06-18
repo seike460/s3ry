@@ -30,14 +30,14 @@ type Updater struct {
 
 // UpdaterConfig configures the updater behavior
 type UpdaterConfig struct {
-	CheckInterval      time.Duration `json:"check_interval"`
-	AutoCheck          bool          `json:"auto_check"`
-	IncludePrerelease  bool          `json:"include_prerelease"`
-	NotifyOnStartup    bool          `json:"notify_on_startup"`
-	LastCheckTime      time.Time     `json:"last_check_time"`
-	SkippedVersion     string        `json:"skipped_version"`
-	ReminderInterval   time.Duration `json:"reminder_interval"`
-	LastReminder       time.Time     `json:"last_reminder"`
+	CheckInterval     time.Duration `json:"check_interval"`
+	AutoCheck         bool          `json:"auto_check"`
+	IncludePrerelease bool          `json:"include_prerelease"`
+	NotifyOnStartup   bool          `json:"notify_on_startup"`
+	LastCheckTime     time.Time     `json:"last_check_time"`
+	SkippedVersion    string        `json:"skipped_version"`
+	ReminderInterval  time.Duration `json:"reminder_interval"`
+	LastReminder      time.Time     `json:"last_reminder"`
 }
 
 // ReleaseInfo contains information about a release
@@ -54,22 +54,22 @@ type ReleaseInfo struct {
 
 // Asset represents a downloadable asset
 type Asset struct {
-	Name               string `json:"name"`
-	DownloadURL        string `json:"browser_download_url"`
-	Size               int64  `json:"size"`
-	ContentType        string `json:"content_type"`
-	DownloadCount      int64  `json:"download_count"`
+	Name          string `json:"name"`
+	DownloadURL   string `json:"browser_download_url"`
+	Size          int64  `json:"size"`
+	ContentType   string `json:"content_type"`
+	DownloadCount int64  `json:"download_count"`
 }
 
 // UpdateCheckResult contains the result of an update check
 type UpdateCheckResult struct {
-	UpdateAvailable bool         `json:"update_available"`
-	CurrentVersion  string       `json:"current_version"`
-	LatestVersion   string       `json:"latest_version"`
-	ReleaseInfo     *ReleaseInfo `json:"release_info,omitempty"`
-	DownloadURL     string       `json:"download_url,omitempty"`
-	InstallCommand  string       `json:"install_command,omitempty"`
-	ReleaseNotes    string       `json:"release_notes,omitempty"`
+	UpdateAvailable bool           `json:"update_available"`
+	CurrentVersion  string         `json:"current_version"`
+	LatestVersion   string         `json:"latest_version"`
+	ReleaseInfo     *ReleaseInfo   `json:"release_info,omitempty"`
+	DownloadURL     string         `json:"download_url,omitempty"`
+	InstallCommand  string         `json:"install_command,omitempty"`
+	ReleaseNotes    string         `json:"release_notes,omitempty"`
 	Severity        UpdateSeverity `json:"severity"`
 }
 
@@ -84,9 +84,9 @@ const (
 )
 
 const (
-	defaultCheckURL    = "https://api.github.com/repos/seike460/s3ry/releases/latest"
+	defaultCheckURL      = "https://api.github.com/repos/seike460/s3ry/releases/latest"
 	defaultCheckInterval = 24 * time.Hour
-	configFileName     = ".s3ry/updater.json"
+	configFileName       = ".s3ry/updater.json"
 )
 
 // NewUpdater creates a new updater instance
@@ -95,11 +95,11 @@ func NewUpdater(currentVersion string) (*Updater, error) {
 	if err != nil {
 		// Create default config if none exists
 		config = &UpdaterConfig{
-			CheckInterval:      defaultCheckInterval,
-			AutoCheck:          true,
-			IncludePrerelease:  false,
-			NotifyOnStartup:    true,
-			ReminderInterval:   7 * 24 * time.Hour, // Weekly reminders
+			CheckInterval:     defaultCheckInterval,
+			AutoCheck:         true,
+			IncludePrerelease: false,
+			NotifyOnStartup:   true,
+			ReminderInterval:  7 * 24 * time.Hour, // Weekly reminders
 		}
 		_ = saveConfig(config) // Ignore error for default config
 	}
@@ -200,7 +200,7 @@ func (u *Updater) NotifyUpdate(result *UpdateCheckResult) {
 
 	severity := result.Severity
 	icon := u.getSeverityIcon(severity)
-	
+
 	fmt.Printf("\n%s ═══════════════════════════════════════════════════════════\n", icon)
 	fmt.Printf("   S3ry Update Available: v%s → v%s\n", result.CurrentVersion, result.LatestVersion)
 	fmt.Printf("═══════════════════════════════════════════════════════════\n\n")
@@ -223,15 +223,15 @@ func (u *Updater) NotifyUpdate(result *UpdateCheckResult) {
 
 	// Show installation options
 	fmt.Printf("Installation Options:\n")
-	
+
 	if result.InstallCommand != "" {
 		fmt.Printf("  Quick Install: %s\n", result.InstallCommand)
 	}
-	
+
 	if result.DownloadURL != "" {
 		fmt.Printf("  Manual Download: %s\n", result.DownloadURL)
 	}
-	
+
 	if result.ReleaseInfo != nil && result.ReleaseInfo.HTMLURL != "" {
 		fmt.Printf("  Release Page: %s\n", result.ReleaseInfo.HTMLURL)
 	}

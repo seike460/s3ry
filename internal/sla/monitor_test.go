@@ -112,14 +112,14 @@ func TestSLAMonitor_ViolationHandling(t *testing.T) {
 	}
 
 	target := sla.Targets[0]
-	
+
 	// Test violation detection
-	assert.True(t, monitor.isTargetViolated(target, 98.0)) // Below threshold
+	assert.True(t, monitor.isTargetViolated(target, 98.0))   // Below threshold
 	assert.False(t, monitor.isTargetViolated(target, 99.95)) // Above threshold
 
 	// Test violation handling
 	monitor.handleViolation(sla, target, 98.0)
-	
+
 	// Check that violation was recorded
 	assert.Greater(t, sla.ViolationCount, 0)
 	assert.Equal(t, SLAStatusViolation, sla.CurrentStatus)
@@ -152,10 +152,10 @@ func TestSLAMonitor_OperatorLogic(t *testing.T) {
 			Operator:  tc.operator,
 			Threshold: tc.threshold,
 		}
-		
+
 		result := monitor.isTargetViolated(target, tc.value)
-		assert.Equal(t, tc.violated, result, 
-			"Operator %s, threshold %f, value %f should be violated=%t", 
+		assert.Equal(t, tc.violated, result,
+			"Operator %s, threshold %f, value %f should be violated=%t",
 			tc.operator, tc.threshold, tc.value, tc.violated)
 	}
 }
@@ -180,7 +180,7 @@ func TestSLAMonitor_BusinessImpactAssessment(t *testing.T) {
 	for _, tc := range testCases {
 		impact := monitor.assessBusinessImpact(tc.severity)
 		risk := monitor.assessRiskLevel(tc.severity)
-		
+
 		assert.Equal(t, tc.expectedImpact, impact)
 		assert.Equal(t, tc.expectedRisk, risk)
 	}
@@ -191,7 +191,7 @@ func TestSLAMonitor_StartStop(t *testing.T) {
 	alertManager, _ := NewSimpleSLAAlertManager(nil)
 	config := DefaultSLAConfig()
 	config.CheckInterval = time.Millisecond * 100 // Fast for testing
-	
+
 	monitor, err := NewSLAMonitor(config, alertManager, storage)
 	require.NoError(t, err)
 

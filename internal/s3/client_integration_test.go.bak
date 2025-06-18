@@ -1,0 +1,590 @@
+package s3
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestS3Client_ListBuckets tests bucket listing functionality
+func TestS3Client_ListBuckets(t *testing.T) {
+	tests := []struct {
+		name     string
+		mockFunc func(*MockS3Client)
+		wantErr  bool
+	}{
+		{
+			name: "successful_list_buckets",
+			mockFunc: func(m *MockS3Client) {
+				m.SetListBucketsResponse(&s3.ListBucketsOutput{
+					Buckets: []types.Bucket{
+						{
+							Name:         aws.String("test-bucket-1"),
+							CreationDate: aws.Time(time.Now()),
+						},
+						{
+							Name:         aws.String("test-bucket-2"),
+							CreationDate: aws.Time(time.Now()),
+						},
+					},
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty_bucket_list",
+			mockFunc: func(m *MockS3Client) {
+				m.SetListBucketsResponse(&s3.ListBucketsOutput{
+					Buckets: []types.Bucket{},
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "access_denied_error",
+			mockFunc: func(m *MockS3Client) {
+				m.SetListBucketsResponse(nil, &types.NoSuchBucket{
+					Message: aws.String("Access Denied"),
+				})
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockFunc(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			buckets, err := client.ListBuckets(context.Background())
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, buckets)
+		})
+	}
+}
+
+// TestS3Client_ListObjects tests object listing with pagination
+func TestS3Client_ListObjects(t *testing.T) {
+	tests := []struct {
+		name      string
+		bucket    string
+		prefix    string
+		maxKeys   int32
+		mockFunc  func(*MockS3Client)
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name:    "list_objects_success",
+			bucket:  "test-bucket",
+			prefix:  "folder/",
+			maxKeys: 1000,
+			mockFunc: func(m *MockS3Client) {
+				m.SetListObjectsV2Response(&s3.ListObjectsV2Output{
+					Contents: []types.Object{
+						{
+							Key:          aws.String("folder/file1.txt"),
+							Size:         aws.Int64(1024),
+							LastModified: aws.Time(time.Now()),
+						},
+						{
+							Key:          aws.String("folder/file2.txt"),
+							Size:         aws.Int64(2048),
+							LastModified: aws.Time(time.Now()),
+						},
+					},
+					KeyCount:    aws.Int32(2),
+					IsTruncated: aws.Bool(false),
+				}, nil)
+			},
+			wantCount: 2,
+			wantErr:   false,
+		},
+		{
+			name:    "paginated_results",
+			bucket:  "test-bucket",
+			prefix:  "",
+			maxKeys: 1,
+			mockFunc: func(m *MockS3Client) {
+				// First call
+				m.SetListObjectsV2Response(&s3.ListObjectsV2Output{
+					Contents: []types.Object{
+						{
+							Key:          aws.String("file1.txt"),
+							Size:         aws.Int64(1024),
+							LastModified: aws.Time(time.Now()),
+						},
+					},
+					KeyCount:              aws.Int32(1),
+					IsTruncated:           aws.Bool(true),
+					NextContinuationToken: aws.String("token1"),
+				}, nil)
+			},
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:    "bucket_not_found",
+			bucket:  "non-existent-bucket",
+			prefix:  "",
+			maxKeys: 1000,
+			mockFunc: func(m *MockS3Client) {
+				m.SetListObjectsV2Response(nil, &types.NoSuchBucket{
+					Message: aws.String("The specified bucket does not exist"),
+				})
+			},
+			wantCount: 0,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockFunc(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			objects, err := client.ListObjects(context.Background(), tt.bucket, tt.prefix)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Len(t, objects, tt.wantCount)
+		})
+	}
+}
+
+// TestS3Client_Upload tests upload functionality with different scenarios
+func TestS3Client_Upload(t *testing.T) {
+	tests := []struct {
+		name     string
+		bucket   string
+		key      string
+		data     string
+		mockFunc func(*MockS3Client)
+		wantErr  bool
+	}{
+		{
+			name:   "successful_upload",
+			bucket: "test-bucket",
+			key:    "test-file.txt",
+			data:   "Hello, World!",
+			mockFunc: func(m *MockS3Client) {
+				m.SetPutObjectResponse(&s3.PutObjectOutput{
+					ETag: aws.String("\"9bb58f26192e4ba00f01e2e7b136bbd8\""),
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:   "large_file_upload",
+			bucket: "test-bucket",
+			key:    "large-file.bin",
+			data:   strings.Repeat("A", 10*1024*1024), // 10MB
+			mockFunc: func(m *MockS3Client) {
+				m.SetPutObjectResponse(&s3.PutObjectOutput{
+					ETag: aws.String("\"large-file-etag\""),
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:   "upload_access_denied",
+			bucket: "restricted-bucket",
+			key:    "test-file.txt",
+			data:   "test data",
+			mockFunc: func(m *MockS3Client) {
+				m.SetPutObjectResponse(nil, &types.NoSuchBucket{
+					Message: aws.String("Access Denied"),
+				})
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockFunc(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			reader := strings.NewReader(tt.data)
+			result, err := client.Upload(context.Background(), tt.bucket, tt.key, reader, int64(len(tt.data)))
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.NotEmpty(t, result.ETag)
+		})
+	}
+}
+
+// TestS3Client_Download tests download functionality
+func TestS3Client_Download(t *testing.T) {
+	tests := []struct {
+		name     string
+		bucket   string
+		key      string
+		mockFunc func(*MockS3Client)
+		wantData string
+		wantErr  bool
+	}{
+		{
+			name:   "successful_download",
+			bucket: "test-bucket",
+			key:    "test-file.txt",
+			mockFunc: func(m *MockS3Client) {
+				data := "Hello, World!"
+				m.SetGetObjectResponse(&s3.GetObjectOutput{
+					Body:          io.NopCloser(strings.NewReader(data)),
+					ContentLength: aws.Int64(int64(len(data))),
+					ETag:          aws.String("\"9bb58f26192e4ba00f01e2e7b136bbd8\""),
+				}, nil)
+			},
+			wantData: "Hello, World!",
+			wantErr:  false,
+		},
+		{
+			name:   "large_file_download",
+			bucket: "test-bucket",
+			key:    "large-file.bin",
+			mockFunc: func(m *MockS3Client) {
+				data := strings.Repeat("A", 5*1024*1024) // 5MB
+				m.SetGetObjectResponse(&s3.GetObjectOutput{
+					Body:          io.NopCloser(strings.NewReader(data)),
+					ContentLength: aws.Int64(int64(len(data))),
+					ETag:          aws.String("\"large-file-etag\""),
+				}, nil)
+			},
+			wantData: strings.Repeat("A", 5*1024*1024),
+			wantErr:  false,
+		},
+		{
+			name:   "object_not_found",
+			bucket: "test-bucket",
+			key:    "non-existent-file.txt",
+			mockFunc: func(m *MockS3Client) {
+				m.SetGetObjectResponse(nil, &types.NoSuchKey{
+					Message: aws.String("The specified key does not exist"),
+				})
+			},
+			wantData: "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockFunc(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			var buf strings.Builder
+			err := client.Download(context.Background(), tt.bucket, tt.key, &buf)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantData, buf.String())
+		})
+	}
+}
+
+// TestS3Client_Delete tests object deletion
+func TestS3Client_Delete(t *testing.T) {
+	tests := []struct {
+		name     string
+		bucket   string
+		key      string
+		mockFunc func(*MockS3Client)
+		wantErr  bool
+	}{
+		{
+			name:   "successful_delete",
+			bucket: "test-bucket",
+			key:    "test-file.txt",
+			mockFunc: func(m *MockS3Client) {
+				m.SetDeleteObjectResponse(&s3.DeleteObjectOutput{
+					DeleteMarker: aws.Bool(false),
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name:   "delete_non_existent_object",
+			bucket: "test-bucket",
+			key:    "non-existent-file.txt",
+			mockFunc: func(m *MockS3Client) {
+				m.SetDeleteObjectResponse(&s3.DeleteObjectOutput{
+					DeleteMarker: aws.Bool(false),
+				}, nil)
+			},
+			wantErr: false, // S3 doesn't return error for deleting non-existent objects
+		},
+		{
+			name:   "delete_access_denied",
+			bucket: "restricted-bucket",
+			key:    "protected-file.txt",
+			mockFunc: func(m *MockS3Client) {
+				m.SetDeleteObjectResponse(nil, &types.NoSuchBucket{
+					Message: aws.String("Access Denied"),
+				})
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockFunc(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			err := client.Delete(context.Background(), tt.bucket, tt.key)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
+// TestS3Client_Performance tests performance characteristics
+func TestS3Client_Performance(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping performance test in short mode")
+	}
+
+	t.Run("concurrent_operations", func(t *testing.T) {
+		mockClient := NewMockS3Client()
+
+		// Setup mock responses for concurrent operations
+		mockClient.SetListBucketsResponse(&s3.ListBucketsOutput{
+			Buckets: []types.Bucket{
+				{Name: aws.String("test-bucket")},
+			},
+		}, nil)
+
+		client := &Client{s3Client: mockClient}
+
+		// Test concurrent bucket listings
+		concurrency := 100
+		errChan := make(chan error, concurrency)
+
+		start := time.Now()
+		for i := 0; i < concurrency; i++ {
+			go func() {
+				_, err := client.ListBuckets(context.Background())
+				errChan <- err
+			}()
+		}
+
+		// Collect results
+		for i := 0; i < concurrency; i++ {
+			err := <-errChan
+			assert.NoError(t, err)
+		}
+
+		duration := time.Since(start)
+		t.Logf("Concurrent operations completed in %v", duration)
+
+		// Performance assertion: 100 concurrent operations should complete within 1 second
+		assert.Less(t, duration, time.Second, "Concurrent operations took too long")
+	})
+
+	t.Run("large_file_handling", func(t *testing.T) {
+		mockClient := NewMockS3Client()
+
+		// Simulate 100MB file
+		fileSize := 100 * 1024 * 1024
+		data := strings.Repeat("A", fileSize)
+
+		mockClient.SetPutObjectResponse(&s3.PutObjectOutput{
+			ETag: aws.String("\"large-file-etag\""),
+		}, nil)
+
+		client := &Client{s3Client: mockClient}
+
+		start := time.Now()
+		reader := strings.NewReader(data)
+		result, err := client.Upload(context.Background(), "test-bucket", "large-file.bin", reader, int64(fileSize))
+		duration := time.Since(start)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		t.Logf("100MB upload completed in %v", duration)
+
+		// Performance assertion: 100MB upload should complete within 10 seconds (mock scenario)
+		assert.Less(t, duration, 10*time.Second, "Large file upload took too long")
+	})
+}
+
+// TestS3Client_ErrorHandling tests error handling scenarios
+func TestS3Client_ErrorHandling(t *testing.T) {
+	tests := []struct {
+		name         string
+		operation    func(*Client) error
+		mockSetup    func(*MockS3Client)
+		expectedType string
+	}{
+		{
+			name: "network_timeout",
+			operation: func(c *Client) error {
+				_, err := c.ListBuckets(context.Background())
+				return err
+			},
+			mockSetup: func(m *MockS3Client) {
+				m.SetListBucketsResponse(nil, context.DeadlineExceeded)
+			},
+			expectedType: "timeout",
+		},
+		{
+			name: "access_denied",
+			operation: func(c *Client) error {
+				_, err := c.ListBuckets(context.Background())
+				return err
+			},
+			mockSetup: func(m *MockS3Client) {
+				m.SetListBucketsResponse(nil, &types.NoSuchBucket{
+					Message: aws.String("Access Denied"),
+				})
+			},
+			expectedType: "access_denied",
+		},
+		{
+			name: "invalid_credentials",
+			operation: func(c *Client) error {
+				_, err := c.ListBuckets(context.Background())
+				return err
+			},
+			mockSetup: func(m *MockS3Client) {
+				m.SetListBucketsResponse(nil, fmt.Errorf("InvalidAccessKeyId: The AWS Access Key Id you provided does not exist"))
+			},
+			expectedType: "credentials",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := NewMockS3Client()
+			tt.mockSetup(mockClient)
+
+			client := &Client{s3Client: mockClient}
+
+			err := tt.operation(client)
+
+			assert.Error(t, err)
+
+			// Check that error contains expected information
+			errorMsg := err.Error()
+			switch tt.expectedType {
+			case "timeout":
+				assert.Contains(t, errorMsg, "timeout", "Error should indicate timeout")
+			case "access_denied":
+				assert.Contains(t, errorMsg, "Access Denied", "Error should indicate access denied")
+			case "credentials":
+				assert.Contains(t, errorMsg, "Access Key", "Error should indicate credential issue")
+			}
+		})
+	}
+}
+
+// TestS3Client_ContextCancellation tests context cancellation handling
+func TestS3Client_ContextCancellation(t *testing.T) {
+	mockClient := NewMockS3Client()
+
+	// Setup a slow response
+	mockClient.SetListBucketsDelay(time.Second * 2)
+	mockClient.SetListBucketsResponse(&s3.ListBucketsOutput{
+		Buckets: []types.Bucket{},
+	}, nil)
+
+	client := &Client{s3Client: mockClient}
+
+	// Create context with short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	start := time.Now()
+	_, err := client.ListBuckets(ctx)
+	duration := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context", "Error should indicate context cancellation")
+	assert.Less(t, duration, time.Millisecond*200, "Operation should be cancelled quickly")
+}
+
+// Benchmark tests for performance regression detection
+func BenchmarkS3Client_ListBuckets(b *testing.B) {
+	mockClient := NewMockS3Client()
+	mockClient.SetListBucketsResponse(&s3.ListBucketsOutput{
+		Buckets: []types.Bucket{
+			{Name: aws.String("test-bucket")},
+		},
+	}, nil)
+
+	client := &Client{s3Client: mockClient}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := client.ListBuckets(context.Background())
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkS3Client_Upload(b *testing.B) {
+	mockClient := NewMockS3Client()
+	mockClient.SetPutObjectResponse(&s3.PutObjectOutput{
+		ETag: aws.String("\"test-etag\""),
+	}, nil)
+
+	client := &Client{s3Client: mockClient}
+	data := "test data for upload benchmark"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		reader := strings.NewReader(data)
+		_, err := client.Upload(context.Background(), "test-bucket", "test-key", reader, int64(len(data)))
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

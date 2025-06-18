@@ -54,7 +54,7 @@ func (m *Monitor) monitorLoop() {
 // updateAndReport updates metrics and reports if needed
 func (m *Monitor) updateAndReport() {
 	m.metrics.UpdateMemoryMetrics()
-	
+
 	// Check for performance issues
 	if m.shouldReport() {
 		snapshot := m.metrics.GetSnapshot()
@@ -65,30 +65,30 @@ func (m *Monitor) updateAndReport() {
 // shouldReport determines if we should report current metrics
 func (m *Monitor) shouldReport() bool {
 	snapshot := m.metrics.GetSnapshot()
-	
+
 	// Report if failure rate is high
 	if snapshot.FailureRate > 10.0 {
 		return true
 	}
-	
+
 	// Report if memory usage is high
 	if snapshot.MemoryUsage.AllocatedBytes > 100*1024*1024 { // 100MB
 		return true
 	}
-	
+
 	// Report every 5 minutes regardless
 	if snapshot.Uptime.Minutes() > 0 && int(snapshot.Uptime.Minutes())%5 == 0 {
 		return true
 	}
-	
+
 	return false
 }
 
 // reportPerformance reports performance metrics
 func (m *Monitor) reportPerformance(snapshot MetricsSnapshot) {
-	log.Printf("Performance Report: Ops/sec=%.2f, Failure=%.2f%%, Memory=%d MB", 
-		snapshot.OperationsPerSec, 
-		snapshot.FailureRate, 
+	log.Printf("Performance Report: Ops/sec=%.2f, Failure=%.2f%%, Memory=%d MB",
+		snapshot.OperationsPerSec,
+		snapshot.FailureRate,
 		snapshot.MemoryUsage.AllocatedBytes/(1024*1024))
 }
 
@@ -112,10 +112,10 @@ type AlertThresholds struct {
 // DefaultAlertThresholds returns sensible default thresholds
 func DefaultAlertThresholds() AlertThresholds {
 	return AlertThresholds{
-		MaxFailureRate:    15.0,                // 15% failure rate
-		MaxMemoryUsage:    200 * 1024 * 1024,   // 200MB
-		MinOperationsRate: 0.1,                 // 0.1 ops/sec minimum
-		MaxResponseTime:   10 * time.Second,    // 10 second max response
+		MaxFailureRate:    15.0,              // 15% failure rate
+		MaxMemoryUsage:    200 * 1024 * 1024, // 200MB
+		MinOperationsRate: 0.1,               // 0.1 ops/sec minimum
+		MaxResponseTime:   10 * time.Second,  // 10 second max response
 	}
 }
 
@@ -182,7 +182,7 @@ func (am *AlertManager) CheckAlerts(snapshot MetricsSnapshot) {
 // triggerAlert triggers an alert and calls callbacks
 func (am *AlertManager) triggerAlert(alert PerformanceAlert) {
 	am.alerts = append(am.alerts, alert)
-	
+
 	// Call all registered callbacks
 	for _, callback := range am.callbacks {
 		go callback(alert)
@@ -193,13 +193,13 @@ func (am *AlertManager) triggerAlert(alert PerformanceAlert) {
 func (am *AlertManager) GetRecentAlerts(since time.Duration) []PerformanceAlert {
 	cutoff := time.Now().Add(-since)
 	var recent []PerformanceAlert
-	
+
 	for _, alert := range am.alerts {
 		if alert.Timestamp.After(cutoff) {
 			recent = append(recent, alert)
 		}
 	}
-	
+
 	return recent
 }
 
@@ -228,28 +228,28 @@ func (bd *BottleneckDetector) DetectBottlenecks() []string {
 	// Check for slow operations
 	for operation, duration := range snapshot.PerformanceTimers {
 		if duration > 5*time.Second {
-			bottlenecks = append(bottlenecks, 
+			bottlenecks = append(bottlenecks,
 				fmt.Sprintf("Slow %s operation: %v", operation, duration))
 		}
 	}
 
 	// Check for high failure rate
 	if snapshot.FailureRate > 10.0 {
-		bottlenecks = append(bottlenecks, 
+		bottlenecks = append(bottlenecks,
 			fmt.Sprintf("High failure rate: %.2f%%", snapshot.FailureRate))
 	}
 
 	// Check for memory pressure
 	if snapshot.MemoryUsage.AllocatedBytes > 150*1024*1024 { // 150MB
-		bottlenecks = append(bottlenecks, 
-			fmt.Sprintf("High memory usage: %d MB", 
+		bottlenecks = append(bottlenecks,
+			fmt.Sprintf("High memory usage: %d MB",
 				snapshot.MemoryUsage.AllocatedBytes/(1024*1024)))
 	}
 
 	// Check for GC pressure
 	if snapshot.MemoryUsage.GCRuns > 100 && snapshot.Uptime < 10*time.Minute {
-		bottlenecks = append(bottlenecks, 
-			fmt.Sprintf("Frequent GC: %d runs in %v", 
+		bottlenecks = append(bottlenecks,
+			fmt.Sprintf("Frequent GC: %d runs in %v",
 				snapshot.MemoryUsage.GCRuns, snapshot.Uptime))
 	}
 

@@ -13,9 +13,9 @@ import (
 type TextAnalyzer struct{}
 
 func (ta *TextAnalyzer) CanAnalyze(contentType string) bool {
-	return strings.HasPrefix(contentType, "text/") || 
-		   contentType == "application/json" ||
-		   contentType == "application/xml"
+	return strings.HasPrefix(contentType, "text/") ||
+		contentType == "application/json" ||
+		contentType == "application/xml"
 }
 
 func (ta *TextAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentAnalysisResult, error) {
@@ -24,7 +24,7 @@ func (ta *TextAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentAn
 	}
 
 	text := string(content)
-	
+
 	// Detect encoding
 	if utf8.Valid(content) {
 		result.Encoding = "UTF-8"
@@ -52,11 +52,11 @@ func (ta *TextAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentAn
 
 	// Pattern analysis
 	patterns := map[string]*regexp.Regexp{
-		"has_code":       regexp.MustCompile(`(?i)(function|class|import|def|var|let|const)\s+\w+`),
-		"has_urls":       regexp.MustCompile(`https?://[^\s]+`),
-		"has_emails":     regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
-		"has_numbers":    regexp.MustCompile(`\d+`),
-		"has_dates":      regexp.MustCompile(`\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}`),
+		"has_code":    regexp.MustCompile(`(?i)(function|class|import|def|var|let|const)\s+\w+`),
+		"has_urls":    regexp.MustCompile(`https?://[^\s]+`),
+		"has_emails":  regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
+		"has_numbers": regexp.MustCompile(`\d+`),
+		"has_dates":   regexp.MustCompile(`\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}`),
 	}
 
 	for pattern, regex := range patterns {
@@ -76,7 +76,7 @@ func (ta *TextAnalyzer) GetSupportedTypes() []string {
 func (ta *TextAnalyzer) detectLanguage(text string) string {
 	// Simple heuristic-based language detection
 	text = strings.ToLower(text)
-	
+
 	// English indicators
 	englishWords := []string{"the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "man", "new", "now", "old", "see", "two", "way", "who", "boy", "did", "its", "let", "put", "say", "she", "too", "use"}
 	englishCount := 0
@@ -136,7 +136,7 @@ func (ia *ImageAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentA
 
 	// Basic image analysis (simplified - in production would use image libraries)
 	imageProps := &ImageProperties{}
-	
+
 	// Detect image format from content
 	if len(content) > 10 {
 		// PNG signature
@@ -166,7 +166,7 @@ func (ia *ImageAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentA
 	if width > 0 && height > 0 {
 		imageProps.Width = width
 		imageProps.Height = height
-		
+
 		// Determine orientation
 		if width > height {
 			imageProps.Orientation = "landscape"
@@ -202,7 +202,7 @@ func (ia *ImageAnalyzer) Analyze(ctx context.Context, content []byte) (*ContentA
 	}
 
 	result.ImageProperties = imageProps
-	
+
 	return result, nil
 }
 
@@ -228,11 +228,11 @@ func (ia *ImageAnalyzer) extractPNGDimensions(content []byte) (int, int) {
 	if len(content) < 24 {
 		return 0, 0
 	}
-	
+
 	// Width is bytes 16-19, height is bytes 20-23 (big-endian)
 	width := int(content[16])<<24 | int(content[17])<<16 | int(content[18])<<8 | int(content[19])
 	height := int(content[20])<<24 | int(content[21])<<16 | int(content[22])<<8 | int(content[23])
-	
+
 	return width, height
 }
 
@@ -256,10 +256,10 @@ func (ia *ImageAnalyzer) extractGIFDimensions(content []byte) (int, int) {
 	if len(content) < 10 {
 		return 0, 0
 	}
-	
+
 	width := int(content[6]) | int(content[7])<<8
 	height := int(content[8]) | int(content[9])<<8
-	
+
 	return width, height
 }
 
@@ -312,7 +312,7 @@ func (ja *JSONAnalyzer) analyzeJSONStructure(data interface{}) map[string]string
 	case map[string]interface{}:
 		metadata["json_type"] = "object"
 		metadata["json_keys"] = fmt.Sprintf("%d", len(v))
-		
+
 		// Analyze common keys
 		commonConfigKeys := []string{"name", "version", "config", "settings", "api", "database", "server"}
 		hasConfigKeys := 0
@@ -340,7 +340,7 @@ func (ja *JSONAnalyzer) analyzeJSONStructure(data interface{}) map[string]string
 	case []interface{}:
 		metadata["json_type"] = "array"
 		metadata["json_length"] = fmt.Sprintf("%d", len(v))
-		
+
 		if len(v) > 0 {
 			// Analyze first element to determine array content type
 			switch v[0].(type) {

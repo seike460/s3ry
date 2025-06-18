@@ -17,12 +17,12 @@ import (
 // MockS3API implements s3iface.S3API for testing
 type MockS3API struct {
 	s3iface.S3API
-	ListBucketsFunc     func(*s3.ListBucketsInput) (*s3.ListBucketsOutput, error)
-	ListObjectsFunc     func(*s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
+	ListBucketsFunc      func(*s3.ListBucketsInput) (*s3.ListBucketsOutput, error)
+	ListObjectsFunc      func(*s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
 	ListObjectsPagesFunc func(*s3.ListObjectsInput, func(*s3.ListObjectsOutput, bool) bool) error
-	GetObjectFunc       func(*s3.GetObjectInput) (*s3.GetObjectOutput, error)
-	PutObjectFunc       func(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
-	DeleteObjectFunc    func(*s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	GetObjectFunc        func(*s3.GetObjectInput) (*s3.GetObjectOutput, error)
+	PutObjectFunc        func(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
+	DeleteObjectFunc     func(*s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 }
 
 func (m *MockS3API) ListBuckets(input *s3.ListBucketsInput) (*s3.ListBucketsOutput, error) {
@@ -128,15 +128,15 @@ func CreateTempFile(t *testing.T, content string) string {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	if _, err := tmpFile.WriteString(content); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
-	
+
 	if err := tmpFile.Close(); err != nil {
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
-	
+
 	return tmpFile.Name()
 }
 
@@ -150,9 +150,9 @@ func CaptureLogOutput(fn func()) string {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
 	defer log.SetOutput(os.Stderr)
-	
+
 	fn()
-	
+
 	return buf.String()
 }
 
@@ -161,16 +161,16 @@ func CaptureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
-	
+
 	fn()
-	
+
 	w.Close()
 	os.Stdout = old
-	
+
 	var buf bytes.Buffer
 	io.Copy(&buf, r)
 	r.Close()
-	
+
 	return buf.String()
 }
 

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/briandowns/spinner"
 	"github.com/seike460/s3ry/internal/i18n"
 )
@@ -50,12 +49,10 @@ func checkLocalExists(objectKey string) {
 	}
 }
 
-// awsErrorPrint print Error for AWS
+// awsErrorPrint print Error for AWS with basic error handling
 func awsErrorPrint(err error) {
-	if aerr, ok := err.(awserr.Error); ok {
-		log.Fatal(aerr.Error())
-	}
-	log.Fatal(err.Error())
+	// Basic error output for MVP
+	fmt.Printf("❌ Error: %v\n", err)
 }
 
 // dirwalk get fileList
@@ -73,7 +70,7 @@ func dirwalk(dir string) []string {
 		if file.Name()[0] == '.' {
 			continue
 		}
-		
+
 		if file.IsDir() {
 			// Add safety check to prevent infinite recursion
 			subDir := filepath.Join(dir, file.Name())

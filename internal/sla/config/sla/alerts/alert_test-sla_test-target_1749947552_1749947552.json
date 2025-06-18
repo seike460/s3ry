@@ -1,0 +1,14 @@
+{
+  "id": "alert_test-sla_test-target_1749947552_1749947552",
+  "type": "VIOLATION",
+  "severity": "CRITICAL",
+  "sla_id": "test-sla",
+  "violation_id": "test-sla_test-target_1749947552",
+  "title": "SLA Violation: Test SLA",
+  "message": "SLA Test SLA is violating target. Expected: 99.900000, Actual: 98.000000",
+  "timestamp": "2025-06-15T09:32:32.358021+09:00",
+  "recipients": null,
+  "channels": null,
+  "tags": null,
+  "status": "ACTIVE"
+}

@@ -21,11 +21,11 @@ type Downloader struct {
 
 // DownloadConfig configures download behavior
 type DownloadConfig struct {
-	ConcurrentDownloads int           // Number of concurrent downloads
-	PartSize            int64         // Size of each download part
-	Concurrency         int           // Number of concurrent parts per file
-	ResumeDownloads     bool          // Whether to resume partial downloads
-	VerifyChecksum      bool          // Whether to verify checksums
+	ConcurrentDownloads int              // Number of concurrent downloads
+	PartSize            int64            // Size of each download part
+	Concurrency         int              // Number of concurrent parts per file
+	ResumeDownloads     bool             // Whether to resume partial downloads
+	VerifyChecksum      bool             // Whether to verify checksums
 	OnProgress          ProgressCallback // Progress callback
 }
 
@@ -84,7 +84,7 @@ func (d *Downloader) Download(ctx context.Context, request DownloadRequest, conf
 			Bucket: aws.String(request.Bucket),
 			Key:    aws.String(request.Key),
 		}
-		
+
 		headOutput, err := d.client.s3Client.HeadObjectWithContext(ctx, headInput)
 		if err != nil {
 			return fmt.Errorf("failed to get object metadata: %w", err)
@@ -125,7 +125,7 @@ func (d *Downloader) Download(ctx context.Context, request DownloadRequest, conf
 // DownloadBatch downloads multiple files concurrently
 func (d *Downloader) DownloadBatch(ctx context.Context, requests []DownloadRequest, config DownloadConfig) []BatchOperation {
 	jobs := make([]worker.Job, len(requests))
-	
+
 	for i, request := range requests {
 		// Create progress tracker for this specific download
 		var progressFunc ProgressCallback
@@ -148,7 +148,7 @@ func (d *Downloader) DownloadBatch(ctx context.Context, requests []DownloadReque
 	})
 
 	results := batchProcessor.ProcessBatch(jobs)
-	
+
 	// Convert worker results to batch operations
 	operations := make([]BatchOperation, len(results))
 	for i, result := range results {
@@ -190,9 +190,9 @@ func (d *Downloader) DownloadDirectory(ctx context.Context, bucket, prefix, loca
 		if prefix != "" && len(obj.Key) > len(prefix) {
 			relativePath = obj.Key[len(prefix):]
 		}
-		
+
 		localPath := filepath.Join(localDir, relativePath)
-		
+
 		requests = append(requests, DownloadRequest{
 			Bucket:   bucket,
 			Key:      obj.Key,
@@ -202,7 +202,7 @@ func (d *Downloader) DownloadDirectory(ctx context.Context, bucket, prefix, loca
 
 	// Download all files
 	operations := d.DownloadBatch(ctx, requests, config)
-	
+
 	// Check for any errors
 	for _, op := range operations {
 		if !op.Success {
@@ -216,24 +216,24 @@ func (d *Downloader) DownloadDirectory(ctx context.Context, bucket, prefix, loca
 // DownloadWithRetry downloads a file with automatic retry on failure
 func (d *Downloader) DownloadWithRetry(ctx context.Context, request DownloadRequest, config DownloadConfig, maxRetries int) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := d.Download(ctx, request, config)
 		if err == nil {
 			return nil // Success
 		}
-		
+
 		lastErr = err
-		
+
 		// Don't retry if context was cancelled
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		
+
 		// Clean up partial file before retry
 		os.Remove(request.FilePath)
 	}
-	
+
 	return fmt.Errorf("download failed after %d attempts: %w", maxRetries+1, lastErr)
 }
 
@@ -266,7 +266,7 @@ func (d *Downloader) isDownloadComplete(ctx context.Context, request DownloadReq
 		Bucket: aws.String(request.Bucket),
 		Key:    aws.String(request.Key),
 	}
-	
+
 	headOutput, err := d.client.s3Client.HeadObjectWithContext(ctx, headInput)
 	if err != nil {
 		return false

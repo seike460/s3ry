@@ -11,7 +11,7 @@ import (
 func TestSimpleSLAAlertManager_SendAlert(t *testing.T) {
 	config := DefaultAlertManagerConfig()
 	config.RateLimiting.Enabled = false // Disable for testing
-	
+
 	manager, err := NewSimpleSLAAlertManager(config)
 	require.NoError(t, err)
 
@@ -33,7 +33,7 @@ func TestSimpleSLAAlertManager_SendAlert(t *testing.T) {
 	activeAlerts, err := manager.GetActiveAlerts()
 	assert.NoError(t, err)
 	assert.Len(t, activeAlerts, 1)
-	
+
 	storedAlert := activeAlerts[0]
 	assert.NotEmpty(t, storedAlert.ID)
 	assert.False(t, storedAlert.Timestamp.IsZero())
@@ -45,7 +45,7 @@ func TestSimpleSLAAlertManager_RateLimiting(t *testing.T) {
 	config := DefaultAlertManagerConfig()
 	config.RateLimiting.Enabled = true
 	config.RateLimiting.MaxPerMinute = 2
-	
+
 	manager, err := NewSimpleSLAAlertManager(config)
 	require.NoError(t, err)
 
@@ -62,7 +62,7 @@ func TestSimpleSLAAlertManager_RateLimiting(t *testing.T) {
 	// Send first two alerts - should succeed
 	err = manager.SendAlert(alert)
 	assert.NoError(t, err)
-	
+
 	alert.ID = "" // Reset ID for new alert
 	err = manager.SendAlert(alert)
 	assert.NoError(t, err)
@@ -79,14 +79,14 @@ func TestSimpleSLAAlertManager_AcknowledgeAlert(t *testing.T) {
 	require.NoError(t, err)
 
 	alert := SLAAlert{
-		ID:          "test-alert",
-		Type:        AlertTypeViolation,
-		Severity:    SeverityCritical,
-		SLAID:       "test-sla",
-		Title:       "Test Alert",
-		Message:     "This is a test alert",
-		Status:      AlertStatusActive,
-		Tags:        make(map[string]string),
+		ID:       "test-alert",
+		Type:     AlertTypeViolation,
+		Severity: SeverityCritical,
+		SLAID:    "test-sla",
+		Title:    "Test Alert",
+		Message:  "This is a test alert",
+		Status:   AlertStatusActive,
+		Tags:     make(map[string]string),
 	}
 
 	// Store alert first
@@ -181,7 +181,7 @@ func TestSimpleSLAAlertManager_ChannelSeverityHandling(t *testing.T) {
 func TestSimpleSLAAlertManager_AlertHistory(t *testing.T) {
 	config := DefaultAlertManagerConfig()
 	config.MaxHistorySize = 3 // Small size for testing
-	
+
 	manager, err := NewSimpleSLAAlertManager(config)
 	require.NoError(t, err)
 
@@ -194,7 +194,7 @@ func TestSimpleSLAAlertManager_AlertHistory(t *testing.T) {
 			Title:    "Test Alert",
 			Message:  "This is a test alert",
 		}
-		
+
 		err = manager.SendAlert(alert)
 		assert.NoError(t, err)
 	}
@@ -243,7 +243,7 @@ func TestSimpleSLAAlertManager_AlertStatistics(t *testing.T) {
 
 	// Get statistics
 	stats := manager.GetAlertStatistics()
-	
+
 	assert.Equal(t, 4, stats["total_alerts"])
 	assert.Equal(t, 2, stats["active_alerts"])
 	assert.Equal(t, 2, stats["resolved_alerts"])
@@ -280,7 +280,7 @@ func TestSimpleSLAAlertManager_EmailFormatting(t *testing.T) {
 	}
 
 	emailBody := manager.formatEmailAlert(alert)
-	
+
 	// Check that key information is included
 	assert.Contains(t, emailBody, "Critical Service Down")
 	assert.Contains(t, emailBody, "CRITICAL")
@@ -381,14 +381,14 @@ func TestFileAlertStorage_SaveAndLoad(t *testing.T) {
 	storage := NewFileAlertStorage(tempDir)
 
 	alert := SLAAlert{
-		ID:          "test-alert",
-		Type:        AlertTypeViolation,
-		Severity:    SeverityCritical,
-		SLAID:       "test-sla",
-		Title:       "Test Alert",
-		Message:     "Test message",
-		Timestamp:   time.Now(),
-		Status:      AlertStatusActive,
+		ID:        "test-alert",
+		Type:      AlertTypeViolation,
+		Severity:  SeverityCritical,
+		SLAID:     "test-sla",
+		Title:     "Test Alert",
+		Message:   "Test message",
+		Timestamp: time.Now(),
+		Status:    AlertStatusActive,
 	}
 
 	// Test save

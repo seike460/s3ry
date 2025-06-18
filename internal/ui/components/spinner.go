@@ -12,18 +12,18 @@ type SpinnerTickMsg time.Time
 
 // Spinner represents a loading spinner component with 60fps optimization
 type Spinner struct {
-	frames   []string
-	current  int
-	message  string
-	active   bool
-	
+	frames  []string
+	current int
+	message string
+	active  bool
+
 	// Performance optimization for 60fps
-	frameRate      time.Duration
-	lastUpdate     time.Time
-	skipFrames     int
-	frameCounter   int
-	targetFPS      int
-	
+	frameRate    time.Duration
+	lastUpdate   time.Time
+	skipFrames   int
+	frameCounter int
+	targetFPS    int
+
 	// Styles
 	spinnerStyle lipgloss.Style
 	messageStyle lipgloss.Style
@@ -37,17 +37,17 @@ func NewSpinner(message string) *Spinner {
 		},
 		message: message,
 		active:  true,
-		
+
 		// 60fps optimization settings
-		targetFPS:   60,
-		frameRate:   time.Millisecond * 16, // ~60fps (16.67ms per frame)
-		lastUpdate:  time.Now(),
-		skipFrames:  0,
+		targetFPS:    60,
+		frameRate:    time.Millisecond * 16, // ~60fps (16.67ms per frame)
+		lastUpdate:   time.Now(),
+		skipFrames:   0,
 		frameCounter: 0,
-		
+
 		spinnerStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7D56F4")),
-		
+
 		messageStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFF")).
 			MarginLeft(1),
@@ -62,17 +62,17 @@ func NewDotSpinner(message string) *Spinner {
 		},
 		message: message,
 		active:  true,
-		
+
 		// 60fps optimization settings
-		targetFPS:   60,
-		frameRate:   time.Millisecond * 16, // ~60fps
-		lastUpdate:  time.Now(),
-		skipFrames:  0,
+		targetFPS:    60,
+		frameRate:    time.Millisecond * 16, // ~60fps
+		lastUpdate:   time.Now(),
+		skipFrames:   0,
 		frameCounter: 0,
-		
+
 		spinnerStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#04B575")),
-		
+
 		messageStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFF")),
 	}
@@ -84,24 +84,24 @@ func (s *Spinner) Update(msg tea.Msg) (*Spinner, tea.Cmd) {
 	case SpinnerTickMsg:
 		if s.active {
 			now := time.Now()
-			
+
 			// Frame rate control to maintain smooth 60fps
 			if now.Sub(s.lastUpdate) >= s.frameRate {
 				// Update frame only when enough time has passed
 				s.frameCounter++
-				
+
 				// Update spinner frame (slower animation for visual appeal)
 				if s.frameCounter%4 == 0 { // Update spinner every 4 frames
 					s.current = (s.current + 1) % len(s.frames)
 				}
-				
+
 				s.lastUpdate = now
 			}
-			
+
 			return s, s.tick()
 		}
 	}
-	
+
 	return s, nil
 }
 
@@ -110,10 +110,10 @@ func (s *Spinner) View() string {
 	if !s.active {
 		return ""
 	}
-	
+
 	frame := s.spinnerStyle.Render(s.frames[s.current])
 	message := s.messageStyle.Render(s.message)
-	
+
 	return frame + message
 }
 
@@ -159,11 +159,11 @@ func (s *Spinner) GetFrameRate() int {
 // GetPerformanceInfo returns performance statistics
 func (s *Spinner) GetPerformanceInfo() map[string]interface{} {
 	return map[string]interface{}{
-		"target_fps":     s.targetFPS,
-		"frame_rate_ms":  s.frameRate.Milliseconds(),
-		"frame_counter":  s.frameCounter,
-		"active":         s.active,
-		"current_frame":  s.current,
-		"total_frames":   len(s.frames),
+		"target_fps":    s.targetFPS,
+		"frame_rate_ms": s.frameRate.Milliseconds(),
+		"frame_counter": s.frameCounter,
+		"active":        s.active,
+		"current_frame": s.current,
+		"total_frames":  len(s.frames),
 	}
 }

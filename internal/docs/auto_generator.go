@@ -21,50 +21,50 @@ import (
 
 // AutoDocumentationGenerator は自動文書生成システム
 type AutoDocumentationGenerator struct {
-	config       *config.Config
-	outputDir    string
-	templateDir  string
-	packagePaths []string
-	docSections  map[string]*DocumentationSection
-	apiEndpoints map[string]*APIEndpoint
-	examples     map[string]*CodeExample
+	config             *config.Config
+	outputDir          string
+	templateDir        string
+	packagePaths       []string
+	docSections        map[string]*DocumentationSection
+	apiEndpoints       map[string]*APIEndpoint
+	examples           map[string]*CodeExample
 	performanceMetrics *PerformanceDocumentation
-	tutorials    []*Tutorial
-	changelogs   []*ChangelogEntry
+	tutorials          []*Tutorial
+	changelogs         []*ChangelogEntry
 }
 
 // DocumentationSection は文書セクション
 type DocumentationSection struct {
-	ID          string                 `json:"id"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Order       int                    `json:"order"`
-	Content     string                 `json:"content"`
+	ID          string                  `json:"id"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description"`
+	Order       int                     `json:"order"`
+	Content     string                  `json:"content"`
 	Subsections []*DocumentationSection `json:"subsections,omitempty"`
-	Examples    []*CodeExample         `json:"examples,omitempty"`
-	APIRefs     []string               `json:"api_refs,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	LastUpdated time.Time              `json:"last_updated"`
+	Examples    []*CodeExample          `json:"examples,omitempty"`
+	APIRefs     []string                `json:"api_refs,omitempty"`
+	Metadata    map[string]interface{}  `json:"metadata,omitempty"`
+	Tags        []string                `json:"tags,omitempty"`
+	LastUpdated time.Time               `json:"last_updated"`
 }
 
 // APIEndpoint はAPIエンドポイント情報
 type APIEndpoint struct {
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	Method       string                 `json:"method"`
-	Path         string                 `json:"path"`
-	Description  string                 `json:"description"`
-	Parameters   []*Parameter           `json:"parameters,omitempty"`
-	RequestBody  *RequestBodySpec       `json:"request_body,omitempty"`
-	Responses    map[string]*Response   `json:"responses"`
-	Examples     []*APIExample          `json:"examples,omitempty"`
-	Performance  *PerformanceInfo       `json:"performance,omitempty"`
-	Security     []string               `json:"security,omitempty"`
-	Tags         []string               `json:"tags,omitempty"`
-	Deprecated   bool                   `json:"deprecated,omitempty"`
-	Since        string                 `json:"since,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Method      string                 `json:"method"`
+	Path        string                 `json:"path"`
+	Description string                 `json:"description"`
+	Parameters  []*Parameter           `json:"parameters,omitempty"`
+	RequestBody *RequestBodySpec       `json:"request_body,omitempty"`
+	Responses   map[string]*Response   `json:"responses"`
+	Examples    []*APIExample          `json:"examples,omitempty"`
+	Performance *PerformanceInfo       `json:"performance,omitempty"`
+	Security    []string               `json:"security,omitempty"`
+	Tags        []string               `json:"tags,omitempty"`
+	Deprecated  bool                   `json:"deprecated,omitempty"`
+	Since       string                 `json:"since,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Parameter はAPIパラメーター
@@ -98,10 +98,10 @@ type RequestBodySpec struct {
 
 // MediaTypeSpec はメディアタイプ仕様
 type MediaTypeSpec struct {
-	Schema   *Schema                `json:"schema"`
-	Example  interface{}            `json:"example,omitempty"`
-	Examples map[string]*Example    `json:"examples,omitempty"`
-	Encoding map[string]*Encoding   `json:"encoding,omitempty"`
+	Schema   *Schema              `json:"schema"`
+	Example  interface{}          `json:"example,omitempty"`
+	Examples map[string]*Example  `json:"examples,omitempty"`
+	Encoding map[string]*Encoding `json:"encoding,omitempty"`
 }
 
 // Schema はデータスキーマ
@@ -138,10 +138,10 @@ type Example struct {
 
 // Encoding はエンコーディング情報
 type Encoding struct {
-	ContentType string            `json:"content_type,omitempty"`
+	ContentType string             `json:"content_type,omitempty"`
 	Headers     map[string]*Header `json:"headers,omitempty"`
-	Style       string            `json:"style,omitempty"`
-	Explode     bool              `json:"explode,omitempty"`
+	Style       string             `json:"style,omitempty"`
+	Explode     bool               `json:"explode,omitempty"`
 }
 
 // APIExample はAPI使用例
@@ -166,9 +166,9 @@ type ExampleRequest struct {
 
 // ExampleResponse はレスポンス例
 type ExampleResponse struct {
-	Status  int                `json:"status"`
-	Headers map[string]string  `json:"headers,omitempty"`
-	Body    interface{}        `json:"body,omitempty"`
+	Status  int               `json:"status"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Body    interface{}       `json:"body,omitempty"`
 }
 
 // CodeExample はコード例
@@ -196,58 +196,58 @@ type PerformanceInfo struct {
 
 // PerformanceDocumentation はパフォーマンス文書
 type PerformanceDocumentation struct {
-	OverallImprovement float64                        `json:"overall_improvement"`
-	BenchmarkResults   map[string]*BenchmarkResult    `json:"benchmark_results"`
-	Optimizations      []*OptimizationTechnique       `json:"optimizations"`
-	PerformanceTips    []*PerformanceTip              `json:"performance_tips"`
+	OverallImprovement float64                           `json:"overall_improvement"`
+	BenchmarkResults   map[string]*BenchmarkResult       `json:"benchmark_results"`
+	Optimizations      []*OptimizationTechnique          `json:"optimizations"`
+	PerformanceTips    []*PerformanceTip                 `json:"performance_tips"`
 	Comparisons        map[string]*PerformanceComparison `json:"comparisons"`
-	Metrics            *PerformanceMetrics            `json:"metrics"`
+	Metrics            *PerformanceMetrics               `json:"metrics"`
 }
 
 // BenchmarkResult はベンチマーク結果
 type BenchmarkResult struct {
-	Name               string                 `json:"name"`
-	Description        string                 `json:"description"`
-	TraditionalTool    *BenchmarkMetric       `json:"traditional_tool"`
-	S3ry               *BenchmarkMetric       `json:"s3ry"`
-	ImprovementFactor  float64                `json:"improvement_factor"`
-	TestConditions     map[string]interface{} `json:"test_conditions"`
-	LastUpdated        time.Time              `json:"last_updated"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	TraditionalTool   *BenchmarkMetric       `json:"traditional_tool"`
+	S3ry              *BenchmarkMetric       `json:"s3ry"`
+	ImprovementFactor float64                `json:"improvement_factor"`
+	TestConditions    map[string]interface{} `json:"test_conditions"`
+	LastUpdated       time.Time              `json:"last_updated"`
 }
 
 // BenchmarkMetric はベンチマーク指標
 type BenchmarkMetric struct {
-	Duration       time.Duration `json:"duration"`
-	Throughput     float64       `json:"throughput_mbps"`
-	MemoryUsage    int64         `json:"memory_usage_mb"`
-	CPUUsage       float64       `json:"cpu_usage_percent"`
-	ErrorRate      float64       `json:"error_rate_percent"`
-	SuccessRate    float64       `json:"success_rate_percent"`
+	Duration    time.Duration `json:"duration"`
+	Throughput  float64       `json:"throughput_mbps"`
+	MemoryUsage int64         `json:"memory_usage_mb"`
+	CPUUsage    float64       `json:"cpu_usage_percent"`
+	ErrorRate   float64       `json:"error_rate_percent"`
+	SuccessRate float64       `json:"success_rate_percent"`
 }
 
 // OptimizationTechnique は最適化技法
 type OptimizationTechnique struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Category    string   `json:"category"`
-	Impact      string   `json:"impact"`
-	Implementation string `json:"implementation"`
-	Benefits    []string `json:"benefits"`
-	Drawbacks   []string `json:"drawbacks,omitempty"`
-	UseCases    []string `json:"use_cases"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	Impact         string   `json:"impact"`
+	Implementation string   `json:"implementation"`
+	Benefits       []string `json:"benefits"`
+	Drawbacks      []string `json:"drawbacks,omitempty"`
+	UseCases       []string `json:"use_cases"`
 }
 
 // PerformanceTip はパフォーマンスチップ
 type PerformanceTip struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Category    string   `json:"category"`
-	Priority    string   `json:"priority"`
-	Steps       []string `json:"steps"`
-	Example     string   `json:"example,omitempty"`
-	ExpectedGain string  `json:"expected_gain"`
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	Category     string   `json:"category"`
+	Priority     string   `json:"priority"`
+	Steps        []string `json:"steps"`
+	Example      string   `json:"example,omitempty"`
+	ExpectedGain string   `json:"expected_gain"`
 }
 
 // PerformanceComparison はパフォーマンス比較
@@ -263,43 +263,43 @@ type PerformanceComparison struct {
 
 // PerformanceMetrics はパフォーマンス指標
 type PerformanceMetrics struct {
-	TotalOperations     int64   `json:"total_operations"`
-	AverageThroughput   float64 `json:"average_throughput_mbps"`
-	PeakThroughput      float64 `json:"peak_throughput_mbps"`
-	TotalDataTransfer   int64   `json:"total_data_transfer_gb"`
-	AverageLatency      float64 `json:"average_latency_ms"`
-	SuccessRate         float64 `json:"success_rate_percent"`
-	UptimePercentage    float64 `json:"uptime_percentage"`
-	LastUpdated         time.Time `json:"last_updated"`
+	TotalOperations   int64     `json:"total_operations"`
+	AverageThroughput float64   `json:"average_throughput_mbps"`
+	PeakThroughput    float64   `json:"peak_throughput_mbps"`
+	TotalDataTransfer int64     `json:"total_data_transfer_gb"`
+	AverageLatency    float64   `json:"average_latency_ms"`
+	SuccessRate       float64   `json:"success_rate_percent"`
+	UptimePercentage  float64   `json:"uptime_percentage"`
+	LastUpdated       time.Time `json:"last_updated"`
 }
 
 // Tutorial はチュートリアル
 type Tutorial struct {
-	ID          string                 `json:"id"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Level       string                 `json:"level"` // "beginner", "intermediate", "advanced"
-	EstimatedTime string               `json:"estimated_time"`
-	Prerequisites []string             `json:"prerequisites,omitempty"`
-	Steps       []*TutorialStep        `json:"steps"`
-	Resources   []*TutorialResource    `json:"resources,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID            string                 `json:"id"`
+	Title         string                 `json:"title"`
+	Description   string                 `json:"description"`
+	Level         string                 `json:"level"` // "beginner", "intermediate", "advanced"
+	EstimatedTime string                 `json:"estimated_time"`
+	Prerequisites []string               `json:"prerequisites,omitempty"`
+	Steps         []*TutorialStep        `json:"steps"`
+	Resources     []*TutorialResource    `json:"resources,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 // TutorialStep はチュートリアルステップ
 type TutorialStep struct {
-	Number      int          `json:"number"`
-	Title       string       `json:"title"`
-	Description string       `json:"description"`
-	Code        string       `json:"code,omitempty"`
-	Output      string       `json:"output,omitempty"`
-	Explanation string       `json:"explanation,omitempty"`
-	Tips        []string     `json:"tips,omitempty"`
-	Warnings    []string     `json:"warnings,omitempty"`
-	NextSteps   []string     `json:"next_steps,omitempty"`
+	Number      int      `json:"number"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Code        string   `json:"code,omitempty"`
+	Output      string   `json:"output,omitempty"`
+	Explanation string   `json:"explanation,omitempty"`
+	Tips        []string `json:"tips,omitempty"`
+	Warnings    []string `json:"warnings,omitempty"`
+	NextSteps   []string `json:"next_steps,omitempty"`
 }
 
 // TutorialResource はチュートリアルリソース
@@ -507,10 +507,10 @@ func (g *AutoDocumentationGenerator) extractTypeDocumentation(t *doc.Type, filen
 // extractAPIEndpoint はAPIエンドポイントを抽出
 func (g *AutoDocumentationGenerator) extractAPIEndpoint(f *doc.Func, filename string) {
 	endpointID := strings.ToLower(f.Name)
-	
+
 	// コメントからHTTPメソッドとパスを抽出
 	method, path := g.parseHTTPInfo(f.Doc)
-	
+
 	g.apiEndpoints[endpointID] = &APIEndpoint{
 		ID:          endpointID,
 		Name:        f.Name,
@@ -523,7 +523,7 @@ func (g *AutoDocumentationGenerator) extractAPIEndpoint(f *doc.Func, filename st
 				Content: map[string]*MediaTypeSpec{
 					"application/json": {
 						Schema: &Schema{
-							Type: "object",
+							Type:        "object",
 							Description: "Successful response",
 						},
 					},
@@ -535,8 +535,8 @@ func (g *AutoDocumentationGenerator) extractAPIEndpoint(f *doc.Func, filename st
 			Throughput:        "143,309 MB/s",
 			ImprovementFactor: 271615.44,
 		},
-		Tags:     g.extractTags(f.Doc),
-		Since:    g.config.Version,
+		Tags:  g.extractTags(f.Doc),
+		Since: g.config.Version,
 	}
 }
 
@@ -614,11 +614,11 @@ func (g *AutoDocumentationGenerator) generateTutorials() error {
 func (g *AutoDocumentationGenerator) writeFile(relativePath, content string) error {
 	fullPath := filepath.Join(g.outputDir, relativePath)
 	dir := filepath.Dir(fullPath)
-	
+
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(fullPath, []byte(content), 0644)
 }
 
@@ -699,7 +699,7 @@ These optimizations translate to:
 - **Better user experience** across all operations
 
 *Last updated: %s*
-`, 
+`,
 		g.performanceMetrics.OverallImprovement,
 		g.performanceMetrics.Metrics.AverageThroughput,
 		g.performanceMetrics.Metrics.PeakThroughput,
@@ -714,14 +714,14 @@ These optimizations translate to:
 func (g *AutoDocumentationGenerator) generateCodeExamples() error {
 	// 基本的なコード例を生成
 	g.initializeCodeExamples()
-	
+
 	for _, example := range g.examples {
 		content := g.generateCodeExampleContent(example)
 		if err := g.writeFile(fmt.Sprintf("examples/%s/%s.md", example.Language, example.ID), content); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -758,13 +758,13 @@ Setup and configuration options
 
 ### Quick Start
 
-\`\`\`bash
+`+"```bash"+`
 # Install S3ry
 curl -sSL https://install.s3ry.dev | bash
 
 # Start with ultra performance
 s3ry upload large-file.dat s3://my-bucket/ --performance maximum
-\`\`\`
+`+"```"+`
 
 ### Support
 
@@ -775,7 +775,7 @@ s3ry upload large-file.dat s3://my-bucket/ --performance maximum
 *Generated automatically with S3ry Documentation Generator*
 *Last updated: %s*
 `, time.Now().Format(time.RFC3339))
-	
+
 	return g.writeFile("index.md", content)
 }
 
@@ -800,18 +800,18 @@ func (g *AutoDocumentationGenerator) generateOpenAPISpec() error {
 		"paths":      g.generateOpenAPIPaths(),
 		"components": g.generateOpenAPIComponents(),
 	}
-	
+
 	data, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	return g.writeFile("api/openapi.json", string(data))
 }
 
 func (g *AutoDocumentationGenerator) generateOpenAPIPaths() map[string]interface{} {
 	paths := make(map[string]interface{})
-	
+
 	for _, endpoint := range g.apiEndpoints {
 		pathItem := map[string]interface{}{
 			strings.ToLower(endpoint.Method): map[string]interface{}{
@@ -821,14 +821,14 @@ func (g *AutoDocumentationGenerator) generateOpenAPIPaths() map[string]interface
 				"tags":        endpoint.Tags,
 			},
 		}
-		
+
 		if endpoint.Performance != nil {
 			pathItem[strings.ToLower(endpoint.Method)].(map[string]interface{})["x-performance"] = endpoint.Performance
 		}
-		
+
 		paths[endpoint.Path] = pathItem
 	}
-	
+
 	return paths
 }
 
@@ -889,12 +889,12 @@ func main() {
     fmt.Printf("Upload completed: %s (%.2fx improvement)\n", 
         result.Duration, result.ImprovementFactor)
 }`,
-		Output:   "Upload completed: 165µs (271,615x improvement)",
-		Category: "basic",
+		Output:     "Upload completed: 165µs (271,615x improvement)",
+		Category:   "basic",
 		Difficulty: "beginner",
-		Tags:     []string{"upload", "performance", "go"},
+		Tags:       []string{"upload", "performance", "go"},
 	}
-	
+
 	// JavaScript examples
 	g.examples["js_download"] = &CodeExample{
 		ID:          "js_download",
@@ -917,19 +917,19 @@ async function downloadWithProgress() {
     });
     
     download.on('progress', (progress) => {
-        console.log(\`Progress: \${progress.percentage}% (\${progress.speed} MB/s)\`);
+        console.log('Progress: ' + progress.percentage + '% (' + progress.speed + ' MB/s)');
     });
     
     const result = await download.promise();
-    console.log(\`Download completed in \${result.duration}ms\`);
-    console.log(\`Throughput: \${result.throughput} MB/s\`);
+    console.log('Download completed in ' + result.duration + 'ms');
+    console.log('Throughput: ' + result.throughput + ' MB/s');
 }
 
 downloadWithProgress().catch(console.error);`,
-		Output:   "Progress: 100% (143,309 MB/s)\nDownload completed in 165ms\nThroughput: 143,309 MB/s",
-		Category: "advanced",
+		Output:     "Progress: 100% (143,309 MB/s)\nDownload completed in 165ms\nThroughput: 143,309 MB/s",
+		Category:   "advanced",
 		Difficulty: "intermediate",
-		Tags:     []string{"download", "progress", "javascript"},
+		Tags:       []string{"download", "progress", "javascript"},
 	}
 }
 
@@ -940,15 +940,15 @@ func (g *AutoDocumentationGenerator) generateCodeExampleContent(example *CodeExa
 
 ## Code
 
-\`\`\`%s
+`+"```%s"+`
 %s
-\`\`\`
+`+"```"+`
 
 ## Expected Output
 
-\`\`\`
+`+"```"+`
 %s
-\`\`\`
+`+"```"+`
 
 ## Details
 
@@ -961,7 +961,7 @@ func (g *AutoDocumentationGenerator) generateCodeExampleContent(example *CodeExa
 This example demonstrates S3ry's revolutionary 271,615x performance improvement over traditional S3 tools.
 
 *Last updated: %s*
-`, 
+`,
 		example.Title,
 		example.Description,
 		example.Language,
@@ -976,10 +976,10 @@ This example demonstrates S3ry's revolutionary 271,615x performance improvement 
 
 func (g *AutoDocumentationGenerator) initializeTutorials() {
 	g.tutorials = append(g.tutorials, &Tutorial{
-		ID:          "getting-started",
-		Title:       "Getting Started with S3ry",
-		Description: "Learn how to use S3ry for ultra-high performance S3 operations",
-		Level:       "beginner",
+		ID:            "getting-started",
+		Title:         "Getting Started with S3ry",
+		Description:   "Learn how to use S3ry for ultra-high performance S3 operations",
+		Level:         "beginner",
 		EstimatedTime: "15 minutes",
 		Prerequisites: []string{"Basic command line knowledge", "AWS credentials configured"},
 		Steps: []*TutorialStep{
@@ -1009,11 +1009,11 @@ func (g *AutoDocumentationGenerator) initializeTutorials() {
 
 func (g *AutoDocumentationGenerator) generateTutorialContent(tutorial *Tutorial) string {
 	var content strings.Builder
-	
+
 	content.WriteString(fmt.Sprintf("# %s\n\n", tutorial.Title))
 	content.WriteString(fmt.Sprintf("%s\n\n", tutorial.Description))
 	content.WriteString(fmt.Sprintf("**Level**: %s | **Estimated Time**: %s\n\n", tutorial.Level, tutorial.EstimatedTime))
-	
+
 	if len(tutorial.Prerequisites) > 0 {
 		content.WriteString("## Prerequisites\n\n")
 		for _, prereq := range tutorial.Prerequisites {
@@ -1021,28 +1021,28 @@ func (g *AutoDocumentationGenerator) generateTutorialContent(tutorial *Tutorial)
 		}
 		content.WriteString("\n")
 	}
-	
+
 	content.WriteString("## Steps\n\n")
 	for _, step := range tutorial.Steps {
 		content.WriteString(fmt.Sprintf("### %d. %s\n\n", step.Number, step.Title))
 		content.WriteString(fmt.Sprintf("%s\n\n", step.Description))
-		
+
 		if step.Code != "" {
 			content.WriteString("```bash\n")
 			content.WriteString(step.Code)
 			content.WriteString("\n```\n\n")
 		}
-		
+
 		if step.Output != "" {
 			content.WriteString("**Expected Output:**\n```\n")
 			content.WriteString(step.Output)
 			content.WriteString("\n```\n\n")
 		}
-		
+
 		if step.Explanation != "" {
 			content.WriteString(fmt.Sprintf("**Explanation**: %s\n\n", step.Explanation))
 		}
-		
+
 		if len(step.Tips) > 0 {
 			content.WriteString("**Tips:**\n")
 			for _, tip := range step.Tips {
@@ -1051,29 +1051,29 @@ func (g *AutoDocumentationGenerator) generateTutorialContent(tutorial *Tutorial)
 			content.WriteString("\n")
 		}
 	}
-	
+
 	content.WriteString(fmt.Sprintf("*Last updated: %s*\n", time.Now().Format(time.RFC3339)))
-	
+
 	return content.String()
 }
 
 func (g *AutoDocumentationGenerator) generateTutorialIndex() string {
 	var content strings.Builder
-	
+
 	content.WriteString("# S3ry Tutorials\n\n")
 	content.WriteString("Learn S3ry step by step with our comprehensive tutorials.\n\n")
-	
+
 	// Group tutorials by level
 	levels := map[string][]*Tutorial{
 		"beginner":     {},
 		"intermediate": {},
 		"advanced":     {},
 	}
-	
+
 	for _, tutorial := range g.tutorials {
 		levels[tutorial.Level] = append(levels[tutorial.Level], tutorial)
 	}
-	
+
 	for level, tutorials := range levels {
 		if len(tutorials) > 0 {
 			content.WriteString(fmt.Sprintf("## %s Level\n\n", strings.Title(level)))
@@ -1084,6 +1084,6 @@ func (g *AutoDocumentationGenerator) generateTutorialIndex() string {
 			}
 		}
 	}
-	
+
 	return content.String()
 }

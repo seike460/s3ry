@@ -1,0 +1,17 @@
+{
+  "id": "test-alert",
+  "type": "VIOLATION",
+  "severity": "CRITICAL",
+  "sla_id": "test-sla",
+  "violation_id": "",
+  "title": "Test Alert",
+  "message": "This is a test alert",
+  "timestamp": "0001-01-01T00:00:00Z",
+  "recipients": null,
+  "channels": null,
+  "tags": {
+    "resolved_at": "2025-06-18T08:36:14+09:00",
+    "resolved_by": "test-user"
+  },
+  "status": "RESOLVED"
+}

@@ -13,14 +13,14 @@ import (
 
 // DashboardServer provides a centralized management dashboard
 type DashboardServer struct {
-	config         *DashboardConfig
-	server         *http.Server
-	metrics        *SystemMetrics
-	templates      *template.Template
-	websockets     map[string]*WebSocketConnection
-	wsLock         sync.RWMutex
-	alertManager   AlertManager
-	systemMonitor  *SystemMonitor
+	config        *DashboardConfig
+	server        *http.Server
+	metrics       *SystemMetrics
+	templates     *template.Template
+	websockets    map[string]*WebSocketConnection
+	wsLock        sync.RWMutex
+	alertManager  AlertManager
+	systemMonitor *SystemMonitor
 }
 
 // DashboardConfig holds dashboard configuration
@@ -54,44 +54,44 @@ func DefaultDashboardConfig() *DashboardConfig {
 // SystemMetrics holds comprehensive system metrics
 type SystemMetrics struct {
 	// Performance Metrics
-	RequestsPerSecond   float64           `json:"requests_per_second"`
-	AverageLatency      time.Duration     `json:"average_latency"`
-	ErrorRate           float64           `json:"error_rate"`
-	Throughput          float64           `json:"throughput"`
-	
+	RequestsPerSecond float64       `json:"requests_per_second"`
+	AverageLatency    time.Duration `json:"average_latency"`
+	ErrorRate         float64       `json:"error_rate"`
+	Throughput        float64       `json:"throughput"`
+
 	// Resource Metrics
-	CPUUsage            float64           `json:"cpu_usage"`
-	MemoryUsage         float64           `json:"memory_usage"`
-	DiskUsage           float64           `json:"disk_usage"`
-	NetworkIO           NetworkStats      `json:"network_io"`
-	
+	CPUUsage    float64      `json:"cpu_usage"`
+	MemoryUsage float64      `json:"memory_usage"`
+	DiskUsage   float64      `json:"disk_usage"`
+	NetworkIO   NetworkStats `json:"network_io"`
+
 	// S3 Metrics
-	S3Operations        S3OperationStats  `json:"s3_operations"`
-	S3Errors            map[string]int64  `json:"s3_errors"`
-	
+	S3Operations S3OperationStats `json:"s3_operations"`
+	S3Errors     map[string]int64 `json:"s3_errors"`
+
 	// Security Metrics
-	AuthenticationStats AuthStats         `json:"authentication_stats"`
-	SecurityAlerts      []SecurityAlert   `json:"security_alerts"`
-	
+	AuthenticationStats AuthStats       `json:"authentication_stats"`
+	SecurityAlerts      []SecurityAlert `json:"security_alerts"`
+
 	// System Health
 	ServiceStatus       map[string]string `json:"service_status"`
 	DatabaseConnections int               `json:"database_connections"`
 	QueueSizes          map[string]int    `json:"queue_sizes"`
-	
+
 	// Business Metrics
-	ActiveUsers         int64             `json:"active_users"`
-	DataTransferred     int64             `json:"data_transferred"`
-	CostMetrics         CostBreakdown     `json:"cost_metrics"`
-	
-	LastUpdated         time.Time         `json:"last_updated"`
-	mutex               sync.RWMutex
+	ActiveUsers     int64         `json:"active_users"`
+	DataTransferred int64         `json:"data_transferred"`
+	CostMetrics     CostBreakdown `json:"cost_metrics"`
+
+	LastUpdated time.Time `json:"last_updated"`
+	mutex       sync.RWMutex
 }
 
 // NetworkStats holds network I/O statistics
 type NetworkStats struct {
-	BytesIn  int64 `json:"bytes_in"`
-	BytesOut int64 `json:"bytes_out"`
-	PacketsIn int64 `json:"packets_in"`
+	BytesIn    int64 `json:"bytes_in"`
+	BytesOut   int64 `json:"bytes_out"`
+	PacketsIn  int64 `json:"packets_in"`
 	PacketsOut int64 `json:"packets_out"`
 }
 
@@ -113,24 +113,24 @@ type AuthStats struct {
 
 // SecurityAlert represents a security alert
 type SecurityAlert struct {
-	ID          string    `json:"id"`
-	Timestamp   time.Time `json:"timestamp"`
-	Severity    string    `json:"severity"`
-	Type        string    `json:"type"`
-	Message     string    `json:"message"`
-	UserID      string    `json:"user_id,omitempty"`
-	IPAddress   string    `json:"ip_address,omitempty"`
-	Resolved    bool      `json:"resolved"`
+	ID        string    `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	Severity  string    `json:"severity"`
+	Type      string    `json:"type"`
+	Message   string    `json:"message"`
+	UserID    string    `json:"user_id,omitempty"`
+	IPAddress string    `json:"ip_address,omitempty"`
+	Resolved  bool      `json:"resolved"`
 }
 
 // CostBreakdown holds cost analysis data
 type CostBreakdown struct {
-	S3Storage     float64 `json:"s3_storage"`
-	S3Requests    float64 `json:"s3_requests"`
-	DataTransfer  float64 `json:"data_transfer"`
-	Compute       float64 `json:"compute"`
-	TotalCost     float64 `json:"total_cost"`
-	Currency      string  `json:"currency"`
+	S3Storage    float64 `json:"s3_storage"`
+	S3Requests   float64 `json:"s3_requests"`
+	DataTransfer float64 `json:"data_transfer"`
+	Compute      float64 `json:"compute"`
+	TotalCost    float64 `json:"total_cost"`
+	Currency     string  `json:"currency"`
 }
 
 // WebSocketConnection represents a WebSocket connection
@@ -177,24 +177,24 @@ const (
 type AlertStatus string
 
 const (
-	AlertStatusActive      AlertStatus = "ACTIVE"
+	AlertStatusActive       AlertStatus = "ACTIVE"
 	AlertStatusAcknowledged AlertStatus = "ACKNOWLEDGED"
-	AlertStatusResolved    AlertStatus = "RESOLVED"
+	AlertStatusResolved     AlertStatus = "RESOLVED"
 )
 
 // SystemMonitor monitors system health and performance
 type SystemMonitor struct {
-	config   *MonitorConfig
-	metrics  *SystemMetrics
-	stopCh   chan struct{}
-	running  bool
-	mutex    sync.RWMutex
+	config  *MonitorConfig
+	metrics *SystemMetrics
+	stopCh  chan struct{}
+	running bool
+	mutex   sync.RWMutex
 }
 
 // MonitorConfig holds monitoring configuration
 type MonitorConfig struct {
-	CollectionInterval time.Duration `json:"collection_interval"`
-	RetentionPeriod    time.Duration `json:"retention_period"`
+	CollectionInterval time.Duration      `json:"collection_interval"`
+	RetentionPeriod    time.Duration      `json:"retention_period"`
 	AlertThresholds    map[string]float64 `json:"alert_thresholds"`
 }
 
@@ -205,10 +205,10 @@ func NewDashboardServer(config *DashboardConfig) (*DashboardServer, error) {
 	}
 
 	server := &DashboardServer{
-		config:      config,
-		metrics:     NewSystemMetrics(),
-		websockets:  make(map[string]*WebSocketConnection),
-		alertManager: NewSimpleAlertManager(),
+		config:        config,
+		metrics:       NewSystemMetrics(),
+		websockets:    make(map[string]*WebSocketConnection),
+		alertManager:  NewSimpleAlertManager(),
 		systemMonitor: NewSystemMonitor(),
 	}
 
@@ -232,11 +232,11 @@ func NewDashboardServer(config *DashboardConfig) (*DashboardServer, error) {
 // NewSystemMetrics creates a new system metrics instance
 func NewSystemMetrics() *SystemMetrics {
 	return &SystemMetrics{
-		S3Errors:      make(map[string]int64),
-		ServiceStatus: make(map[string]string),
-		QueueSizes:    make(map[string]int),
+		S3Errors:       make(map[string]int64),
+		ServiceStatus:  make(map[string]string),
+		QueueSizes:     make(map[string]int),
 		SecurityAlerts: make([]SecurityAlert, 0),
-		LastUpdated:   time.Now(),
+		LastUpdated:    time.Now(),
 	}
 }
 
@@ -521,12 +521,12 @@ func (d *DashboardServer) loadTemplates() error {
 func (d *DashboardServer) setupRoutes(mux *http.ServeMux) {
 	// Main dashboard
 	mux.HandleFunc("/", d.authMiddleware(d.handleDashboard))
-	
+
 	// API endpoints
 	mux.HandleFunc("/api/metrics", d.authMiddleware(d.handleAPIMetrics))
 	mux.HandleFunc("/api/alerts", d.authMiddleware(d.handleAPIAlerts))
 	mux.HandleFunc("/api/health", d.handleAPIHealth)
-	
+
 	// Management endpoints
 	mux.HandleFunc("/api/users", d.authMiddleware(d.handleAPIUsers))
 	mux.HandleFunc("/api/settings", d.authMiddleware(d.handleAPISettings))
@@ -588,7 +588,7 @@ func (d *DashboardServer) handleAPIMetrics(w http.ResponseWriter, r *http.Reques
 // handleAPIAlerts serves alerts as JSON
 func (d *DashboardServer) handleAPIAlerts(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	switch r.Method {
 	case "GET":
 		json.NewEncoder(w).Encode(d.alertManager.GetActiveAlerts())
@@ -614,9 +614,9 @@ func (d *DashboardServer) handleAPIHealth(w http.ResponseWriter, r *http.Request
 		"timestamp": time.Now(),
 		"version":   "2.0.0",
 		"services": map[string]string{
-			"dashboard":    "healthy",
-			"security":     "healthy",
-			"monitoring":   "healthy",
+			"dashboard":  "healthy",
+			"security":   "healthy",
+			"monitoring": "healthy",
 		},
 	}
 
@@ -661,7 +661,7 @@ func (s *SystemMonitor) Start(ctx context.Context) error {
 func (s *SystemMonitor) Stop() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	
+
 	if s.running {
 		close(s.stopCh)
 		s.running = false

@@ -1,0 +1,14 @@
+{
+  "id": "alert_1750201650676100000",
+  "type": "VIOLATION",
+  "severity": "CRITICAL",
+  "sla_id": "test-sla",
+  "violation_id": "",
+  "title": "Test Alert",
+  "message": "This is a test alert",
+  "timestamp": "2025-06-18T08:07:30.6761+09:00",
+  "recipients": null,
+  "channels": null,
+  "tags": null,
+  "status": "ACTIVE"
+}

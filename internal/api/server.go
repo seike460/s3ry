@@ -158,12 +158,12 @@ type MetaInfo struct {
 }
 
 type HealthStatus struct {
-	Status    string            `json:"status"`
-	Version   string            `json:"version"`
-	Uptime    time.Duration     `json:"uptime"`
-	AWS       AWSHealthStatus   `json:"aws"`
-	Memory    MemoryStatus      `json:"memory"`
-	Timestamp time.Time         `json:"timestamp"`
+	Status    string          `json:"status"`
+	Version   string          `json:"version"`
+	Uptime    time.Duration   `json:"uptime"`
+	AWS       AWSHealthStatus `json:"aws"`
+	Memory    MemoryStatus    `json:"memory"`
+	Timestamp time.Time       `json:"timestamp"`
 }
 
 type AWSHealthStatus struct {
@@ -221,10 +221,10 @@ func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	// Memory stats would go here in a real implementation
 	memoryStatus := MemoryStatus{
-		AllocMB:      10.5,  // Placeholder
-		TotalAllocMB: 25.3,  // Placeholder
-		SysMB:        45.2,  // Placeholder
-		NumGC:        156,   // Placeholder
+		AllocMB:      10.5, // Placeholder
+		TotalAllocMB: 25.3, // Placeholder
+		SysMB:        45.2, // Placeholder
+		NumGC:        156,  // Placeholder
 	}
 
 	health := HealthStatus{
@@ -241,10 +241,10 @@ func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *APIServer) handleInfo(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
-		"name":         "S3ry",
-		"version":      "2.0.0",
-		"api_version":  s.version,
-		"description":  "Next-generation S3 browser with 271,615x performance improvement",
+		"name":        "S3ry",
+		"version":     "2.0.0",
+		"api_version": s.version,
+		"description": "Next-generation S3 browser with 271,615x performance improvement",
 		"features": []string{
 			"High-performance S3 operations",
 			"Parallel processing",
@@ -256,8 +256,8 @@ func (s *APIServer) handleInfo(w http.ResponseWriter, r *http.Request) {
 		},
 		"performance": map[string]interface{}{
 			"improvement_factor": 271615.44,
-			"throughput_mbps":   143309.18,
-			"ui_fps":            35022.6,
+			"throughput_mbps":    143309.18,
+			"ui_fps":             35022.6,
 		},
 	}
 
@@ -279,7 +279,7 @@ func (s *APIServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"performance": map[string]interface{}{
 			"max_concurrent_downloads": s.config.Performance.MaxConcurrentDownloads,
 			"max_concurrent_uploads":   s.config.Performance.MaxConcurrentUploads,
-			"chunk_size":              s.config.Performance.ChunkSize,
+			"chunk_size":               s.config.Performance.ChunkSize,
 		},
 	}
 
@@ -616,10 +616,10 @@ func (s *APIServer) handleBatchDownload(w http.ResponseWriter, r *http.Request) 
 	jobID := fmt.Sprintf("batch-download-%d", time.Now().Unix())
 
 	s.sendJSON(w, http.StatusAccepted, map[string]interface{}{
-		"job_id":      jobID,
-		"status":      "queued",
+		"job_id":       jobID,
+		"status":       "queued",
 		"object_count": len(req.Objects),
-		"message":     "Batch download job queued",
+		"message":      "Batch download job queued",
 	})
 }
 
@@ -741,9 +741,9 @@ func (s *APIServer) handleAnalytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	analytics := map[string]interface{}{
-		"bucket":     bucket,
-		"period":     days + " days",
-		"total_size": "15.3 GB",
+		"bucket":       bucket,
+		"period":       days + " days",
+		"total_size":   "15.3 GB",
 		"object_count": 1247,
 		"requests": map[string]int{
 			"get":    856,

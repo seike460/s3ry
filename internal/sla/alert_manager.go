@@ -21,11 +21,11 @@ type SimpleSLAAlertManager struct {
 
 // AlertManagerConfig holds alert manager configuration
 type AlertManagerConfig struct {
-	Enabled          bool          `json:"enabled"`
-	ConfigDir        string        `json:"config_dir"`
-	HistoryRetention time.Duration `json:"history_retention"`
-	MaxHistorySize   int           `json:"max_history_size"`
-	DefaultChannels  []ChannelType `json:"default_channels"`
+	Enabled          bool            `json:"enabled"`
+	ConfigDir        string          `json:"config_dir"`
+	HistoryRetention time.Duration   `json:"history_retention"`
+	MaxHistorySize   int             `json:"max_history_size"`
+	DefaultChannels  []ChannelType   `json:"default_channels"`
 	RateLimiting     RateLimitConfig `json:"rate_limiting"`
 }
 
@@ -305,11 +305,11 @@ func (s *SimpleSLAAlertManager) SendAlert(alert SLAAlert) error {
 // isRateLimited checks if an alert should be rate limited
 func (s *SimpleSLAAlertManager) isRateLimited(alert SLAAlert) bool {
 	now := time.Now()
-	
+
 	// Count recent alerts
 	recentAlerts := 0
 	hourlyAlerts := 0
-	
+
 	for _, histAlert := range s.alertHistory {
 		if histAlert.SLAID == alert.SLAID {
 			if now.Sub(histAlert.Timestamp) < time.Minute {
@@ -322,7 +322,7 @@ func (s *SimpleSLAAlertManager) isRateLimited(alert SLAAlert) bool {
 	}
 
 	return recentAlerts >= s.config.RateLimiting.MaxPerMinute ||
-		   hourlyAlerts >= s.config.RateLimiting.MaxPerHour
+		hourlyAlerts >= s.config.RateLimiting.MaxPerHour
 }
 
 // channelHandlesSeverity checks if a channel handles the given severity
@@ -355,10 +355,10 @@ func (s *SimpleSLAAlertManager) sendThroughChannel(alert SLAAlert, channel Alert
 func (s *SimpleSLAAlertManager) sendEmailAlert(alert SLAAlert, channel AlertChannel) error {
 	// In a real implementation, this would use SMTP to send emails
 	fmt.Printf("📧 EMAIL ALERT: [%s] %s - %s\n", alert.Severity, alert.Title, alert.Message)
-	
+
 	emailBody := s.formatEmailAlert(alert)
 	fmt.Printf("Email Body:\n%s\n", emailBody)
-	
+
 	return nil // Simulated success
 }
 
@@ -367,7 +367,7 @@ func (s *SimpleSLAAlertManager) sendSlackAlert(alert SLAAlert, channel AlertChan
 	// In a real implementation, this would send to Slack webhook
 	emoji := s.getSeverityEmoji(alert.Severity)
 	fmt.Printf("💬 SLACK ALERT: %s [%s] %s - %s\n", emoji, alert.Severity, alert.Title, alert.Message)
-	
+
 	return nil // Simulated success
 }
 
@@ -375,18 +375,18 @@ func (s *SimpleSLAAlertManager) sendSlackAlert(alert SLAAlert, channel AlertChan
 func (s *SimpleSLAAlertManager) sendWebhookAlert(alert SLAAlert, channel AlertChannel) error {
 	// In a real implementation, this would make HTTP POST to webhook URL
 	webhookPayload := map[string]interface{}{
-		"alert_id":   alert.ID,
-		"severity":   alert.Severity,
-		"title":      alert.Title,
-		"message":    alert.Message,
-		"timestamp":  alert.Timestamp,
-		"sla_id":     alert.SLAID,
-		"tags":       alert.Tags,
+		"alert_id":  alert.ID,
+		"severity":  alert.Severity,
+		"title":     alert.Title,
+		"message":   alert.Message,
+		"timestamp": alert.Timestamp,
+		"sla_id":    alert.SLAID,
+		"tags":      alert.Tags,
 	}
-	
+
 	payload, _ := json.MarshalIndent(webhookPayload, "", "  ")
 	fmt.Printf("🔗 WEBHOOK ALERT:\n%s\n", string(payload))
-	
+
 	return nil // Simulated success
 }
 
@@ -395,7 +395,7 @@ func (s *SimpleSLAAlertManager) sendSMSAlert(alert SLAAlert, channel AlertChanne
 	// In a real implementation, this would use SMS service API
 	smsText := fmt.Sprintf("[%s] %s: %s", alert.Severity, alert.Title, alert.Message)
 	fmt.Printf("📱 SMS ALERT: %s\n", smsText)
-	
+
 	return nil // Simulated success
 }
 
@@ -432,7 +432,7 @@ func (s *SimpleSLAAlertManager) formatTags(tags map[string]string) string {
 	if len(tags) == 0 {
 		return "  (none)"
 	}
-	
+
 	result := ""
 	for key, value := range tags {
 		result += fmt.Sprintf("  %s: %s\n", key, value)
@@ -697,15 +697,15 @@ func (s *SimpleSLAAlertManager) Cleanup() error {
 
 	cutoff := time.Now().Add(-s.config.HistoryRetention)
 	filtered := make([]SLAAlert, 0)
-	
+
 	for _, alert := range s.alertHistory {
 		if alert.Timestamp.After(cutoff) {
 			filtered = append(filtered, alert)
 		}
 	}
-	
+
 	s.alertHistory = filtered
-	
+
 	fmt.Printf("Alert cleanup completed\n")
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/seike460/s3ry/internal/errors"
 	"github.com/seike460/s3ry/internal/metrics"
 	"github.com/seike460/s3ry/pkg/interfaces"
 )
@@ -31,11 +32,11 @@ type Pool struct {
 
 // PoolConfig configures the worker pool
 type PoolConfig struct {
-	Workers      int           // Number of workers (0 = number of CPUs)
-	QueueSize    int           // Size of job queue (0 = unbuffered)
-	Timeout      time.Duration // Timeout for individual jobs
-	RetryCount   int           // Number of retries for failed jobs
-	RetryDelay   time.Duration // Delay between retries
+	Workers    int           // Number of workers (0 = number of CPUs)
+	QueueSize  int           // Size of job queue (0 = unbuffered)
+	Timeout    time.Duration // Timeout for individual jobs
+	RetryCount int           // Number of retries for failed jobs
+	RetryDelay time.Duration // Delay between retries
 }
 
 // DefaultConfig returns a default pool configuration
@@ -94,7 +95,7 @@ func (p *Pool) Submit(job Job) error {
 		return fmt.Errorf("pool is shutting down")
 	default:
 	}
-	
+
 	select {
 	case p.jobQueue <- job:
 		return nil
@@ -121,10 +122,10 @@ func (p *Pool) worker(id int) {
 				// Job queue is closed
 				return
 			}
-			
+
 			// Execute job with timeout
 			result := p.executeJob(job)
-			
+
 			// Send result
 			select {
 			case p.resultChan <- result:
@@ -138,7 +139,7 @@ func (p *Pool) worker(id int) {
 	}
 }
 
-// executeJob executes a job with timeout and retry logic
+// executeJob executes a job with timeout, retry logic, and error recovery
 func (p *Pool) executeJob(job Job) Result {
 	// Start performance timer
 	timer := p.metrics.StartTimer("job_execution")
@@ -147,26 +148,97 @@ func (p *Pool) executeJob(job Job) Result {
 	ctx, cancel := context.WithTimeout(p.ctx, 30*time.Second)
 	defer cancel()
 
-	err := job.Execute(ctx)
-	
+	var lastErr error
+	maxRetries := 3
+
+	// Execute with retry logic for recoverable errors
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		err := job.Execute(ctx)
+
+		if err == nil {
+			// Success
+			return Result{Job: job, Error: nil}
+		}
+
+		lastErr = err
+
+		// Check if error is recoverable
+		if s3ryErr, ok := err.(*errors.S3ryError); ok {
+			if recoverable, ok := s3ryErr.Context["recoverable"].(bool); ok && !recoverable {
+				// Non-recoverable error, don't retry
+				break
+			}
+
+			// Check if we should retry
+			if attempt < maxRetries {
+				// Apply backoff delay
+				var delay time.Duration
+				if retryDelay, ok := s3ryErr.Context["retry_delay"].(string); ok && retryDelay == "exponential" {
+					delay = time.Duration(1<<uint(attempt)) * time.Second
+				} else {
+					delay = time.Second * time.Duration(attempt+1)
+				}
+
+				// Wait before retry
+				select {
+				case <-ctx.Done():
+					return Result{Job: job, Error: ctx.Err()}
+				case <-time.After(delay):
+					// Continue to next retry
+				}
+			}
+		} else {
+			// Non-S3ry error, wrap it and don't retry
+			lastErr = p.wrapJobError(err, "job_execution")
+			break
+		}
+	}
+
 	// Update metrics based on result
-	if err != nil {
+	if lastErr != nil {
 		p.metrics.IncrementFailedOperations()
 	}
 
 	return Result{
 		Job:   job,
-		Error: err,
+		Error: lastErr,
 	}
+}
+
+// wrapJobError wraps generic job errors in S3ryError
+func (p *Pool) wrapJobError(err error, operation string) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if already wrapped
+	if _, ok := err.(*errors.S3ryError); ok {
+		return err
+	}
+
+	// Determine error code based on error type
+	var errorCode errors.ErrorCode
+	if err == context.DeadlineExceeded {
+		errorCode = errors.ErrCodeTimeout
+	} else if err == context.Canceled {
+		errorCode = errors.ErrCodeCancelled
+	} else {
+		errorCode = errors.ErrCodeJobExecution
+	}
+
+	return errors.Wrap(err, errorCode, "worker_pool", err.Error()).WithContext("worker_pool_context", map[string]interface{}{
+		"operation":   operation,
+		"recoverable": errorCode == errors.ErrCodeTimeout || errorCode == errors.ErrCodeJobExecution,
+	})
 }
 
 // BatchProcessor handles batch processing with progress tracking
 type BatchProcessor struct {
-	pool        interfaces.WorkerPool
-	totalJobs   int
+	pool          interfaces.WorkerPool
+	totalJobs     int
 	completedJobs int
-	mutex       sync.RWMutex
-	onProgress  func(completed, total int)
+	mutex         sync.RWMutex
+	onProgress    func(completed, total int)
 }
 
 // NewBatchProcessor creates a new batch processor
@@ -197,7 +269,7 @@ func (bp *BatchProcessor) ProcessBatch(jobs []Job) []Result {
 	for i := 0; i < len(jobs); i++ {
 		result := <-bp.pool.Results()
 		results = append(results, result)
-		
+
 		bp.mutex.Lock()
 		bp.completedJobs++
 		if bp.onProgress != nil {

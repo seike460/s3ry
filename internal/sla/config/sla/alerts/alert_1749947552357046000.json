@@ -1,0 +1,14 @@
+{
+  "id": "alert_1749947552357046000",
+  "type": "VIOLATION",
+  "severity": "ERROR",
+  "sla_id": "test-sla",
+  "violation_id": "",
+  "title": "Test Alert",
+  "message": "Test message",
+  "timestamp": "2025-06-15T09:32:32.357046+09:00",
+  "recipients": null,
+  "channels": null,
+  "tags": null,
+  "status": "RESOLVED"
+}

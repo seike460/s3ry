@@ -4,16 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/seike460/s3ry/internal/errors"
 	"github.com/seike460/s3ry/internal/metrics"
 	"github.com/seike460/s3ry/pkg/interfaces"
 	"github.com/seike460/s3ry/pkg/types"
 )
-
 
 // S3DownloadJob represents a S3 download job
 type S3DownloadJob struct {
@@ -29,49 +25,32 @@ func (j *S3DownloadJob) Execute(ctx context.Context) error {
 	timer := m.StartTimer("s3_download")
 	defer timer.Stop()
 
-	// Get file size for metrics
-	headInput := &s3.HeadObjectInput{
-		Bucket: aws.String(j.Request.Bucket),
-		Key:    aws.String(j.Request.Key),
-	}
-	
-	headOutput, err := j.Client.S3().HeadObjectWithContext(ctx, headInput)
+	// For MVP: Use basic download without head request
+	// Real file size will be determined during download
+	fileSize := int64(0)
+
+	// Use interface download method for MVP
+	err := j.Client.DownloadFile(ctx, j.Request.Bucket, j.Request.Key, j.Request.FilePath)
 	if err != nil {
-		return fmt.Errorf("failed to get object metadata: %w", err)
-	}
-	
-	fileSize := *headOutput.ContentLength
-
-	// Create the file
-	file, err := os.Create(j.Request.FilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", j.Request.FilePath, err)
-	}
-	defer file.Close()
-
-	// Create download input
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(j.Request.Bucket),
-		Key:    aws.String(j.Request.Key),
+		return j.wrapError(err, "download_file", map[string]interface{}{
+			"bucket":    j.Request.Bucket,
+			"key":       j.Request.Key,
+			"file_path": j.Request.FilePath,
+		})
 	}
 
-	// Download with progress tracking
-	downloader := j.Client.Downloader()
-	if j.Progress != nil {
-		downloader.Concurrency = 5 // Concurrent download parts
-		downloader.PartSize = 5 * 1024 * 1024 // 5MB parts
+	// Get file size for progress and metrics
+	fileInfo, err := os.Stat(j.Request.FilePath)
+	if err == nil && fileInfo != nil {
+		fileSize = fileInfo.Size()
+		// Call progress callback if provided
+		if j.Progress != nil {
+			j.Progress(fileSize, fileSize)
+		}
+		// Update metrics on successful download
+		m.IncrementS3Downloads()
+		m.AddBytesTransferred(fileSize)
 	}
-
-	_, err = downloader.DownloadWithContext(ctx, file, input)
-	if err != nil {
-		// Clean up the file if download failed
-		os.Remove(j.Request.FilePath)
-		return fmt.Errorf("failed to download %s: %w", j.Request.Key, err)
-	}
-
-	// Update metrics on successful download
-	m.IncrementS3Downloads()
-	m.AddBytesTransferred(fileSize)
 
 	return nil
 }
@@ -90,44 +69,14 @@ func (j *S3UploadJob) Execute(ctx context.Context) error {
 	timer := m.StartTimer("s3_upload")
 	defer timer.Stop()
 
-	// Open the file
-	file, err := os.Open(j.Request.FilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", j.Request.FilePath, err)
-	}
-	defer file.Close()
-
-	// Get file info for size
-	fileInfo, err := file.Stat()
+	// Get file info for size and progress
+	fileInfo, err := os.Stat(j.Request.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to get file info for %s: %w", j.Request.FilePath, err)
 	}
 
-	// Create upload input
-	input := &s3manager.UploadInput{
-		Bucket: aws.String(j.Request.Bucket),
-		Key:    aws.String(j.Request.Key),
-		Body:   file,
-	}
-
-	// Set content type if provided
-	if j.Request.ContentType != "" {
-		input.ContentType = aws.String(j.Request.ContentType)
-	}
-
-	// Set metadata if provided
-	if j.Request.Metadata != nil {
-		input.Metadata = j.Request.Metadata
-	}
-
-	// Upload with progress tracking
-	uploader := j.Client.Uploader()
-	if j.Progress != nil {
-		uploader.Concurrency = 5 // Concurrent upload parts
-		uploader.PartSize = 5 * 1024 * 1024 // 5MB parts
-	}
-
-	_, err = uploader.UploadWithContext(ctx, input)
+	// Upload using interface method for MVP
+	err = j.Client.UploadFile(ctx, j.Request.FilePath, j.Request.Bucket, j.Request.Key)
 	if err != nil {
 		return fmt.Errorf("failed to upload %s: %w", j.Request.FilePath, err)
 	}
@@ -144,7 +93,6 @@ func (j *S3UploadJob) Execute(ctx context.Context) error {
 	return nil
 }
 
-
 // S3DeleteJob represents a S3 delete job
 type S3DeleteJob struct {
 	Client interfaces.S3Client
@@ -159,12 +107,7 @@ func (j *S3DeleteJob) Execute(ctx context.Context) error {
 	timer := m.StartTimer("s3_delete")
 	defer timer.Stop()
 
-	input := &s3.DeleteObjectInput{
-		Bucket: aws.String(j.Bucket),
-		Key:    aws.String(j.Key),
-	}
-
-	_, err := j.Client.S3().DeleteObjectWithContext(ctx, input)
+	err := j.Client.DeleteObject(ctx, j.Bucket, j.Key)
 	if err != nil {
 		return fmt.Errorf("failed to delete %s: %w", j.Key, err)
 	}
@@ -191,41 +134,21 @@ func (j *S3ListJob) Execute(ctx context.Context) error {
 
 	var objects []types.Object
 
-	input := &s3.ListObjectsV2Input{
-		Bucket: aws.String(j.Request.Bucket),
-	}
-
-	if j.Request.Prefix != "" {
-		input.Prefix = aws.String(j.Request.Prefix)
-	}
-	if j.Request.Delimiter != "" {
-		input.Delimiter = aws.String(j.Request.Delimiter)
-	}
-	if j.Request.MaxKeys > 0 {
-		input.MaxKeys = aws.Int64(j.Request.MaxKeys)
-	}
-	if j.Request.StartAfter != "" {
-		input.StartAfter = aws.String(j.Request.StartAfter)
-	}
-
-	err := j.Client.S3().ListObjectsV2PagesWithContext(ctx, input,
-		func(page *s3.ListObjectsV2Output, lastPage bool) bool {
-			for _, obj := range page.Contents {
-				if obj.Key != nil && !strings.HasSuffix(*obj.Key, "/") {
-					objects = append(objects, types.Object{
-						Key:          *obj.Key,
-						Size:         *obj.Size,
-						LastModified: *obj.LastModified,
-						ETag:         *obj.ETag,
-						StorageClass: *obj.StorageClass,
-					})
-				}
-			}
-			return !lastPage
-		})
+	// Use S3Client interface for listing
+	objectList, err := j.Client.ListObjects(ctx, j.Request.Bucket, j.Request.Prefix, "")
 
 	if err != nil {
 		return fmt.Errorf("failed to list objects in %s: %w", j.Request.Bucket, err)
+	}
+
+	// Convert interface objects to types.Object
+	for _, obj := range objectList {
+		objects = append(objects, types.Object{
+			Key:          obj.Key,
+			Size:         obj.Size,
+			LastModified: obj.LastModified,
+			ETag:         obj.ETag,
+		})
 	}
 
 	// Update metrics on successful list operation
@@ -239,4 +162,110 @@ func (j *S3ListJob) Execute(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// wrapError wraps errors with S3ryError for standardized error handling
+func (j *S3DownloadJob) wrapError(err error, operation string, context map[string]interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if already wrapped
+	if _, ok := err.(*errors.S3ryError); ok {
+		return err
+	}
+
+	// Determine error code based on operation
+	var errorCode errors.ErrorCode
+	switch operation {
+	case "head_object", "get_object":
+		errorCode = errors.ErrCodeS3Connection
+	case "create_file", "copy_data":
+		errorCode = errors.ErrCodeFileSystem
+	default:
+		errorCode = errors.ErrCodeUnknown
+	}
+
+	// Add job-specific context
+	if context == nil {
+		context = make(map[string]interface{})
+	}
+	context["job_type"] = "s3_download"
+	context["operation"] = operation
+
+	return errors.Wrap(err, errorCode, "s3_download_job", err.Error()).WithContext("job_context", context)
+}
+
+// wrapError wraps errors with S3ryError for standardized error handling
+func (j *S3UploadJob) wrapError(err error, operation string, context map[string]interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if already wrapped
+	if _, ok := err.(*errors.S3ryError); ok {
+		return err
+	}
+
+	// Determine error code based on operation
+	var errorCode errors.ErrorCode
+	switch operation {
+	case "put_object":
+		errorCode = errors.ErrCodeS3Connection
+	case "open_file", "stat_file":
+		errorCode = errors.ErrCodeFileSystem
+	default:
+		errorCode = errors.ErrCodeUnknown
+	}
+
+	// Add job-specific context
+	if context == nil {
+		context = make(map[string]interface{})
+	}
+	context["job_type"] = "s3_upload"
+	context["operation"] = operation
+
+	return errors.Wrap(err, errorCode, "s3_upload_job", err.Error()).WithContext("job_context", context)
+}
+
+// wrapError wraps errors with S3ryError for standardized error handling
+func (j *S3DeleteJob) wrapError(err error, operation string, context map[string]interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if already wrapped
+	if _, ok := err.(*errors.S3ryError); ok {
+		return err
+	}
+
+	// Add job-specific context
+	if context == nil {
+		context = make(map[string]interface{})
+	}
+	context["job_type"] = "s3_delete"
+	context["operation"] = operation
+
+	return errors.Wrap(err, errors.ErrCodeS3Connection, "s3_delete_job", err.Error()).WithContext("job_context", context)
+}
+
+// wrapError wraps errors with S3ryError for standardized error handling
+func (j *S3ListJob) wrapError(err error, operation string, context map[string]interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if already wrapped
+	if _, ok := err.(*errors.S3ryError); ok {
+		return err
+	}
+
+	// Add job-specific context
+	if context == nil {
+		context = make(map[string]interface{})
+	}
+	context["job_type"] = "s3_list"
+	context["operation"] = operation
+
+	return errors.Wrap(err, errors.ErrCodeS3Connection, "s3_list_job", err.Error()).WithContext("job_context", context)
 }

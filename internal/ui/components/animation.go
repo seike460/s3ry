@@ -38,24 +38,24 @@ type AnimationTickMsg struct {
 
 // Animation represents a UI animation
 type Animation struct {
-	id           string
+	id            string
 	animationType AnimationType
-	duration     time.Duration
-	startTime    time.Time
-	state        AnimationState
-	progress     float64
-	frames       int
-	currentFrame int
-	
+	duration      time.Duration
+	startTime     time.Time
+	state         AnimationState
+	progress      float64
+	frames        int
+	currentFrame  int
+
 	// Animation parameters
 	startOpacity float64
 	endOpacity   float64
 	startOffset  int
 	endOffset    int
-	
+
 	// Easing function
 	easing func(float64) float64
-	
+
 	// Callback when animation completes
 	onComplete func()
 }
@@ -111,18 +111,18 @@ func (am *AnimationManager) CreatePulseAnimation(id string, duration time.Durati
 // createAnimation creates a base animation
 func (am *AnimationManager) createAnimation(id string, animType AnimationType, duration time.Duration, startOpacity, endOpacity float64, startOffset, endOffset int) *Animation {
 	anim := &Animation{
-		id:           id,
+		id:            id,
 		animationType: animType,
-		duration:     duration,
-		state:        AnimationStateIdle,
-		startOpacity: startOpacity,
-		endOpacity:   endOpacity,
-		startOffset:  startOffset,
-		endOffset:    endOffset,
-		frames:       int(duration.Milliseconds() / 16), // ~60fps
-		easing:       easeInOutCubic,
+		duration:      duration,
+		state:         AnimationStateIdle,
+		startOpacity:  startOpacity,
+		endOpacity:    endOpacity,
+		startOffset:   startOffset,
+		endOffset:     endOffset,
+		frames:        int(duration.Milliseconds() / 16), // ~60fps
+		easing:        easeInOutCubic,
 	}
-	
+
 	am.animations[id] = anim
 	return anim
 }
@@ -133,12 +133,12 @@ func (am *AnimationManager) StartAnimation(id string) tea.Cmd {
 	if !exists {
 		return nil
 	}
-	
+
 	anim.state = AnimationStateRunning
 	anim.startTime = time.Now()
 	anim.currentFrame = 0
 	anim.progress = 0.0
-	
+
 	return am.animationTick(id)
 }
 
@@ -173,10 +173,10 @@ func (am *AnimationManager) ApplyAnimationStyle(id string, baseStyle lipgloss.St
 	if !exists || anim.state != AnimationStateRunning {
 		return baseStyle.Render(content)
 	}
-	
+
 	style := baseStyle
 	easedProgress := anim.easing(anim.progress)
-	
+
 	switch anim.animationType {
 	case AnimationFadeIn, AnimationFadeOut:
 		opacity := lerp(anim.startOpacity, anim.endOpacity, easedProgress)
@@ -186,7 +186,7 @@ func (am *AnimationManager) ApplyAnimationStyle(id string, baseStyle lipgloss.St
 		} else if alpha > 255 {
 			alpha = 255
 		}
-		
+
 		// Approximate opacity effect by adjusting foreground color
 		if alpha < 255 {
 			currentColor := style.GetForeground()
@@ -196,7 +196,7 @@ func (am *AnimationManager) ApplyAnimationStyle(id string, baseStyle lipgloss.St
 			// This is a simplified opacity effect
 			style = style.Foreground(currentColor)
 		}
-		
+
 	case AnimationSlideIn:
 		offset := int(lerp(float64(anim.startOffset), float64(anim.endOffset), easedProgress))
 		if offset > 0 {
@@ -204,7 +204,7 @@ func (am *AnimationManager) ApplyAnimationStyle(id string, baseStyle lipgloss.St
 		} else if offset < 0 {
 			style = style.MarginTop(-offset)
 		}
-		
+
 	case AnimationSlideOut:
 		offset := int(lerp(float64(anim.startOffset), float64(anim.endOffset), easedProgress))
 		if offset > 0 {
@@ -212,21 +212,21 @@ func (am *AnimationManager) ApplyAnimationStyle(id string, baseStyle lipgloss.St
 		} else if offset < 0 {
 			style = style.MarginTop(-offset)
 		}
-		
+
 	case AnimationBounce:
 		// Apply a subtle transform for bounce effect
 		bounceOffset := int(easedProgress * 2)
 		if bounceOffset > 0 {
 			style = style.MarginLeft(bounceOffset)
 		}
-		
+
 	case AnimationPulse:
 		// Apply scaling effect for pulse (simplified as padding)
 		scale := easedProgress
 		padding := int(scale * 2)
 		style = style.Padding(0, padding)
 	}
-	
+
 	return style.Render(content)
 }
 
@@ -245,25 +245,25 @@ func (am *AnimationManager) handleAnimationTick(msg AnimationTickMsg) tea.Cmd {
 	if !exists || anim.state != AnimationStateRunning {
 		return nil
 	}
-	
+
 	elapsed := time.Since(anim.startTime)
 	progress := float64(elapsed) / float64(anim.duration)
-	
+
 	if progress >= 1.0 {
 		// Animation completed
 		anim.progress = 1.0
 		anim.state = AnimationStateCompleted
-		
+
 		if anim.onComplete != nil {
 			anim.onComplete()
 		}
-		
+
 		return nil
 	}
-	
+
 	anim.progress = progress
 	anim.currentFrame++
-	
+
 	// Continue animation
 	return am.animationTick(msg.AnimationID)
 }
@@ -301,7 +301,7 @@ func easeInOutCubic(t float64) float64 {
 func bounceEasing(t float64) float64 {
 	const n1 = 7.5625
 	const d1 = 2.75
-	
+
 	if t < 1/d1 {
 		return n1 * t * t
 	} else if t < 2/d1 {

@@ -24,7 +24,7 @@ type SimpleEncryptionManager struct {
 func NewSimpleEncryptionManager() *SimpleEncryptionManager {
 	key := make([]byte, 32) // AES-256
 	rand.Read(key)
-	
+
 	manager := &SimpleEncryptionManager{key: key}
 	manager.initializeGCM()
 	return manager
@@ -36,12 +36,12 @@ func (s *SimpleEncryptionManager) initializeGCM() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create cipher: %v", err))
 	}
-	
+
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create GCM: %v", err))
 	}
-	
+
 	s.gcm = gcm
 }
 
@@ -91,18 +91,18 @@ func NewGzipCompressionManager() *GzipCompressionManager {
 // Compress compresses data using gzip
 func (g *GzipCompressionManager) Compress(data io.Reader) (io.Reader, error) {
 	pr, pw := io.Pipe()
-	
+
 	go func() {
 		defer pw.Close()
 		gzWriter := gzip.NewWriter(pw)
 		defer gzWriter.Close()
-		
+
 		_, err := io.Copy(gzWriter, data)
 		if err != nil {
 			pw.CloseWithError(err)
 		}
 	}()
-	
+
 	return pr, nil
 }
 
@@ -148,22 +148,22 @@ func (s *SHA256VerificationManager) VerifyBackupIntegrity(backup *Backup) error 
 	if backup.FilePath == "" {
 		return fmt.Errorf("backup file path is empty")
 	}
-	
+
 	file, err := os.Open(backup.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open backup file: %w", err)
 	}
 	defer file.Close()
-	
+
 	valid, err := s.VerifyChecksum(file, backup.Checksum)
 	if err != nil {
 		return fmt.Errorf("checksum verification failed: %w", err)
 	}
-	
+
 	if !valid {
 		return fmt.Errorf("backup integrity check failed: checksum mismatch")
 	}
-	
+
 	return nil
 }
 
@@ -174,10 +174,10 @@ type SimpleNotificationManager struct {
 
 // NotificationConfig holds notification configuration
 type NotificationConfig struct {
-	EmailEnabled  bool     `json:"email_enabled"`
-	SlackEnabled  bool     `json:"slack_enabled"`
-	WebhookEnabled bool    `json:"webhook_enabled"`
-	Recipients    []string `json:"recipients"`
+	EmailEnabled   bool     `json:"email_enabled"`
+	SlackEnabled   bool     `json:"slack_enabled"`
+	WebhookEnabled bool     `json:"webhook_enabled"`
+	Recipients     []string `json:"recipients"`
 }
 
 // NewSimpleNotificationManager creates a new simple notification manager
@@ -185,7 +185,7 @@ func NewSimpleNotificationManager() *SimpleNotificationManager {
 	return &SimpleNotificationManager{
 		config: NotificationConfig{
 			EmailEnabled: true,
-			Recipients:  []string{"admin@example.com"},
+			Recipients:   []string{"admin@example.com"},
 		},
 	}
 }
@@ -285,7 +285,7 @@ func (f *FileMetadataStore) SaveBackupMetadata(backup *Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup metadata: %w", err)
 	}
-	
+
 	filename := filepath.Join(f.configDir, "backups", fmt.Sprintf("%s.json", backup.ID))
 	return os.WriteFile(filename, data, 0644)
 }
@@ -297,12 +297,12 @@ func (f *FileMetadataStore) LoadBackupMetadata(backupID string) (*Backup, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read backup metadata: %w", err)
 	}
-	
+
 	var backup Backup
 	if err := json.Unmarshal(data, &backup); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal backup metadata: %w", err)
 	}
-	
+
 	return &backup, nil
 }
 
@@ -316,25 +316,25 @@ func (f *FileMetadataStore) ListBackups(filters map[string]interface{}) ([]*Back
 		}
 		return nil, fmt.Errorf("failed to read backup directory: %w", err)
 	}
-	
+
 	var backups []*Backup
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		
+
 		backupID := entry.Name()[:len(entry.Name())-5] // Remove .json
 		backup, err := f.LoadBackupMetadata(backupID)
 		if err != nil {
 			fmt.Printf("Failed to load backup %s: %v\n", backupID, err)
 			continue
 		}
-		
+
 		if f.matchesBackupFilters(backup, filters) {
 			backups = append(backups, backup)
 		}
 	}
-	
+
 	return backups, nil
 }
 
@@ -350,7 +350,7 @@ func (f *FileMetadataStore) SaveRestoreRequest(restore *RestoreRequest) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal restore request: %w", err)
 	}
-	
+
 	filename := filepath.Join(f.configDir, "restores", fmt.Sprintf("%s.json", restore.ID))
 	return os.WriteFile(filename, data, 0644)
 }
@@ -362,12 +362,12 @@ func (f *FileMetadataStore) LoadRestoreRequest(restoreID string) (*RestoreReques
 	if err != nil {
 		return nil, fmt.Errorf("failed to read restore request: %w", err)
 	}
-	
+
 	var restore RestoreRequest
 	if err := json.Unmarshal(data, &restore); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal restore request: %w", err)
 	}
-	
+
 	return &restore, nil
 }
 
@@ -381,25 +381,25 @@ func (f *FileMetadataStore) ListRestoreRequests(filters map[string]interface{}) 
 		}
 		return nil, fmt.Errorf("failed to read restore directory: %w", err)
 	}
-	
+
 	var restores []*RestoreRequest
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		
+
 		restoreID := entry.Name()[:len(entry.Name())-5] // Remove .json
 		restore, err := f.LoadRestoreRequest(restoreID)
 		if err != nil {
 			fmt.Printf("Failed to load restore request %s: %v\n", restoreID, err)
 			continue
 		}
-		
+
 		if f.matchesRestoreFilters(restore, filters) {
 			restores = append(restores, restore)
 		}
 	}
-	
+
 	return restores, nil
 }
 
@@ -408,31 +408,31 @@ func (f *FileMetadataStore) matchesBackupFilters(backup *Backup, filters map[str
 	if filters == nil {
 		return true
 	}
-	
+
 	if backupType, exists := filters["type"]; exists {
 		if backup.Type != BackupType(backupType.(string)) {
 			return false
 		}
 	}
-	
+
 	if status, exists := filters["status"]; exists {
 		if backup.Status != BackupStatus(status.(string)) {
 			return false
 		}
 	}
-	
+
 	if after, exists := filters["after"]; exists {
 		if backup.StartTime.Before(after.(time.Time)) {
 			return false
 		}
 	}
-	
+
 	if before, exists := filters["before"]; exists {
 		if backup.StartTime.After(before.(time.Time)) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -441,25 +441,25 @@ func (f *FileMetadataStore) matchesRestoreFilters(restore *RestoreRequest, filte
 	if filters == nil {
 		return true
 	}
-	
+
 	if backupID, exists := filters["backup_id"]; exists {
 		if restore.BackupID != backupID.(string) {
 			return false
 		}
 	}
-	
+
 	if status, exists := filters["status"]; exists {
 		if restore.Status != RestoreStatus(status.(string)) {
 			return false
 		}
 	}
-	
+
 	if restoreType, exists := filters["type"]; exists {
 		if restore.RestoreType != RestoreType(restoreType.(string)) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -477,18 +477,18 @@ func NewFileBackupStorage(storageDir string) *FileBackupStorage {
 // Store stores backup data to file
 func (f *FileBackupStorage) Store(backup *Backup, data io.Reader) error {
 	filename := filepath.Join(f.storageDir, fmt.Sprintf("%s.backup", backup.ID))
-	
+
 	outFile, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create backup file: %w", err)
 	}
 	defer outFile.Close()
-	
+
 	_, err = io.Copy(outFile, data)
 	if err != nil {
 		return fmt.Errorf("failed to write backup data: %w", err)
 	}
-	
+
 	backup.FilePath = filename
 	return nil
 }
@@ -523,23 +523,23 @@ func (f *FileBackupStorage) Cleanup(retentionPolicy RetentionPolicy) error {
 	if err != nil {
 		return err
 	}
-	
+
 	cutoff := time.Now().Add(-time.Duration(retentionPolicy.DailyRetention) * time.Hour * 24)
-	
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
-		
+
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
-		
+
 		if info.ModTime().Before(cutoff) {
 			os.Remove(filepath.Join(f.storageDir, entry.Name()))
 		}
 	}
-	
+
 	return nil
 }

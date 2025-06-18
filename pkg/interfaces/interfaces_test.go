@@ -195,7 +195,7 @@ func TestJob_MultipleJobs(t *testing.T) {
 
 func TestS3Client_ContextPropagation(t *testing.T) {
 	client := &mockS3Client{}
-	
+
 	// Test that context is properly handled
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -203,7 +203,7 @@ func TestS3Client_ContextPropagation(t *testing.T) {
 	// Test that the interface methods work
 	s3Client := client.S3()
 	assert.Nil(t, s3Client)
-	
+
 	// Context can be used for future implementations
 	assert.NotNil(t, ctx)
 }

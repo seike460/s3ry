@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/seike460/s3ry/internal/config"
@@ -23,7 +23,7 @@ type SettingsView struct {
 	list   *components.List
 	config *config.Config
 	status string
-	
+
 	// Styles
 	headerStyle lipgloss.Style
 	valueStyle  lipgloss.Style
@@ -37,23 +37,23 @@ func NewSettingsView() *SettingsView {
 	if err != nil {
 		cfg = config.Default()
 	}
-	
+
 	settings := &SettingsView{
 		config: cfg,
 		headerStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(2),
-		
+
 		valueStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#04B575")),
-		
+
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FF5555")),
 	}
-	
+
 	settings.buildSettingsList()
 	return settings
 }
@@ -70,7 +70,7 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
@@ -100,12 +100,12 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		
+
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
 	}
-	
+
 	return v, nil
 }
 
@@ -114,12 +114,12 @@ func (v *SettingsView) View() string {
 	if v.list == nil {
 		return v.errorStyle.Render("Settings not available")
 	}
-	
+
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
 		MarginTop(1).
 		Render("r: refresh • esc/q: back • Edit ~/.s3ry.yaml to modify settings")
-	
+
 	return v.list.View() + "\n" + footer
 }
 
@@ -258,7 +258,7 @@ func (v *SettingsView) buildSettingsList() {
 			Tag:         "Action",
 		},
 	}
-	
+
 	v.list = components.NewList("⚙️ S3ry Settings & Configuration", items)
 }
 

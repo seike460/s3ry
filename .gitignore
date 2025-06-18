@@ -47,6 +47,19 @@ Thumbs.db
 *.log
 
 # =============================================================================
+# Additional build and development artifacts
+# =============================================================================
+s3ry
+s3ry-*
+*.prof
+dist/
+*.gz
+*-results.json
+code_quality_report.json
+lint-results.json
+adapter-lint.json
+
+# =============================================================================
 # Node.js (for frontend/extensions)
 # =============================================================================
 node_modules/

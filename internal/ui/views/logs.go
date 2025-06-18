@@ -32,7 +32,7 @@ type LogsView struct {
 	spinner *components.Spinner
 	loading bool
 	logs    []LogEntry
-	
+
 	// Styles
 	headerStyle    lipgloss.Style
 	errorStyle     lipgloss.Style
@@ -46,27 +46,27 @@ func NewLogsView() *LogsView {
 	logs := &LogsView{
 		loading: true,
 		spinner: components.NewSpinner("Loading application logs..."),
-		
+
 		headerStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(2),
-		
+
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FF5555")),
-		
+
 		infoStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#04B575")),
-		
+
 		warningStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FFA500")),
-		
+
 		timestampStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888")),
 	}
-	
+
 	return logs
 }
 
@@ -81,17 +81,17 @@ func (v *LogsView) Init() tea.Cmd {
 // Update handles messages for the logs view
 func (v *LogsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case LogsLoadedMsg:
 		v.loading = false
 		v.spinner.Stop()
-		
+
 		if msg.Error != nil {
 			// Show error message
 			items := []components.ListItem{
@@ -109,16 +109,16 @@ func (v *LogsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.list = components.NewList("⚠️ Error Loading Logs", items)
 			return v, nil
 		}
-		
+
 		v.logs = msg.Logs
 		v.buildLogsList()
 		return v, nil
-		
+
 	case tea.KeyMsg:
 		if v.loading {
 			break
 		}
-		
+
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return v, tea.Quit
@@ -131,18 +131,18 @@ func (v *LogsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				v.loadLogs(),
 			)
 		}
-		
+
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case components.SpinnerTickMsg:
 		if v.loading {
 			v.spinner, _ = v.spinner.Update(msg)
 			cmds = append(cmds, v.spinner.Start())
 		}
 	}
-	
+
 	return v, tea.Batch(cmds...)
 }
 
@@ -151,16 +151,16 @@ func (v *LogsView) View() string {
 	if v.loading {
 		return v.headerStyle.Render("📋 S3ry Application Logs") + "\n\n" + v.spinner.View()
 	}
-	
+
 	if v.list == nil {
 		return v.errorStyle.Render("No logs available")
 	}
-	
+
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
 		MarginTop(1).
 		Render("r: refresh • esc/q: back • Logs show recent application activity")
-	
+
 	return v.list.View() + "\n" + footer
 }
 
@@ -168,14 +168,14 @@ func (v *LogsView) View() string {
 func (v *LogsView) loadLogs() tea.Cmd {
 	return func() tea.Msg {
 		var logs []LogEntry
-		
+
 		// Try to load from actual log files first
 		logFiles := []string{
 			"/tmp/s3ry.log",
 			"/var/log/s3ry.log",
 			filepath.Join(os.TempDir(), "s3ry.log"),
 		}
-		
+
 		foundLogFile := false
 		for _, logFile := range logFiles {
 			if entries, err := v.loadLogFile(logFile); err == nil {
@@ -184,7 +184,7 @@ func (v *LogsView) loadLogs() tea.Cmd {
 				break
 			}
 		}
-		
+
 		// If no log files found, show minimal system information
 		if !foundLogFile {
 			// Add basic startup information
@@ -194,7 +194,7 @@ func (v *LogsView) loadLogs() tea.Cmd {
 				Message:   "S3ry TUI application started",
 				Source:    "ui/app",
 			})
-			
+
 			// Add environment information if available
 			if region := os.Getenv("AWS_REGION"); region != "" {
 				logs = append(logs, LogEntry{
@@ -204,7 +204,7 @@ func (v *LogsView) loadLogs() tea.Cmd {
 					Source:    "config",
 				})
 			}
-			
+
 			if profile := os.Getenv("AWS_PROFILE"); profile != "" {
 				logs = append(logs, LogEntry{
 					Timestamp: time.Now().Add(-time.Second * 30),
@@ -213,11 +213,11 @@ func (v *LogsView) loadLogs() tea.Cmd {
 					Source:    "config",
 				})
 			}
-			
+
 			// TODO: Replace with real logging system integration when available
 			// This will be connected to actual application logs when LLM-2 completes integration
 		}
-		
+
 		return LogsLoadedMsg{Logs: logs}
 	}
 }
@@ -242,7 +242,7 @@ func (v *LogsView) buildLogsList() {
 		v.list = components.NewList("📋 S3ry Application Logs", items)
 		return
 	}
-	
+
 	// Sort logs by timestamp (newest first)
 	sortedLogs := make([]LogEntry, len(v.logs))
 	copy(sortedLogs, v.logs)
@@ -253,28 +253,28 @@ func (v *LogsView) buildLogsList() {
 			}
 		}
 	}
-	
+
 	// Create list items
 	items := make([]components.ListItem, 0, len(sortedLogs)+3)
-	
+
 	// Add header
 	items = append(items, components.ListItem{
 		Title:       "📋 Recent Application Activity",
 		Description: fmt.Sprintf("Showing %d log entries", len(sortedLogs)),
 		Tag:         "Header",
 	})
-	
+
 	items = append(items, components.ListItem{
 		Title:       "",
 		Description: "",
 		Tag:         "Separator",
 	})
-	
+
 	// Add log entries
 	for _, log := range sortedLogs {
 		title := v.formatLogTitle(log)
 		description := v.formatLogDescription(log)
-		
+
 		items = append(items, components.ListItem{
 			Title:       title,
 			Description: description,
@@ -282,7 +282,7 @@ func (v *LogsView) buildLogsList() {
 			Data:        log,
 		})
 	}
-	
+
 	v.list = components.NewList("📋 S3ry Application Logs", items)
 }
 
@@ -301,7 +301,7 @@ func (v *LogsView) formatLogTitle(log LogEntry) string {
 	default:
 		levelIcon = "📝"
 	}
-	
+
 	timestamp := log.Timestamp.Format("15:04:05")
 	return fmt.Sprintf("%s %s [%s] %s", levelIcon, timestamp, log.Level, log.Message)
 }

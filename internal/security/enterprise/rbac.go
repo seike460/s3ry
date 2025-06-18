@@ -12,20 +12,28 @@ type Permission string
 
 const (
 	// S3 Permissions
-	PermissionS3Read       Permission = "s3:read"
-	PermissionS3Write      Permission = "s3:write"
-	PermissionS3Delete     Permission = "s3:delete"
-	PermissionS3List       Permission = "s3:list"
-	PermissionS3Admin      Permission = "s3:admin"
-	
+	PermissionS3Read   Permission = "s3:read"
+	PermissionS3Write  Permission = "s3:write"
+	PermissionS3Delete Permission = "s3:delete"
+	PermissionS3List   Permission = "s3:list"
+	PermissionS3Admin  Permission = "s3:admin"
+
 	// System Permissions
 	PermissionSystemAdmin  Permission = "system:admin"
 	PermissionSystemConfig Permission = "system:config"
 	PermissionSystemUser   Permission = "system:user"
-	
+
 	// Audit Permissions
-	PermissionAuditRead    Permission = "audit:read"
-	PermissionAuditWrite   Permission = "audit:write"
+	PermissionAuditRead  Permission = "audit:read"
+	PermissionAuditWrite Permission = "audit:write"
+
+	// Security Permissions
+	PermissionSecurityRead  Permission = "security:read"
+	PermissionSecurityAdmin Permission = "security:admin"
+
+	// MFA Permissions
+	PermissionMFASetup    Permission = "mfa:setup"
+	PermissionMFAValidate Permission = "mfa:validate"
 )
 
 // Role represents a role with a set of permissions
@@ -63,10 +71,10 @@ func NewRBACManager() *RBACManager {
 		roles: make(map[string]*Role),
 		users: make(map[string]*User),
 	}
-	
+
 	// Initialize default roles
 	rbac.initializeDefaultRoles()
-	
+
 	return rbac
 }
 
@@ -78,10 +86,12 @@ func (r *RBACManager) initializeDefaultRoles() {
 			Name:        "Administrator",
 			Description: "Full system administrator with all permissions",
 			Permissions: []Permission{
-				PermissionS3Read, PermissionS3Write, PermissionS3Delete, 
+				PermissionS3Read, PermissionS3Write, PermissionS3Delete,
 				PermissionS3List, PermissionS3Admin,
 				PermissionSystemAdmin, PermissionSystemConfig, PermissionSystemUser,
 				PermissionAuditRead, PermissionAuditWrite,
+				PermissionSecurityRead, PermissionSecurityAdmin,
+				PermissionMFASetup, PermissionMFAValidate,
 			},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -113,6 +123,20 @@ func (r *RBACManager) initializeDefaultRoles() {
 			Name:        "Auditor",
 			Description: "Audit log access and system monitoring",
 			Permissions: []Permission{
+				PermissionAuditRead,
+				PermissionSystemUser,
+				PermissionSecurityRead,
+			},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		},
+		{
+			ID:          "security-admin",
+			Name:        "Security Administrator",
+			Description: "Security administration and MFA management",
+			Permissions: []Permission{
+				PermissionSecurityRead, PermissionSecurityAdmin,
+				PermissionMFASetup, PermissionMFAValidate,
 				PermissionAuditRead,
 				PermissionSystemUser,
 			},
@@ -348,7 +372,7 @@ func (r *RBACManager) GetUserPermissions(userID string) ([]Permission, error) {
 	}
 
 	permissionSet := make(map[Permission]bool)
-	
+
 	// Collect permissions from all user roles
 	for _, roleID := range user.Roles {
 		role, exists := r.roles[roleID]
@@ -423,7 +447,7 @@ func (r *RBACManager) RevokeRole(userID, roleID string) error {
 func (r *RBACManager) CheckAccess(userID string, action string, resource string) bool {
 	// Convert action to permission
 	var permission Permission
-	
+
 	// Parse action (e.g., "s3:read", "system:admin")
 	parts := strings.Split(action, ":")
 	if len(parts) != 2 {

@@ -10,11 +10,11 @@ import (
 type SOC2Trust string
 
 const (
-	SOC2Security      SOC2Trust = "SECURITY"
-	SOC2Availability  SOC2Trust = "AVAILABILITY"
-	SOC2Processing    SOC2Trust = "PROCESSING_INTEGRITY"
-	SOC2Confidential  SOC2Trust = "CONFIDENTIALITY"
-	SOC2Privacy       SOC2Trust = "PRIVACY"
+	SOC2Security     SOC2Trust = "SECURITY"
+	SOC2Availability SOC2Trust = "AVAILABILITY"
+	SOC2Processing   SOC2Trust = "PROCESSING_INTEGRITY"
+	SOC2Confidential SOC2Trust = "CONFIDENTIALITY"
+	SOC2Privacy      SOC2Trust = "PRIVACY"
 )
 
 // SOC2Control represents a SOC 2 control
@@ -51,11 +51,11 @@ func NewSOC2Compliance(enabled bool) *SOC2Compliance {
 		controls: make(map[string]*SOC2Control),
 		enabled:  enabled,
 	}
-	
+
 	if enabled {
 		soc2.initializeControls()
 	}
-	
+
 	return soc2
 }
 
@@ -303,7 +303,7 @@ func (s *SOC2Compliance) TestControl(controlID string, tester string) error {
 
 	// Mark control as tested
 	control.TestDate = time.Now()
-	
+
 	// In a real implementation, this would perform actual testing
 	// For now, we'll assume the test passes if the control is implemented
 	if control.Implemented {

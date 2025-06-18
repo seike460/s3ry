@@ -13,15 +13,15 @@ import (
 
 // SLAMonitor provides comprehensive SLA monitoring and alerting
 type SLAMonitor struct {
-	config        *SLAConfig
-	slas          map[string]*SLA
-	violations    map[string]*Violation
-	metrics       *SLAMetrics
-	alertManager  AlertManager
-	storage       SLAStorage
-	stopCh        chan struct{}
-	running       bool
-	mutex         sync.RWMutex
+	config       *SLAConfig
+	slas         map[string]*SLA
+	violations   map[string]*Violation
+	metrics      *SLAMetrics
+	alertManager AlertManager
+	storage      SLAStorage
+	stopCh       chan struct{}
+	running      bool
+	mutex        sync.RWMutex
 }
 
 // SLAConfig holds SLA monitoring configuration
@@ -50,38 +50,38 @@ func DefaultSLAConfig() *SLAConfig {
 
 // SLA represents a Service Level Agreement
 type SLA struct {
-	ID               string              `json:"id"`
-	Name             string              `json:"name"`
-	Description      string              `json:"description"`
-	Service          string              `json:"service"`
-	Category         SLACategory         `json:"category"`
-	Type             SLAType             `json:"type"`
-	Targets          []SLATarget         `json:"targets"`
-	Measurement      MeasurementConfig   `json:"measurement"`
-	Alerting         AlertingConfig      `json:"alerting"`
-	Remediation      RemediationConfig   `json:"remediation"`
-	Schedule         ScheduleConfig      `json:"schedule"`
-	Tags             map[string]string   `json:"tags"`
-	Enabled          bool                `json:"enabled"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
-	LastChecked      time.Time           `json:"last_checked"`
-	CurrentStatus    SLAStatus           `json:"current_status"`
-	ViolationCount   int                 `json:"violation_count"`
-	UptimePercent    float64             `json:"uptime_percent"`
-	ResponseTime     ResponseTimeMetrics `json:"response_time"`
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	Description    string              `json:"description"`
+	Service        string              `json:"service"`
+	Category       SLACategory         `json:"category"`
+	Type           SLAType             `json:"type"`
+	Targets        []SLATarget         `json:"targets"`
+	Measurement    MeasurementConfig   `json:"measurement"`
+	Alerting       AlertingConfig      `json:"alerting"`
+	Remediation    RemediationConfig   `json:"remediation"`
+	Schedule       ScheduleConfig      `json:"schedule"`
+	Tags           map[string]string   `json:"tags"`
+	Enabled        bool                `json:"enabled"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
+	LastChecked    time.Time           `json:"last_checked"`
+	CurrentStatus  SLAStatus           `json:"current_status"`
+	ViolationCount int                 `json:"violation_count"`
+	UptimePercent  float64             `json:"uptime_percent"`
+	ResponseTime   ResponseTimeMetrics `json:"response_time"`
 }
 
 // SLACategory categorizes SLAs
 type SLACategory string
 
 const (
-	SLACategoryAvailability  SLACategory = "AVAILABILITY"
-	SLACategoryPerformance   SLACategory = "PERFORMANCE"
-	SLACategoryReliability   SLACategory = "RELIABILITY"
-	SLACategoryCapacity      SLACategory = "CAPACITY"
-	SLACategorySecurity      SLACategory = "SECURITY"
-	SLACategoryCompliance    SLACategory = "COMPLIANCE"
+	SLACategoryAvailability SLACategory = "AVAILABILITY"
+	SLACategoryPerformance  SLACategory = "PERFORMANCE"
+	SLACategoryReliability  SLACategory = "RELIABILITY"
+	SLACategoryCapacity     SLACategory = "CAPACITY"
+	SLACategorySecurity     SLACategory = "SECURITY"
+	SLACategoryCompliance   SLACategory = "COMPLIANCE"
 )
 
 // SLAType defines the type of SLA
@@ -109,15 +109,15 @@ const (
 
 // SLATarget defines an SLA target/threshold
 type SLATarget struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Metric      string      `json:"metric"`
-	Threshold   float64     `json:"threshold"`
-	Operator    Operator    `json:"operator"` // >=, <=, ==, !=
-	Unit        string      `json:"unit"`
-	Window      TimeWindow  `json:"window"`
-	Severity    Severity    `json:"severity"`
-	Enabled     bool        `json:"enabled"`
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Metric    string     `json:"metric"`
+	Threshold float64    `json:"threshold"`
+	Operator  Operator   `json:"operator"` // >=, <=, ==, !=
+	Unit      string     `json:"unit"`
+	Window    TimeWindow `json:"window"`
+	Severity  Severity   `json:"severity"`
+	Enabled   bool       `json:"enabled"`
 }
 
 // Operator defines comparison operators
@@ -191,12 +191,12 @@ type CustomMetric struct {
 
 // AlertingConfig defines how to alert on SLA violations
 type AlertingConfig struct {
-	Enabled         bool                   `json:"enabled"`
-	Channels        []AlertChannel         `json:"channels"`
-	Escalation      EscalationPolicy       `json:"escalation"`
-	Suppression     SuppressionConfig      `json:"suppression"`
-	Templates       map[string]string      `json:"templates"`
-	Recipients      []Recipient            `json:"recipients"`
+	Enabled     bool              `json:"enabled"`
+	Channels    []AlertChannel    `json:"channels"`
+	Escalation  EscalationPolicy  `json:"escalation"`
+	Suppression SuppressionConfig `json:"suppression"`
+	Templates   map[string]string `json:"templates"`
+	Recipients  []Recipient       `json:"recipients"`
 }
 
 // AlertChannel defines alert delivery channels
@@ -221,9 +221,9 @@ const (
 
 // EscalationPolicy defines how to escalate alerts
 type EscalationPolicy struct {
-	Enabled  bool               `json:"enabled"`
-	Levels   []EscalationLevel  `json:"levels"`
-	Timeout  time.Duration      `json:"timeout"`
+	Enabled bool              `json:"enabled"`
+	Levels  []EscalationLevel `json:"levels"`
+	Timeout time.Duration     `json:"timeout"`
 }
 
 // EscalationLevel defines an escalation level
@@ -236,8 +236,8 @@ type EscalationLevel struct {
 
 // SuppressionConfig defines alert suppression rules
 type SuppressionConfig struct {
-	Enabled    bool              `json:"enabled"`
-	Rules      []SuppressionRule `json:"rules"`
+	Enabled     bool                `json:"enabled"`
+	Rules       []SuppressionRule   `json:"rules"`
 	Maintenance []MaintenanceWindow `json:"maintenance"`
 }
 
@@ -289,34 +289,34 @@ type RemediationConfig struct {
 
 // RemediationAction defines an automatic remediation action
 type RemediationAction struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Type        ActionType        `json:"type"`
-	Command     string            `json:"command"`
-	Parameters  map[string]string `json:"parameters"`
-	Conditions  []string          `json:"conditions"`
-	Timeout     time.Duration     `json:"timeout"`
-	RunOrder    int               `json:"run_order"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Type       ActionType        `json:"type"`
+	Command    string            `json:"command"`
+	Parameters map[string]string `json:"parameters"`
+	Conditions []string          `json:"conditions"`
+	Timeout    time.Duration     `json:"timeout"`
+	RunOrder   int               `json:"run_order"`
 }
 
 // ActionType defines types of remediation actions
 type ActionType string
 
 const (
-	ActionTypeScript    ActionType = "SCRIPT"
-	ActionTypeAPI       ActionType = "API"
-	ActionTypeRestart   ActionType = "RESTART"
-	ActionTypeScale     ActionType = "SCALE"
-	ActionTypeFailover  ActionType = "FAILOVER"
-	ActionTypeRollback  ActionType = "ROLLBACK"
+	ActionTypeScript   ActionType = "SCRIPT"
+	ActionTypeAPI      ActionType = "API"
+	ActionTypeRestart  ActionType = "RESTART"
+	ActionTypeScale    ActionType = "SCALE"
+	ActionTypeFailover ActionType = "FAILOVER"
+	ActionTypeRollback ActionType = "ROLLBACK"
 )
 
 // ScheduleConfig defines when SLA monitoring is active
 type ScheduleConfig struct {
-	Enabled       bool             `json:"enabled"`
-	TimeZone      string           `json:"timezone"`
-	BusinessHours BusinessHours    `json:"business_hours"`
-	Exclusions    []TimeExclusion  `json:"exclusions"`
+	Enabled       bool            `json:"enabled"`
+	TimeZone      string          `json:"timezone"`
+	BusinessHours BusinessHours   `json:"business_hours"`
+	Exclusions    []TimeExclusion `json:"exclusions"`
 }
 
 // BusinessHours defines business hours for SLA monitoring
@@ -360,38 +360,38 @@ type ResponseTimeMetrics struct {
 
 // Violation represents an SLA violation
 type Violation struct {
-	ID           string            `json:"id"`
-	SLAID        string            `json:"sla_id"`
-	TargetID     string            `json:"target_id"`
-	Timestamp    time.Time         `json:"timestamp"`
-	Duration     time.Duration     `json:"duration"`
-	Severity     Severity          `json:"severity"`
-	Status       ViolationStatus   `json:"status"`
-	ActualValue  float64           `json:"actual_value"`
-	ExpectedValue float64          `json:"expected_value"`
-	Impact       ImpactAssessment  `json:"impact"`
-	Remediation  RemediationResult `json:"remediation"`
-	Alerts       []AlertRecord     `json:"alerts"`
-	Resolution   Resolution        `json:"resolution"`
-	Tags         map[string]string `json:"tags"`
+	ID            string            `json:"id"`
+	SLAID         string            `json:"sla_id"`
+	TargetID      string            `json:"target_id"`
+	Timestamp     time.Time         `json:"timestamp"`
+	Duration      time.Duration     `json:"duration"`
+	Severity      Severity          `json:"severity"`
+	Status        ViolationStatus   `json:"status"`
+	ActualValue   float64           `json:"actual_value"`
+	ExpectedValue float64           `json:"expected_value"`
+	Impact        ImpactAssessment  `json:"impact"`
+	Remediation   RemediationResult `json:"remediation"`
+	Alerts        []AlertRecord     `json:"alerts"`
+	Resolution    Resolution        `json:"resolution"`
+	Tags          map[string]string `json:"tags"`
 }
 
 // ViolationStatus represents the status of a violation
 type ViolationStatus string
 
 const (
-	ViolationStatusActive    ViolationStatus = "ACTIVE"
-	ViolationStatusResolved  ViolationStatus = "RESOLVED"
+	ViolationStatusActive     ViolationStatus = "ACTIVE"
+	ViolationStatusResolved   ViolationStatus = "RESOLVED"
 	ViolationStatusSuppressed ViolationStatus = "SUPPRESSED"
 )
 
 // ImpactAssessment assesses the impact of a violation
 type ImpactAssessment struct {
-	BusinessImpact    BusinessImpact `json:"business_impact"`
-	AffectedUsers     int64          `json:"affected_users"`
-	AffectedServices  []string       `json:"affected_services"`
-	EstimatedCost     float64        `json:"estimated_cost"`
-	RiskLevel         RiskLevel      `json:"risk_level"`
+	BusinessImpact   BusinessImpact `json:"business_impact"`
+	AffectedUsers    int64          `json:"affected_users"`
+	AffectedServices []string       `json:"affected_services"`
+	EstimatedCost    float64        `json:"estimated_cost"`
+	RiskLevel        RiskLevel      `json:"risk_level"`
 }
 
 // BusinessImpact defines business impact levels
@@ -416,12 +416,12 @@ const (
 
 // RemediationResult holds the result of remediation actions
 type RemediationResult struct {
-	Attempted    bool               `json:"attempted"`
-	Successful   bool               `json:"successful"`
-	Actions      []ActionResult     `json:"actions"`
-	StartTime    time.Time          `json:"start_time"`
-	EndTime      time.Time          `json:"end_time"`
-	ErrorMessage string             `json:"error_message,omitempty"`
+	Attempted    bool           `json:"attempted"`
+	Successful   bool           `json:"successful"`
+	Actions      []ActionResult `json:"actions"`
+	StartTime    time.Time      `json:"start_time"`
+	EndTime      time.Time      `json:"end_time"`
+	ErrorMessage string         `json:"error_message,omitempty"`
 }
 
 // ActionResult holds the result of a remediation action
@@ -437,40 +437,40 @@ type ActionResult struct {
 
 // AlertRecord records when alerts were sent
 type AlertRecord struct {
-	ID        string      `json:"id"`
-	Timestamp time.Time   `json:"timestamp"`
-	Channel   ChannelType `json:"channel"`
-	Recipient string      `json:"recipient"`
-	Successful bool       `json:"successful"`
-	Message   string      `json:"message"`
+	ID         string      `json:"id"`
+	Timestamp  time.Time   `json:"timestamp"`
+	Channel    ChannelType `json:"channel"`
+	Recipient  string      `json:"recipient"`
+	Successful bool        `json:"successful"`
+	Message    string      `json:"message"`
 }
 
 // Resolution records how a violation was resolved
 type Resolution struct {
-	ResolvedAt   time.Time `json:"resolved_at"`
-	ResolvedBy   string    `json:"resolved_by"`
-	Method       string    `json:"method"` // automatic, manual, timeout
-	Description  string    `json:"description"`
-	RootCause    string    `json:"root_cause"`
-	PreventionSteps []string `json:"prevention_steps"`
+	ResolvedAt      time.Time `json:"resolved_at"`
+	ResolvedBy      string    `json:"resolved_by"`
+	Method          string    `json:"method"` // automatic, manual, timeout
+	Description     string    `json:"description"`
+	RootCause       string    `json:"root_cause"`
+	PreventionSteps []string  `json:"prevention_steps"`
 }
 
 // SLAMetrics holds comprehensive SLA monitoring metrics
 type SLAMetrics struct {
-	TotalSLAs          int                    `json:"total_slas"`
-	ActiveSLAs         int                    `json:"active_slas"`
-	HealthySLAs        int                    `json:"healthy_slas"`
-	ViolatingSLAs      int                    `json:"violating_slas"`
-	TotalViolations    int64                  `json:"total_violations"`
-	ActiveViolations   int                    `json:"active_violations"`
-	MTTR               time.Duration          `json:"mttr"` // Mean Time To Recovery
-	MTBF               time.Duration          `json:"mtbf"` // Mean Time Between Failures
-	OverallUptime      float64                `json:"overall_uptime"`
-	ServiceMetrics     map[string]ServiceSLA  `json:"service_metrics"`
-	ViolationsByType   map[SLAType]int        `json:"violations_by_type"`
-	ViolationTrends    []ViolationTrend       `json:"violation_trends"`
-	LastUpdated        time.Time              `json:"last_updated"`
-	mutex              sync.RWMutex
+	TotalSLAs        int                   `json:"total_slas"`
+	ActiveSLAs       int                   `json:"active_slas"`
+	HealthySLAs      int                   `json:"healthy_slas"`
+	ViolatingSLAs    int                   `json:"violating_slas"`
+	TotalViolations  int64                 `json:"total_violations"`
+	ActiveViolations int                   `json:"active_violations"`
+	MTTR             time.Duration         `json:"mttr"` // Mean Time To Recovery
+	MTBF             time.Duration         `json:"mtbf"` // Mean Time Between Failures
+	OverallUptime    float64               `json:"overall_uptime"`
+	ServiceMetrics   map[string]ServiceSLA `json:"service_metrics"`
+	ViolationsByType map[SLAType]int       `json:"violations_by_type"`
+	ViolationTrends  []ViolationTrend      `json:"violation_trends"`
+	LastUpdated      time.Time             `json:"last_updated"`
+	mutex            sync.RWMutex
 }
 
 // ServiceSLA holds SLA metrics for a specific service
@@ -487,9 +487,9 @@ type ServiceSLA struct {
 
 // ViolationTrend tracks violation trends over time
 type ViolationTrend struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Violations  int       `json:"violations"`
-	Period      string    `json:"period"` // hourly, daily, weekly
+	Timestamp  time.Time `json:"timestamp"`
+	Violations int       `json:"violations"`
+	Period     string    `json:"period"` // hourly, daily, weekly
 }
 
 // AlertManager interface for sending alerts
@@ -529,9 +529,9 @@ const (
 type AlertStatus string
 
 const (
-	AlertStatusActive      AlertStatus = "ACTIVE"
+	AlertStatusActive       AlertStatus = "ACTIVE"
 	AlertStatusAcknowledged AlertStatus = "ACKNOWLEDGED"
-	AlertStatusResolved    AlertStatus = "RESOLVED"
+	AlertStatusResolved     AlertStatus = "RESOLVED"
 )
 
 // SLAStorage interface for storing SLA data
@@ -567,10 +567,10 @@ func NewSLAMonitor(config *SLAConfig, alertManager AlertManager, storage SLAStor
 // NewSLAMetrics creates new SLA metrics instance
 func NewSLAMetrics() *SLAMetrics {
 	return &SLAMetrics{
-		ServiceMetrics:     make(map[string]ServiceSLA),
-		ViolationsByType:   make(map[SLAType]int),
-		ViolationTrends:    make([]ViolationTrend, 0),
-		LastUpdated:        time.Now(),
+		ServiceMetrics:   make(map[string]ServiceSLA),
+		ViolationsByType: make(map[SLAType]int),
+		ViolationTrends:  make([]ViolationTrend, 0),
+		LastUpdated:      time.Now(),
 	}
 }
 

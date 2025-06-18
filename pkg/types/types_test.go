@@ -102,7 +102,7 @@ func TestProgressCallback_Invocation(t *testing.T) {
 
 func TestProgressCallback_Nil(t *testing.T) {
 	var callback ProgressCallback
-	
+
 	// Should not panic when nil
 	assert.NotPanics(t, func() {
 		if callback != nil {
@@ -113,9 +113,9 @@ func TestProgressCallback_Nil(t *testing.T) {
 
 func TestObject_IsDirectory(t *testing.T) {
 	tests := []struct {
-		key        string
-		isDir      bool
-		name       string
+		key   string
+		isDir bool
+		name  string
 	}{
 		{"folder/", true, "folder with trailing slash"},
 		{"file.txt", false, "regular file"},

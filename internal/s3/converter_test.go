@@ -14,9 +14,9 @@ func TestToTypesDownloadRequest(t *testing.T) {
 		Key:      "test-key",
 		FilePath: "/local/path/file.txt",
 	}
-	
+
 	typesRequest := ToTypesDownloadRequest(s3Request)
-	
+
 	assert.Equal(t, s3Request.Bucket, typesRequest.Bucket)
 	assert.Equal(t, s3Request.Key, typesRequest.Key)
 	assert.Equal(t, s3Request.FilePath, typesRequest.FilePath)
@@ -27,7 +27,7 @@ func TestToTypesUploadRequest(t *testing.T) {
 		"author": stringPtr("test-user"),
 		"type":   stringPtr("document"),
 	}
-	
+
 	s3Request := UploadRequest{
 		Bucket:      "test-bucket",
 		Key:         "test-key",
@@ -35,9 +35,9 @@ func TestToTypesUploadRequest(t *testing.T) {
 		ContentType: "text/plain",
 		Metadata:    metadata,
 	}
-	
+
 	typesRequest := ToTypesUploadRequest(s3Request)
-	
+
 	assert.Equal(t, s3Request.Bucket, typesRequest.Bucket)
 	assert.Equal(t, s3Request.Key, typesRequest.Key)
 	assert.Equal(t, s3Request.FilePath, typesRequest.FilePath)
@@ -53,9 +53,9 @@ func TestToTypesListRequest(t *testing.T) {
 		MaxKeys:    100,
 		StartAfter: "documents/file1.txt",
 	}
-	
+
 	typesRequest := ToTypesListRequest(s3Request)
-	
+
 	assert.Equal(t, s3Request.Bucket, typesRequest.Bucket)
 	assert.Equal(t, s3Request.Prefix, typesRequest.Prefix)
 	assert.Equal(t, s3Request.Delimiter, typesRequest.Delimiter)
@@ -72,9 +72,9 @@ func TestFromTypesObject(t *testing.T) {
 		ETag:         `"d41d8cd98f00b204e9800998ecf8427e"`,
 		StorageClass: "STANDARD",
 	}
-	
+
 	s3Object := FromTypesObject(typesObject)
-	
+
 	assert.Equal(t, typesObject.Key, s3Object.Key)
 	assert.Equal(t, typesObject.Size, s3Object.Size)
 	assert.Equal(t, typesObject.LastModified, s3Object.LastModified)
@@ -107,11 +107,11 @@ func TestFromTypesObjects(t *testing.T) {
 			StorageClass: "GLACIER",
 		},
 	}
-	
+
 	s3Objects := FromTypesObjects(typesObjects)
-	
+
 	assert.Len(t, s3Objects, 3)
-	
+
 	for i, s3Object := range s3Objects {
 		assert.Equal(t, typesObjects[i].Key, s3Object.Key)
 		assert.Equal(t, typesObjects[i].Size, s3Object.Size)
@@ -124,7 +124,7 @@ func TestFromTypesObjects(t *testing.T) {
 func TestFromTypesObjects_Empty(t *testing.T) {
 	typesObjects := []types.Object{}
 	s3Objects := FromTypesObjects(typesObjects)
-	
+
 	assert.Len(t, s3Objects, 0)
 	assert.NotNil(t, s3Objects) // Should be empty slice, not nil
 }
@@ -132,21 +132,21 @@ func TestFromTypesObjects_Empty(t *testing.T) {
 func TestToTypesProgressCallback_Nil(t *testing.T) {
 	var nilCallback ProgressCallback
 	typesCallback := ToTypesProgressCallback(nilCallback)
-	
+
 	assert.Nil(t, typesCallback)
 }
 
 func TestToTypesProgressCallback_Valid(t *testing.T) {
 	var capturedBytes, capturedTotal int64
-	
+
 	s3Callback := func(bytes, total int64) {
 		capturedBytes = bytes
 		capturedTotal = total
 	}
-	
+
 	typesCallback := ToTypesProgressCallback(s3Callback)
 	assert.NotNil(t, typesCallback)
-	
+
 	// Test the conversion by calling the callback
 	typesCallback(512, 1024)
 	assert.Equal(t, int64(512), capturedBytes)
@@ -159,10 +159,10 @@ func TestConversion_RoundTrip_DownloadRequest(t *testing.T) {
 		Key:      "round-trip-key",
 		FilePath: "/round/trip/path",
 	}
-	
+
 	// Convert to types and back (simulating worker conversion)
 	typesRequest := ToTypesDownloadRequest(original)
-	
+
 	// Verify the conversion maintains all data
 	assert.Equal(t, original.Bucket, typesRequest.Bucket)
 	assert.Equal(t, original.Key, typesRequest.Key)
@@ -173,7 +173,7 @@ func TestConversion_RoundTrip_UploadRequest(t *testing.T) {
 	metadata := map[string]*string{
 		"test": stringPtr("value"),
 	}
-	
+
 	original := UploadRequest{
 		Bucket:      "round-trip-bucket",
 		Key:         "round-trip-key",
@@ -181,10 +181,10 @@ func TestConversion_RoundTrip_UploadRequest(t *testing.T) {
 		ContentType: "application/octet-stream",
 		Metadata:    metadata,
 	}
-	
+
 	// Convert to types and back (simulating worker conversion)
 	typesRequest := ToTypesUploadRequest(original)
-	
+
 	// Verify the conversion maintains all data
 	assert.Equal(t, original.Bucket, typesRequest.Bucket)
 	assert.Equal(t, original.Key, typesRequest.Key)
@@ -201,10 +201,10 @@ func TestConversion_RoundTrip_ListRequest(t *testing.T) {
 		MaxKeys:    1000,
 		StartAfter: "test/prefix/start",
 	}
-	
+
 	// Convert to types and back (simulating worker conversion)
 	typesRequest := ToTypesListRequest(original)
-	
+
 	// Verify the conversion maintains all data
 	assert.Equal(t, original.Bucket, typesRequest.Bucket)
 	assert.Equal(t, original.Prefix, typesRequest.Prefix)
@@ -220,9 +220,9 @@ func TestConversion_SpecialCharacters(t *testing.T) {
 		Key:      "path/with spaces/file (1).txt",
 		FilePath: "/local/path with spaces/file (1).txt",
 	}
-	
+
 	typesRequest := ToTypesDownloadRequest(s3Request)
-	
+
 	assert.Equal(t, s3Request.Bucket, typesRequest.Bucket)
 	assert.Equal(t, s3Request.Key, typesRequest.Key)
 	assert.Equal(t, s3Request.FilePath, typesRequest.FilePath)
@@ -237,9 +237,9 @@ func TestConversion_EmptyValues(t *testing.T) {
 		MaxKeys:    0,
 		StartAfter: "",
 	}
-	
+
 	typesRequest := ToTypesListRequest(s3Request)
-	
+
 	assert.Equal(t, "test-bucket", typesRequest.Bucket)
 	assert.Equal(t, "", typesRequest.Prefix)
 	assert.Equal(t, "", typesRequest.Delimiter)
@@ -254,7 +254,7 @@ func BenchmarkToTypesDownloadRequest(b *testing.B) {
 		Key:      "benchmark-key",
 		FilePath: "/benchmark/path",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = ToTypesDownloadRequest(s3Request)
@@ -265,7 +265,7 @@ func BenchmarkToTypesUploadRequest(b *testing.B) {
 	metadata := map[string]*string{
 		"author": stringPtr("test-user"),
 	}
-	
+
 	s3Request := UploadRequest{
 		Bucket:      "benchmark-bucket",
 		Key:         "benchmark-key",
@@ -273,7 +273,7 @@ func BenchmarkToTypesUploadRequest(b *testing.B) {
 		ContentType: "text/plain",
 		Metadata:    metadata,
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = ToTypesUploadRequest(s3Request)
@@ -289,7 +289,7 @@ func BenchmarkFromTypesObject(b *testing.B) {
 		ETag:         `"benchmark-etag"`,
 		StorageClass: "STANDARD",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = FromTypesObject(typesObject)
@@ -308,7 +308,7 @@ func BenchmarkFromTypesObjects(b *testing.B) {
 			StorageClass: "STANDARD",
 		}
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = FromTypesObjects(typesObjects)
@@ -320,7 +320,7 @@ func BenchmarkProgressCallbackConversion(b *testing.B) {
 		// Simulate some work
 		_ = float64(bytes) / float64(total)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		typesCallback := ToTypesProgressCallback(callback)

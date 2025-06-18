@@ -11,7 +11,7 @@ import (
 
 func TestDefaultUploadConfig(t *testing.T) {
 	config := DefaultUploadConfig()
-	
+
 	assert.Equal(t, 5, config.ConcurrentUploads)
 	assert.Equal(t, int64(5*1024*1024), config.PartSize)
 	assert.Equal(t, 3, config.Concurrency)
@@ -27,12 +27,12 @@ func TestNewUploader(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultUploadConfig()
 	uploader := NewUploader(client, config)
-	
+
 	assert.NotNil(t, uploader)
 	assert.NotNil(t, uploader.client)
 	assert.NotNil(t, uploader.pool)
 	assert.Equal(t, client, uploader.client)
-	
+
 	// Clean up
 	uploader.Close()
 }
@@ -41,7 +41,7 @@ func TestUploader_Close(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultUploadConfig()
 	uploader := NewUploader(client, config)
-	
+
 	// Should not panic
 	assert.NotPanics(t, func() {
 		uploader.Close()
@@ -53,7 +53,7 @@ func TestUploadRequest_Creation(t *testing.T) {
 		"author": stringPtr("test-user"),
 		"type":   stringPtr("document"),
 	}
-	
+
 	request := UploadRequest{
 		Bucket:      "test-bucket",
 		Key:         "path/to/file.txt",
@@ -61,7 +61,7 @@ func TestUploadRequest_Creation(t *testing.T) {
 		ContentType: "text/plain",
 		Metadata:    metadata,
 	}
-	
+
 	assert.Equal(t, "test-bucket", request.Bucket)
 	assert.Equal(t, "path/to/file.txt", request.Key)
 	assert.Equal(t, "/local/path/file.txt", request.FilePath)
@@ -73,7 +73,7 @@ func TestUploadConfig_CustomValues(t *testing.T) {
 	metadata := map[string]*string{
 		"environment": stringPtr("test"),
 	}
-	
+
 	config := UploadConfig{
 		ConcurrentUploads:  10,
 		PartSize:           10 * 1024 * 1024,
@@ -87,7 +87,7 @@ func TestUploadConfig_CustomValues(t *testing.T) {
 			// Custom progress callback
 		},
 	}
-	
+
 	assert.Equal(t, 10, config.ConcurrentUploads)
 	assert.Equal(t, int64(10*1024*1024), config.PartSize)
 	assert.Equal(t, 5, config.Concurrency)
@@ -104,18 +104,18 @@ func TestUploader_MultipleUploaders(t *testing.T) {
 	config := DefaultUploadConfig()
 	uploader1 := NewUploader(client, config)
 	uploader2 := NewUploader(client, config)
-	
+
 	assert.NotNil(t, uploader1)
 	assert.NotNil(t, uploader2)
 	assert.NotEqual(t, uploader1.pool, uploader2.pool)
-	
+
 	uploader1.Close()
 	uploader2.Close()
 }
 
 func TestUploader_WithProgressCallback(t *testing.T) {
 	client := NewClient("us-east-1")
-	
+
 	var capturedBytes, capturedTotal int64
 	config := UploadConfig{
 		ConcurrentUploads: 3,
@@ -124,40 +124,40 @@ func TestUploader_WithProgressCallback(t *testing.T) {
 			capturedTotal = total
 		},
 	}
-	
+
 	uploader := NewUploader(client, config)
 	assert.NotNil(t, uploader)
-	
+
 	// Test that progress callback is properly stored in config
 	assert.NotNil(t, config.OnProgress)
 	config.OnProgress(256, 1024)
 	assert.Equal(t, int64(256), capturedBytes)
 	assert.Equal(t, int64(1024), capturedTotal)
-	
+
 	uploader.Close()
 }
 
 func TestUploader_WithMetadata(t *testing.T) {
 	client := NewClient("us-east-1")
-	
+
 	metadata := map[string]*string{
 		"author":      stringPtr("test-user"),
 		"version":     stringPtr("1.0"),
 		"environment": stringPtr("test"),
 	}
-	
+
 	config := UploadConfig{
 		ConcurrentUploads: 5,
 		Metadata:          metadata,
 	}
-	
+
 	uploader := NewUploader(client, config)
 	assert.NotNil(t, uploader)
 	assert.Equal(t, metadata, config.Metadata)
 	assert.Equal(t, "test-user", *config.Metadata["author"])
 	assert.Equal(t, "1.0", *config.Metadata["version"])
 	assert.Equal(t, "test", *config.Metadata["environment"])
-	
+
 	uploader.Close()
 }
 
@@ -214,7 +214,7 @@ func TestUploadRequest_Validation(t *testing.T) {
 			valid: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.valid {
@@ -234,16 +234,16 @@ func TestUploader_ContextHandling(t *testing.T) {
 	config := DefaultUploadConfig()
 	uploader := NewUploader(client, config)
 	defer uploader.Close()
-	
+
 	// Test context creation
 	ctx := context.Background()
 	assert.NotNil(t, ctx)
-	
+
 	// Test context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	assert.NotNil(t, ctx)
-	
+
 	// Test context with cancellation
 	ctx, cancel = context.WithCancel(context.Background())
 	assert.NotNil(t, ctx)
@@ -265,7 +265,7 @@ func TestUploader_ContentTypeDetection(t *testing.T) {
 		{"archive.zip", ".zip"},
 		{"noextension", ""},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.fileName, func(t *testing.T) {
 			ext := filepath.Ext(tt.fileName)
@@ -277,7 +277,7 @@ func TestUploader_ContentTypeDetection(t *testing.T) {
 func TestUploader_ResourceCleanup(t *testing.T) {
 	client := NewClient("us-east-1")
 	config := DefaultUploadConfig()
-	
+
 	// Create and close multiple uploaders to test resource cleanup
 	for i := 0; i < 5; i++ {
 		uploader := NewUploader(client, config)
@@ -305,7 +305,7 @@ func TestUploader_BatchOperations(t *testing.T) {
 			FilePath: "/path3",
 		},
 	}
-	
+
 	assert.Len(t, requests, 3)
 	for i, req := range requests {
 		assert.Equal(t, req.Bucket, requests[i].Bucket)
@@ -320,12 +320,12 @@ func TestUploader_MetadataMerging(t *testing.T) {
 		"environment": stringPtr("production"),
 		"version":     stringPtr("1.0"),
 	}
-	
+
 	requestMetadata := map[string]*string{
 		"author": stringPtr("user123"),
 		"type":   stringPtr("document"),
 	}
-	
+
 	// Simulate metadata merging
 	merged := make(map[string]*string)
 	for k, v := range defaultMetadata {
@@ -334,7 +334,7 @@ func TestUploader_MetadataMerging(t *testing.T) {
 	for k, v := range requestMetadata {
 		merged[k] = v
 	}
-	
+
 	assert.Len(t, merged, 4)
 	assert.Equal(t, "production", *merged["environment"])
 	assert.Equal(t, "1.0", *merged["version"])
@@ -346,7 +346,7 @@ func TestUploader_MetadataMerging(t *testing.T) {
 func BenchmarkNewUploader(b *testing.B) {
 	client := NewClient("us-east-1")
 	config := DefaultUploadConfig()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		uploader := NewUploader(client, config)
@@ -366,7 +366,7 @@ func BenchmarkUploadRequest_Creation(b *testing.B) {
 	metadata := map[string]*string{
 		"author": stringPtr("test-user"),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		request := UploadRequest{
@@ -398,7 +398,7 @@ func BenchmarkProgressCallback_Upload(b *testing.B) {
 		percentage := float64(bytes) / float64(total) * 100
 		_ = percentage
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		callback(int64(i), 1000)

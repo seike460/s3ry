@@ -10,7 +10,8 @@ import (
 type CloudProvider int
 
 const (
-	ProviderAWS CloudProvider = iota
+	ProviderAWS      CloudProvider = iota // Optimized AWS with performance enhancements
+	ProviderAWSBasic                      // Basic AWS client for compatibility
 	ProviderAzure
 	ProviderGCS
 	ProviderMinIO
@@ -20,6 +21,8 @@ func (cp CloudProvider) String() string {
 	switch cp {
 	case ProviderAWS:
 		return "aws"
+	case ProviderAWSBasic:
+		return "aws-basic"
 	case ProviderAzure:
 		return "azure"
 	case ProviderGCS:
@@ -36,19 +39,19 @@ type StorageClient interface {
 	// Provider information
 	GetProvider() CloudProvider
 	GetRegion() string
-	
+
 	// Connection management
 	Connect(ctx context.Context) error
 	Disconnect(ctx context.Context) error
 	HealthCheck(ctx context.Context) error
-	
+
 	// Bucket operations
 	ListBuckets(ctx context.Context) ([]BucketInfo, error)
 	CreateBucket(ctx context.Context, bucket string, options *CreateBucketOptions) error
 	DeleteBucket(ctx context.Context, bucket string) error
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 	GetBucketInfo(ctx context.Context, bucket string) (*BucketInfo, error)
-	
+
 	// Object operations
 	ListObjects(ctx context.Context, bucket string, options *ListObjectsOptions) (*ObjectList, error)
 	GetObject(ctx context.Context, bucket, key string, options *GetObjectOptions) (*Object, error)
@@ -56,21 +59,21 @@ type StorageClient interface {
 	DeleteObject(ctx context.Context, bucket, key string, options *DeleteObjectOptions) error
 	DeleteObjects(ctx context.Context, bucket string, keys []string, options *DeleteObjectsOptions) (*BatchDeleteResult, error)
 	CopyObject(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string, options *CopyObjectOptions) error
-	
+
 	// Object metadata and properties
 	HeadObject(ctx context.Context, bucket, key string) (*ObjectMetadata, error)
 	SetObjectMetadata(ctx context.Context, bucket, key string, metadata map[string]string) error
 	GetObjectURL(ctx context.Context, bucket, key string, options *URLOptions) (string, error)
 	GeneratePresignedURL(ctx context.Context, bucket, key string, options *PresignedURLOptions) (string, error)
-	
+
 	// Advanced operations
 	MultipartUpload(ctx context.Context, bucket, key string, options *MultipartUploadOptions) (MultipartUploader, error)
 	BatchOperations(ctx context.Context, operations []BatchOperation) (*BatchResult, error)
-	
+
 	// Storage class and lifecycle
 	SetStorageClass(ctx context.Context, bucket, key string, storageClass StorageClass) error
 	GetStorageClass(ctx context.Context, bucket, key string) (StorageClass, error)
-	
+
 	// Access control
 	SetBucketPolicy(ctx context.Context, bucket string, policy *BucketPolicy) error
 	GetBucketPolicy(ctx context.Context, bucket string) (*BucketPolicy, error)
@@ -80,122 +83,122 @@ type StorageClient interface {
 
 // BucketInfo contains information about a bucket
 type BucketInfo struct {
-	Name           string            `json:"name"`
-	Region         string            `json:"region"`
-	CreationDate   time.Time         `json:"creation_date"`
-	Versioning     bool              `json:"versioning"`
-	Encryption     *EncryptionInfo   `json:"encryption,omitempty"`
-	Tags           map[string]string `json:"tags,omitempty"`
-	StorageClass   StorageClass      `json:"storage_class"`
-	Size           int64             `json:"size"`
-	ObjectCount    int64             `json:"object_count"`
-	LastModified   time.Time         `json:"last_modified"`
-	PublicAccess   bool              `json:"public_access"`
-	Website        *WebsiteConfig    `json:"website,omitempty"`
-	CORS           *CORSConfig       `json:"cors,omitempty"`
-	Lifecycle      *LifecycleConfig  `json:"lifecycle,omitempty"`
+	Name         string            `json:"name"`
+	Region       string            `json:"region"`
+	CreationDate time.Time         `json:"creation_date"`
+	Versioning   bool              `json:"versioning"`
+	Encryption   *EncryptionInfo   `json:"encryption,omitempty"`
+	Tags         map[string]string `json:"tags,omitempty"`
+	StorageClass StorageClass      `json:"storage_class"`
+	Size         int64             `json:"size"`
+	ObjectCount  int64             `json:"object_count"`
+	LastModified time.Time         `json:"last_modified"`
+	PublicAccess bool              `json:"public_access"`
+	Website      *WebsiteConfig    `json:"website,omitempty"`
+	CORS         *CORSConfig       `json:"cors,omitempty"`
+	Lifecycle    *LifecycleConfig  `json:"lifecycle,omitempty"`
 }
 
 // CreateBucketOptions contains options for creating a bucket
 type CreateBucketOptions struct {
-	Region         string            `json:"region,omitempty"`
-	StorageClass   StorageClass      `json:"storage_class,omitempty"`
-	Versioning     bool              `json:"versioning,omitempty"`
-	Tags           map[string]string `json:"tags,omitempty"`
-	Encryption     *EncryptionInfo   `json:"encryption,omitempty"`
-	PublicAccess   bool              `json:"public_access,omitempty"`
-	Website        *WebsiteConfig    `json:"website,omitempty"`
-	CORS           *CORSConfig       `json:"cors,omitempty"`
-	Lifecycle      *LifecycleConfig  `json:"lifecycle,omitempty"`
+	Region       string            `json:"region,omitempty"`
+	StorageClass StorageClass      `json:"storage_class,omitempty"`
+	Versioning   bool              `json:"versioning,omitempty"`
+	Tags         map[string]string `json:"tags,omitempty"`
+	Encryption   *EncryptionInfo   `json:"encryption,omitempty"`
+	PublicAccess bool              `json:"public_access,omitempty"`
+	Website      *WebsiteConfig    `json:"website,omitempty"`
+	CORS         *CORSConfig       `json:"cors,omitempty"`
+	Lifecycle    *LifecycleConfig  `json:"lifecycle,omitempty"`
 }
 
 // ListObjectsOptions contains options for listing objects
 type ListObjectsOptions struct {
-	Prefix        string `json:"prefix,omitempty"`
-	Delimiter     string `json:"delimiter,omitempty"`
-	MaxKeys       int    `json:"max_keys,omitempty"`
+	Prefix            string `json:"prefix,omitempty"`
+	Delimiter         string `json:"delimiter,omitempty"`
+	MaxKeys           int    `json:"max_keys,omitempty"`
 	ContinuationToken string `json:"continuation_token,omitempty"`
-	StartAfter    string `json:"start_after,omitempty"`
-	Recursive     bool   `json:"recursive,omitempty"`
-	IncludeMetadata bool `json:"include_metadata,omitempty"`
-	IncludeVersions bool `json:"include_versions,omitempty"`
+	StartAfter        string `json:"start_after,omitempty"`
+	Recursive         bool   `json:"recursive,omitempty"`
+	IncludeMetadata   bool   `json:"include_metadata,omitempty"`
+	IncludeVersions   bool   `json:"include_versions,omitempty"`
 }
 
 // ObjectList contains the result of listing objects
 type ObjectList struct {
-	Objects           []ObjectInfo `json:"objects"`
-	CommonPrefixes    []string     `json:"common_prefixes,omitempty"`
-	IsTruncated       bool         `json:"is_truncated"`
-	NextContinuationToken string   `json:"next_continuation_token,omitempty"`
-	TotalCount        int64        `json:"total_count"`
-	TotalSize         int64        `json:"total_size"`
+	Objects               []ObjectInfo `json:"objects"`
+	CommonPrefixes        []string     `json:"common_prefixes,omitempty"`
+	IsTruncated           bool         `json:"is_truncated"`
+	NextContinuationToken string       `json:"next_continuation_token,omitempty"`
+	TotalCount            int64        `json:"total_count"`
+	TotalSize             int64        `json:"total_size"`
 }
 
 // ObjectInfo contains information about an object
 type ObjectInfo struct {
-	Key              string            `json:"key"`
-	Size             int64             `json:"size"`
-	LastModified     time.Time         `json:"last_modified"`
-	ETag             string            `json:"etag"`
-	StorageClass     StorageClass      `json:"storage_class"`
-	ContentType      string            `json:"content_type"`
-	ContentEncoding  string            `json:"content_encoding,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
-	Metadata         map[string]string `json:"metadata,omitempty"`
-	VersionID        string            `json:"version_id,omitempty"`
-	IsLatest         bool              `json:"is_latest"`
-	DeleteMarker     bool              `json:"delete_marker"`
-	Checksum         string            `json:"checksum,omitempty"`
-	Owner            *OwnerInfo        `json:"owner,omitempty"`
+	Key             string            `json:"key"`
+	Size            int64             `json:"size"`
+	LastModified    time.Time         `json:"last_modified"`
+	ETag            string            `json:"etag"`
+	StorageClass    StorageClass      `json:"storage_class"`
+	ContentType     string            `json:"content_type"`
+	ContentEncoding string            `json:"content_encoding,omitempty"`
+	Tags            map[string]string `json:"tags,omitempty"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
+	VersionID       string            `json:"version_id,omitempty"`
+	IsLatest        bool              `json:"is_latest"`
+	DeleteMarker    bool              `json:"delete_marker"`
+	Checksum        string            `json:"checksum,omitempty"`
+	Owner           *OwnerInfo        `json:"owner,omitempty"`
 }
 
 // Object represents a complete object with its content
 type Object struct {
-	Info    *ObjectInfo `json:"info"`
-	Body    io.ReadCloser `json:"-"`
-	Length  int64       `json:"length"`
+	Info   *ObjectInfo   `json:"info"`
+	Body   io.ReadCloser `json:"-"`
+	Length int64         `json:"length"`
 }
 
 // GetObjectOptions contains options for getting an object
 type GetObjectOptions struct {
-	Range         *Range            `json:"range,omitempty"`
-	IfMatch       string            `json:"if_match,omitempty"`
-	IfNoneMatch   string            `json:"if_none_match,omitempty"`
-	IfModifiedSince    *time.Time   `json:"if_modified_since,omitempty"`
-	IfUnmodifiedSince  *time.Time   `json:"if_unmodified_since,omitempty"`
-	VersionID     string            `json:"version_id,omitempty"`
-	ResponseCacheControl    string  `json:"response_cache_control,omitempty"`
-	ResponseContentDisposition string `json:"response_content_disposition,omitempty"`
-	ResponseContentEncoding string  `json:"response_content_encoding,omitempty"`
-	ResponseContentLanguage string  `json:"response_content_language,omitempty"`
-	ResponseContentType     string  `json:"response_content_type,omitempty"`
-	ResponseExpires         *time.Time `json:"response_expires,omitempty"`
+	Range                      *Range     `json:"range,omitempty"`
+	IfMatch                    string     `json:"if_match,omitempty"`
+	IfNoneMatch                string     `json:"if_none_match,omitempty"`
+	IfModifiedSince            *time.Time `json:"if_modified_since,omitempty"`
+	IfUnmodifiedSince          *time.Time `json:"if_unmodified_since,omitempty"`
+	VersionID                  string     `json:"version_id,omitempty"`
+	ResponseCacheControl       string     `json:"response_cache_control,omitempty"`
+	ResponseContentDisposition string     `json:"response_content_disposition,omitempty"`
+	ResponseContentEncoding    string     `json:"response_content_encoding,omitempty"`
+	ResponseContentLanguage    string     `json:"response_content_language,omitempty"`
+	ResponseContentType        string     `json:"response_content_type,omitempty"`
+	ResponseExpires            *time.Time `json:"response_expires,omitempty"`
 }
 
 // PutObjectOptions contains options for putting an object
 type PutObjectOptions struct {
-	ContentType     string            `json:"content_type,omitempty"`
-	ContentEncoding string            `json:"content_encoding,omitempty"`
-	ContentLanguage string            `json:"content_language,omitempty"`
-	ContentDisposition string         `json:"content_disposition,omitempty"`
-	CacheControl    string            `json:"cache_control,omitempty"`
-	Expires         *time.Time        `json:"expires,omitempty"`
-	Metadata        map[string]string `json:"metadata,omitempty"`
-	Tags            map[string]string `json:"tags,omitempty"`
-	StorageClass    StorageClass      `json:"storage_class,omitempty"`
-	Encryption      *EncryptionInfo   `json:"encryption,omitempty"`
-	ACL             *ObjectACL        `json:"acl,omitempty"`
-	Checksum        string            `json:"checksum,omitempty"`
-	ProgressCallback func(uploaded, total int64) `json:"-"`
+	ContentType        string                      `json:"content_type,omitempty"`
+	ContentEncoding    string                      `json:"content_encoding,omitempty"`
+	ContentLanguage    string                      `json:"content_language,omitempty"`
+	ContentDisposition string                      `json:"content_disposition,omitempty"`
+	CacheControl       string                      `json:"cache_control,omitempty"`
+	Expires            *time.Time                  `json:"expires,omitempty"`
+	Metadata           map[string]string           `json:"metadata,omitempty"`
+	Tags               map[string]string           `json:"tags,omitempty"`
+	StorageClass       StorageClass                `json:"storage_class,omitempty"`
+	Encryption         *EncryptionInfo             `json:"encryption,omitempty"`
+	ACL                *ObjectACL                  `json:"acl,omitempty"`
+	Checksum           string                      `json:"checksum,omitempty"`
+	ProgressCallback   func(uploaded, total int64) `json:"-"`
 }
 
 // PutObjectResult contains the result of putting an object
 type PutObjectResult struct {
-	ETag         string    `json:"etag"`
-	VersionID    string    `json:"version_id,omitempty"`
-	Checksum     string    `json:"checksum,omitempty"`
-	Size         int64     `json:"size"`
-	UploadTime   time.Time `json:"upload_time"`
+	ETag         string       `json:"etag"`
+	VersionID    string       `json:"version_id,omitempty"`
+	Checksum     string       `json:"checksum,omitempty"`
+	Size         int64        `json:"size"`
+	UploadTime   time.Time    `json:"upload_time"`
 	StorageClass StorageClass `json:"storage_class"`
 }
 
@@ -233,69 +236,69 @@ type DeleteError struct {
 
 // CopyObjectOptions contains options for copying an object
 type CopyObjectOptions struct {
-	Metadata         map[string]string `json:"metadata,omitempty"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
 	MetadataDirective MetadataDirective `json:"metadata_directive,omitempty"`
-	TagsDirective    TagsDirective     `json:"tags_directive,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
-	StorageClass     StorageClass      `json:"storage_class,omitempty"`
-	Encryption       *EncryptionInfo   `json:"encryption,omitempty"`
-	ACL              *ObjectACL        `json:"acl,omitempty"`
-	IfMatch          string            `json:"if_match,omitempty"`
-	IfNoneMatch      string            `json:"if_none_match,omitempty"`
-	IfModifiedSince  *time.Time        `json:"if_modified_since,omitempty"`
-	IfUnmodifiedSince *time.Time       `json:"if_unmodified_since,omitempty"`
-	SourceVersionID  string            `json:"source_version_id,omitempty"`
+	TagsDirective     TagsDirective     `json:"tags_directive,omitempty"`
+	Tags              map[string]string `json:"tags,omitempty"`
+	StorageClass      StorageClass      `json:"storage_class,omitempty"`
+	Encryption        *EncryptionInfo   `json:"encryption,omitempty"`
+	ACL               *ObjectACL        `json:"acl,omitempty"`
+	IfMatch           string            `json:"if_match,omitempty"`
+	IfNoneMatch       string            `json:"if_none_match,omitempty"`
+	IfModifiedSince   *time.Time        `json:"if_modified_since,omitempty"`
+	IfUnmodifiedSince *time.Time        `json:"if_unmodified_since,omitempty"`
+	SourceVersionID   string            `json:"source_version_id,omitempty"`
 }
 
 // ObjectMetadata contains metadata about an object
 type ObjectMetadata struct {
-	Key              string            `json:"key"`
-	Size             int64             `json:"size"`
-	LastModified     time.Time         `json:"last_modified"`
-	ETag             string            `json:"etag"`
-	ContentType      string            `json:"content_type"`
-	ContentEncoding  string            `json:"content_encoding,omitempty"`
-	ContentLanguage  string            `json:"content_language,omitempty"`
-	ContentDisposition string          `json:"content_disposition,omitempty"`
-	CacheControl     string            `json:"cache_control,omitempty"`
-	Expires          *time.Time        `json:"expires,omitempty"`
-	Metadata         map[string]string `json:"metadata,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
-	StorageClass     StorageClass      `json:"storage_class"`
-	VersionID        string            `json:"version_id,omitempty"`
-	IsLatest         bool              `json:"is_latest"`
-	DeleteMarker     bool              `json:"delete_marker"`
-	Checksum         string            `json:"checksum,omitempty"`
-	Encryption       *EncryptionInfo   `json:"encryption,omitempty"`
-	Owner            *OwnerInfo        `json:"owner,omitempty"`
+	Key                string            `json:"key"`
+	Size               int64             `json:"size"`
+	LastModified       time.Time         `json:"last_modified"`
+	ETag               string            `json:"etag"`
+	ContentType        string            `json:"content_type"`
+	ContentEncoding    string            `json:"content_encoding,omitempty"`
+	ContentLanguage    string            `json:"content_language,omitempty"`
+	ContentDisposition string            `json:"content_disposition,omitempty"`
+	CacheControl       string            `json:"cache_control,omitempty"`
+	Expires            *time.Time        `json:"expires,omitempty"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Tags               map[string]string `json:"tags,omitempty"`
+	StorageClass       StorageClass      `json:"storage_class"`
+	VersionID          string            `json:"version_id,omitempty"`
+	IsLatest           bool              `json:"is_latest"`
+	DeleteMarker       bool              `json:"delete_marker"`
+	Checksum           string            `json:"checksum,omitempty"`
+	Encryption         *EncryptionInfo   `json:"encryption,omitempty"`
+	Owner              *OwnerInfo        `json:"owner,omitempty"`
 }
 
 // URLOptions contains options for generating object URLs
 type URLOptions struct {
-	Secure    bool              `json:"secure,omitempty"`
-	CustomDomain string         `json:"custom_domain,omitempty"`
-	Params    map[string]string `json:"params,omitempty"`
+	Secure       bool              `json:"secure,omitempty"`
+	CustomDomain string            `json:"custom_domain,omitempty"`
+	Params       map[string]string `json:"params,omitempty"`
 }
 
 // PresignedURLOptions contains options for generating presigned URLs
 type PresignedURLOptions struct {
-	Method     string            `json:"method"`
-	Expires    time.Duration     `json:"expires"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	Params     map[string]string `json:"params,omitempty"`
-	VersionID  string            `json:"version_id,omitempty"`
+	Method    string            `json:"method"`
+	Expires   time.Duration     `json:"expires"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Params    map[string]string `json:"params,omitempty"`
+	VersionID string            `json:"version_id,omitempty"`
 }
 
 // MultipartUploadOptions contains options for multipart upload
 type MultipartUploadOptions struct {
-	PartSize         int64             `json:"part_size,omitempty"`
-	Concurrency      int               `json:"concurrency,omitempty"`
-	ContentType      string            `json:"content_type,omitempty"`
-	Metadata         map[string]string `json:"metadata,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
-	StorageClass     StorageClass      `json:"storage_class,omitempty"`
-	Encryption       *EncryptionInfo   `json:"encryption,omitempty"`
-	ACL              *ObjectACL        `json:"acl,omitempty"`
+	PartSize         int64                       `json:"part_size,omitempty"`
+	Concurrency      int                         `json:"concurrency,omitempty"`
+	ContentType      string                      `json:"content_type,omitempty"`
+	Metadata         map[string]string           `json:"metadata,omitempty"`
+	Tags             map[string]string           `json:"tags,omitempty"`
+	StorageClass     StorageClass                `json:"storage_class,omitempty"`
+	Encryption       *EncryptionInfo             `json:"encryption,omitempty"`
+	ACL              *ObjectACL                  `json:"acl,omitempty"`
 	ProgressCallback func(uploaded, total int64) `json:"-"`
 }
 
@@ -310,10 +313,10 @@ type MultipartUploader interface {
 
 // UploadPartResult contains the result of uploading a part
 type UploadPartResult struct {
-	PartNumber   int    `json:"part_number"`
-	ETag         string `json:"etag"`
-	Size         int64  `json:"size"`
-	Checksum     string `json:"checksum,omitempty"`
+	PartNumber int    `json:"part_number"`
+	ETag       string `json:"etag"`
+	Size       int64  `json:"size"`
+	Checksum   string `json:"checksum,omitempty"`
 }
 
 // CompletedPart represents a completed part for multipart upload
@@ -324,12 +327,12 @@ type CompletedPart struct {
 
 // BatchOperation represents an operation in a batch
 type BatchOperation struct {
-	Type     BatchOperationType `json:"type"`
-	Bucket   string             `json:"bucket"`
-	Key      string             `json:"key"`
-	Source   *BatchSource       `json:"source,omitempty"`
-	Target   *BatchTarget       `json:"target,omitempty"`
-	Options  interface{}        `json:"options,omitempty"`
+	Type    BatchOperationType `json:"type"`
+	Bucket  string             `json:"bucket"`
+	Key     string             `json:"key"`
+	Source  *BatchSource       `json:"source,omitempty"`
+	Target  *BatchTarget       `json:"target,omitempty"`
+	Options interface{}        `json:"options,omitempty"`
 }
 
 // BatchOperationType represents the type of batch operation
@@ -359,11 +362,11 @@ type BatchTarget struct {
 
 // BatchResult contains the result of batch operations
 type BatchResult struct {
-	Successful []BatchOperationResult `json:"successful"`
-	Failed     []BatchOperationError  `json:"failed"`
-	TotalCount int                    `json:"total_count"`
-	SuccessCount int                  `json:"success_count"`
-	FailureCount int                  `json:"failure_count"`
+	Successful   []BatchOperationResult `json:"successful"`
+	Failed       []BatchOperationError  `json:"failed"`
+	TotalCount   int                    `json:"total_count"`
+	SuccessCount int                    `json:"success_count"`
+	FailureCount int                    `json:"failure_count"`
 }
 
 // BatchOperationResult represents a successful batch operation
@@ -436,10 +439,10 @@ func (sc StorageClass) String() string {
 
 // EncryptionInfo contains encryption information
 type EncryptionInfo struct {
-	Type      EncryptionType `json:"type"`
-	Algorithm string         `json:"algorithm,omitempty"`
-	KeyID     string         `json:"key_id,omitempty"`
-	Key       string         `json:"key,omitempty"`
+	Type      EncryptionType    `json:"type"`
+	Algorithm string            `json:"algorithm,omitempty"`
+	KeyID     string            `json:"key_id,omitempty"`
+	Key       string            `json:"key,omitempty"`
 	Context   map[string]string `json:"context,omitempty"`
 }
 
@@ -521,17 +524,17 @@ type OwnerInfo struct {
 
 // Grant represents an ACL grant
 type Grant struct {
-	Grantee    *Grantee    `json:"grantee"`
+	Grantee    *Grantee   `json:"grantee"`
 	Permission Permission `json:"permission"`
 }
 
 // Grantee represents a grantee in an ACL
 type Grantee struct {
-	Type         GranteeType `json:"type"`
-	ID           string      `json:"id,omitempty"`
-	DisplayName  string      `json:"display_name,omitempty"`
-	Email        string      `json:"email,omitempty"`
-	URI          string      `json:"uri,omitempty"`
+	Type        GranteeType `json:"type"`
+	ID          string      `json:"id,omitempty"`
+	DisplayName string      `json:"display_name,omitempty"`
+	Email       string      `json:"email,omitempty"`
+	URI         string      `json:"uri,omitempty"`
 }
 
 // GranteeType represents the type of grantee
@@ -556,8 +559,8 @@ const (
 
 // WebsiteConfig represents website configuration
 type WebsiteConfig struct {
-	IndexDocument string       `json:"index_document,omitempty"`
-	ErrorDocument string       `json:"error_document,omitempty"`
+	IndexDocument string         `json:"index_document,omitempty"`
+	ErrorDocument string         `json:"error_document,omitempty"`
 	RedirectRules []RedirectRule `json:"redirect_rules,omitempty"`
 }
 
@@ -575,11 +578,11 @@ type RedirectCondition struct {
 
 // RedirectTarget represents redirect target
 type RedirectTarget struct {
-	HostName               string `json:"host_name,omitempty"`
-	HttpRedirectCode       string `json:"http_redirect_code,omitempty"`
-	Protocol               string `json:"protocol,omitempty"`
-	ReplaceKeyPrefixWith   string `json:"replace_key_prefix_with,omitempty"`
-	ReplaceKeyWith         string `json:"replace_key_with,omitempty"`
+	HostName             string `json:"host_name,omitempty"`
+	HttpRedirectCode     string `json:"http_redirect_code,omitempty"`
+	Protocol             string `json:"protocol,omitempty"`
+	ReplaceKeyPrefixWith string `json:"replace_key_prefix_with,omitempty"`
+	ReplaceKeyWith       string `json:"replace_key_with,omitempty"`
 }
 
 // CORSConfig represents CORS configuration
@@ -603,13 +606,13 @@ type LifecycleConfig struct {
 
 // LifecycleRule represents a lifecycle rule
 type LifecycleRule struct {
-	ID                             string                         `json:"id,omitempty"`
-	Status                         string                         `json:"status"`
-	Filter                         *LifecycleFilter               `json:"filter,omitempty"`
-	Transitions                    []LifecycleTransition          `json:"transitions,omitempty"`
-	Expiration                     *LifecycleExpiration           `json:"expiration,omitempty"`
-	NoncurrentVersionTransitions   []LifecycleTransition          `json:"noncurrent_version_transitions,omitempty"`
-	NoncurrentVersionExpiration    *LifecycleExpiration           `json:"noncurrent_version_expiration,omitempty"`
+	ID                             string                          `json:"id,omitempty"`
+	Status                         string                          `json:"status"`
+	Filter                         *LifecycleFilter                `json:"filter,omitempty"`
+	Transitions                    []LifecycleTransition           `json:"transitions,omitempty"`
+	Expiration                     *LifecycleExpiration            `json:"expiration,omitempty"`
+	NoncurrentVersionTransitions   []LifecycleTransition           `json:"noncurrent_version_transitions,omitempty"`
+	NoncurrentVersionExpiration    *LifecycleExpiration            `json:"noncurrent_version_expiration,omitempty"`
 	AbortIncompleteMultipartUpload *AbortIncompleteMultipartUpload `json:"abort_incomplete_multipart_upload,omitempty"`
 }
 
@@ -671,38 +674,38 @@ const (
 type CloudConfig struct {
 	Provider CloudProvider `json:"provider"`
 	Region   string        `json:"region"`
-	
+
 	// AWS specific
 	AccessKeyID     string `json:"access_key_id,omitempty"`
 	SecretAccessKey string `json:"secret_access_key,omitempty"`
 	SessionToken    string `json:"session_token,omitempty"`
 	Profile         string `json:"profile,omitempty"`
-	
+
 	// Azure specific
-	AccountName   string `json:"account_name,omitempty"`
-	AccountKey    string `json:"account_key,omitempty"`
-	SASToken      string `json:"sas_token,omitempty"`
-	TenantID      string `json:"tenant_id,omitempty"`
-	ClientID      string `json:"client_id,omitempty"`
-	ClientSecret  string `json:"client_secret,omitempty"`
-	
+	AccountName  string `json:"account_name,omitempty"`
+	AccountKey   string `json:"account_key,omitempty"`
+	SASToken     string `json:"sas_token,omitempty"`
+	TenantID     string `json:"tenant_id,omitempty"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+
 	// GCS specific
-	ProjectID   string `json:"project_id,omitempty"`
-	KeyFile     string `json:"key_file,omitempty"`
-	KeyData     []byte `json:"key_data,omitempty"`
-	
+	ProjectID string `json:"project_id,omitempty"`
+	KeyFile   string `json:"key_file,omitempty"`
+	KeyData   []byte `json:"key_data,omitempty"`
+
 	// MinIO specific
-	Endpoint        string `json:"endpoint,omitempty"`
-	UseSSL          bool   `json:"use_ssl,omitempty"`
-	
+	Endpoint string `json:"endpoint,omitempty"`
+	UseSSL   bool   `json:"use_ssl,omitempty"`
+
 	// Common options
-	Timeout         time.Duration `json:"timeout,omitempty"`
-	RetryAttempts   int           `json:"retry_attempts,omitempty"`
-	RetryDelay      time.Duration `json:"retry_delay,omitempty"`
-	MaxConnections  int           `json:"max_connections,omitempty"`
-	EnableLogging   bool          `json:"enable_logging,omitempty"`
-	LogLevel        string        `json:"log_level,omitempty"`
-	UserAgent       string        `json:"user_agent,omitempty"`
+	Timeout        time.Duration `json:"timeout,omitempty"`
+	RetryAttempts  int           `json:"retry_attempts,omitempty"`
+	RetryDelay     time.Duration `json:"retry_delay,omitempty"`
+	MaxConnections int           `json:"max_connections,omitempty"`
+	EnableLogging  bool          `json:"enable_logging,omitempty"`
+	LogLevel       string        `json:"log_level,omitempty"`
+	UserAgent      string        `json:"user_agent,omitempty"`
 }
 
 // DefaultCloudConfig returns default configuration

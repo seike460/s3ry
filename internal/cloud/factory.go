@@ -28,14 +28,14 @@ func NewClientFactory(logger Logger) *ClientFactory {
 func (cf *ClientFactory) RegisterProvider(provider CloudProvider, config *CloudConfig) error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
-	
+
 	if config == nil {
 		return fmt.Errorf("config cannot be nil for provider %s", provider.String())
 	}
-	
+
 	config.Provider = provider
 	cf.configs[provider] = config
-	
+
 	cf.logger.Info("Registered cloud provider: %s", provider.String())
 	return nil
 }
@@ -48,36 +48,36 @@ func (cf *ClientFactory) GetClient(provider CloudProvider) (StorageClient, error
 		return client, nil
 	}
 	cf.mu.RUnlock()
-	
+
 	// Create new client
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
-	
+
 	// Double-check after acquiring write lock
 	if client, exists := cf.clients[provider]; exists {
 		return client, nil
 	}
-	
+
 	config, exists := cf.configs[provider]
 	if !exists {
 		return nil, fmt.Errorf("no configuration found for provider %s", provider.String())
 	}
-	
+
 	client, err := cf.createClient(provider, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client for provider %s: %w", provider.String(), err)
 	}
-	
+
 	cf.clients[provider] = client
 	cf.logger.Info("Created new client for provider: %s", provider.String())
-	
+
 	return client, nil
 }
 
 // GetMultipleClients returns multiple storage clients
 func (cf *ClientFactory) GetMultipleClients(providers []CloudProvider) (map[CloudProvider]StorageClient, error) {
 	clients := make(map[CloudProvider]StorageClient)
-	
+
 	for _, provider := range providers {
 		client, err := cf.GetClient(provider)
 		if err != nil {
@@ -85,7 +85,7 @@ func (cf *ClientFactory) GetMultipleClients(providers []CloudProvider) (map[Clou
 		}
 		clients[provider] = client
 	}
-	
+
 	return clients, nil
 }
 
@@ -93,6 +93,10 @@ func (cf *ClientFactory) GetMultipleClients(providers []CloudProvider) (map[Clou
 func (cf *ClientFactory) createClient(provider CloudProvider, config *CloudConfig) (StorageClient, error) {
 	switch provider {
 	case ProviderAWS:
+		// Basic AWS client for MVP compatibility
+		return NewAWSClient(config, cf.logger)
+	case ProviderAWSBasic:
+		// Basic AWS client for compatibility
 		return NewAWSClient(config, cf.logger)
 	case ProviderAzure:
 		return NewAzureClient(config, cf.logger)
@@ -109,30 +113,43 @@ func (cf *ClientFactory) createClient(provider CloudProvider, config *CloudConfi
 func (cf *ClientFactory) ListProviders() []CloudProvider {
 	cf.mu.RLock()
 	defer cf.mu.RUnlock()
-	
+
 	providers := make([]CloudProvider, 0, len(cf.configs))
 	for provider := range cf.configs {
 		providers = append(providers, provider)
 	}
-	
+
 	return providers
+}
+
+// Stub implementations for non-AWS providers in MVP
+func NewAzureClient(config *CloudConfig, logger Logger) (StorageClient, error) {
+	return nil, fmt.Errorf("Azure client not implemented in MVP")
+}
+
+func NewGCSClient(config *CloudConfig, logger Logger) (StorageClient, error) {
+	return nil, fmt.Errorf("GCS client not implemented in MVP")
+}
+
+func NewMinIOClient(config *CloudConfig, logger Logger) (StorageClient, error) {
+	return nil, fmt.Errorf("MinIO client not implemented in MVP")
 }
 
 // RemoveProvider removes a provider and closes its client
 func (cf *ClientFactory) RemoveProvider(provider CloudProvider) error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
-	
+
 	if client, exists := cf.clients[provider]; exists {
 		if err := client.Disconnect(context.Background()); err != nil {
 			cf.logger.Warn("Failed to disconnect client for provider %s: %v", provider.String(), err)
 		}
 		delete(cf.clients, provider)
 	}
-	
+
 	delete(cf.configs, provider)
 	cf.logger.Info("Removed provider: %s", provider.String())
-	
+
 	return nil
 }
 
@@ -140,19 +157,19 @@ func (cf *ClientFactory) RemoveProvider(provider CloudProvider) error {
 func (cf *ClientFactory) Close() error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
-	
+
 	var lastErr error
-	
+
 	for provider, client := range cf.clients {
 		if err := client.Disconnect(context.Background()); err != nil {
 			cf.logger.Warn("Failed to disconnect client for provider %s: %v", provider.String(), err)
 			lastErr = err
 		}
 	}
-	
+
 	cf.clients = make(map[CloudProvider]StorageClient)
 	cf.configs = make(map[CloudProvider]*CloudConfig)
-	
+
 	cf.logger.Info("Closed all cloud clients")
 	return lastErr
 }
@@ -177,25 +194,25 @@ func (mcm *MultiCloudManager) CrossCloudCopy(ctx context.Context, req *CrossClou
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source client: %w", err)
 	}
-	
+
 	targetClient, err := mcm.factory.GetClient(req.TargetProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get target client: %w", err)
 	}
-	
+
 	// Get object from source
 	sourceObj, err := sourceClient.GetObject(ctx, req.SourceBucket, req.SourceKey, req.GetOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source object: %w", err)
 	}
 	defer sourceObj.Body.Close()
-	
+
 	// Put object to target
 	putResult, err := targetClient.PutObject(ctx, req.TargetBucket, req.TargetKey, sourceObj.Body, req.PutOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put target object: %w", err)
 	}
-	
+
 	result := &CrossCloudCopyResult{
 		SourceProvider: req.SourceProvider,
 		TargetProvider: req.TargetProvider,
@@ -206,11 +223,11 @@ func (mcm *MultiCloudManager) CrossCloudCopy(ctx context.Context, req *CrossClou
 		Size:           sourceObj.Info.Size,
 		PutResult:      putResult,
 	}
-	
-	mcm.logger.Info("Cross-cloud copy completed: %s:%s/%s -> %s:%s/%s", 
+
+	mcm.logger.Info("Cross-cloud copy completed: %s:%s/%s -> %s:%s/%s",
 		req.SourceProvider.String(), req.SourceBucket, req.SourceKey,
 		req.TargetProvider.String(), req.TargetBucket, req.TargetKey)
-	
+
 	return result, nil
 }
 
@@ -220,37 +237,37 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 	if err != nil {
 		return nil, fmt.Errorf("failed to get source client: %w", err)
 	}
-	
+
 	targetClient, err := mcm.factory.GetClient(req.TargetProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get target client: %w", err)
 	}
-	
+
 	// List objects in source
 	sourceObjects, err := sourceClient.ListObjects(ctx, req.SourceBucket, req.ListOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list source objects: %w", err)
 	}
-	
+
 	// List objects in target
 	targetObjects, err := targetClient.ListObjects(ctx, req.TargetBucket, req.ListOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list target objects: %w", err)
 	}
-	
+
 	// Create maps for comparison
 	sourceMap := make(map[string]*ObjectInfo)
 	for i := range sourceObjects.Objects {
 		obj := &sourceObjects.Objects[i]
 		sourceMap[obj.Key] = obj
 	}
-	
+
 	targetMap := make(map[string]*ObjectInfo)
 	for i := range targetObjects.Objects {
 		obj := &targetObjects.Objects[i]
 		targetMap[obj.Key] = obj
 	}
-	
+
 	result := &CrossCloudSyncResult{
 		SourceProvider: req.SourceProvider,
 		TargetProvider: req.TargetProvider,
@@ -261,11 +278,11 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 			TotalTargetObjects: len(targetObjects.Objects),
 		},
 	}
-	
+
 	// Find objects to copy (new or modified)
 	for key, sourceObj := range sourceMap {
 		targetObj, exists := targetMap[key]
-		
+
 		var shouldCopy bool
 		if !exists {
 			shouldCopy = true
@@ -277,7 +294,7 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 			shouldCopy = true
 			result.Summary.ModifiedObjects++
 		}
-		
+
 		if shouldCopy {
 			copyReq := &CrossCloudCopyRequest{
 				SourceProvider: req.SourceProvider,
@@ -289,7 +306,7 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 				GetOptions:     req.GetOptions,
 				PutOptions:     req.PutOptions,
 			}
-			
+
 			copyResult, err := mcm.CrossCloudCopy(ctx, copyReq)
 			if err != nil {
 				result.Summary.FailedObjects++
@@ -306,7 +323,7 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 			result.Summary.SkippedObjects++
 		}
 	}
-	
+
 	// Find objects to delete (if delete mode is enabled)
 	if req.SyncMode == SyncModeSync || req.SyncMode == SyncModeForce {
 		for key := range targetMap {
@@ -325,31 +342,31 @@ func (mcm *MultiCloudManager) CrossCloudSync(ctx context.Context, req *CrossClou
 			}
 		}
 	}
-	
-	mcm.logger.Info("Cross-cloud sync completed: %s:%s -> %s:%s (%d synced, %d failed)", 
+
+	mcm.logger.Info("Cross-cloud sync completed: %s:%s -> %s:%s (%d synced, %d failed)",
 		req.SourceProvider.String(), req.SourceBucket,
 		req.TargetProvider.String(), req.TargetBucket,
 		result.Summary.SyncedObjects, result.Summary.FailedObjects)
-	
+
 	return result, nil
 }
 
 // MultiCloudSearch searches for objects across multiple cloud providers
 func (mcm *MultiCloudManager) MultiCloudSearch(ctx context.Context, req *MultiCloudSearchRequest) (*MultiCloudSearchResult, error) {
 	results := make(map[CloudProvider]*SearchProviderResult)
-	
+
 	for _, provider := range req.Providers {
 		client, err := mcm.factory.GetClient(provider)
 		if err != nil {
 			mcm.logger.Warn("Failed to get client for provider %s: %v", provider.String(), err)
 			continue
 		}
-		
+
 		providerResult := &SearchProviderResult{
 			Provider: provider,
 			Objects:  make([]ObjectInfo, 0),
 		}
-		
+
 		for _, bucket := range req.Buckets {
 			objects, err := client.ListObjects(ctx, bucket, req.ListOptions)
 			if err != nil {
@@ -357,7 +374,7 @@ func (mcm *MultiCloudManager) MultiCloudSearch(ctx context.Context, req *MultiCl
 				providerResult.Errors = append(providerResult.Errors, fmt.Sprintf("bucket %s: %s", bucket, err.Error()))
 				continue
 			}
-			
+
 			// Filter objects based on search criteria
 			for _, obj := range objects.Objects {
 				if mcm.matchesSearchCriteria(&obj, req.Criteria) {
@@ -365,10 +382,10 @@ func (mcm *MultiCloudManager) MultiCloudSearch(ctx context.Context, req *MultiCl
 				}
 			}
 		}
-		
+
 		results[provider] = providerResult
 	}
-	
+
 	return &MultiCloudSearchResult{
 		Results: results,
 	}, nil
@@ -379,7 +396,7 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 	if criteria == nil {
 		return true
 	}
-	
+
 	// Check key pattern
 	if criteria.KeyPattern != "" {
 		// Simple pattern matching (could be enhanced with regex)
@@ -387,7 +404,7 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 			return false
 		}
 	}
-	
+
 	// Check size range
 	if criteria.MinSize > 0 && obj.Size < criteria.MinSize {
 		return false
@@ -395,7 +412,7 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 	if criteria.MaxSize > 0 && obj.Size > criteria.MaxSize {
 		return false
 	}
-	
+
 	// Check date range
 	if criteria.ModifiedAfter != nil && obj.LastModified.Before(*criteria.ModifiedAfter) {
 		return false
@@ -403,12 +420,12 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 	if criteria.ModifiedBefore != nil && obj.LastModified.After(*criteria.ModifiedBefore) {
 		return false
 	}
-	
+
 	// Check storage class
 	if criteria.StorageClass != nil && obj.StorageClass != *criteria.StorageClass {
 		return false
 	}
-	
+
 	// Check tags
 	if len(criteria.Tags) > 0 {
 		for key, value := range criteria.Tags {
@@ -417,7 +434,7 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 			}
 		}
 	}
-	
+
 	return true
 }
 
@@ -425,7 +442,7 @@ func (mcm *MultiCloudManager) matchesSearchCriteria(obj *ObjectInfo, criteria *S
 func (mcm *MultiCloudManager) HealthCheckAll(ctx context.Context) (*MultiCloudHealthResult, error) {
 	providers := mcm.factory.ListProviders()
 	results := make(map[CloudProvider]*HealthCheckResult)
-	
+
 	for _, provider := range providers {
 		client, err := mcm.factory.GetClient(provider)
 		if err != nil {
@@ -436,15 +453,20 @@ func (mcm *MultiCloudManager) HealthCheckAll(ctx context.Context) (*MultiCloudHe
 			}
 			continue
 		}
-		
+
 		err = client.HealthCheck(ctx)
 		results[provider] = &HealthCheckResult{
 			Provider: provider,
 			Healthy:  err == nil,
-			Error:    func() string { if err != nil { return err.Error() }; return "" }(),
+			Error: func() string {
+				if err != nil {
+					return err.Error()
+				}
+				return ""
+			}(),
 		}
 	}
-	
+
 	return &MultiCloudHealthResult{
 		Results: results,
 	}, nil
@@ -452,11 +474,11 @@ func (mcm *MultiCloudManager) HealthCheckAll(ctx context.Context) (*MultiCloudHe
 
 // Helper function for string contains check
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && 
-			(s[:len(substr)] == substr || 
-			 s[len(s)-len(substr):] == substr || 
-			 containsMiddle(s, substr))))
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
+			(s[:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				containsMiddle(s, substr))))
 }
 
 func containsMiddle(s, substr string) bool {
@@ -472,14 +494,14 @@ func containsMiddle(s, substr string) bool {
 
 // CrossCloudCopyRequest contains parameters for cross-cloud copy
 type CrossCloudCopyRequest struct {
-	SourceProvider CloudProvider        `json:"source_provider"`
-	TargetProvider CloudProvider        `json:"target_provider"`
-	SourceBucket   string               `json:"source_bucket"`
-	SourceKey      string               `json:"source_key"`
-	TargetBucket   string               `json:"target_bucket"`
-	TargetKey      string               `json:"target_key"`
-	GetOptions     *GetObjectOptions    `json:"get_options,omitempty"`
-	PutOptions     *PutObjectOptions    `json:"put_options,omitempty"`
+	SourceProvider CloudProvider     `json:"source_provider"`
+	TargetProvider CloudProvider     `json:"target_provider"`
+	SourceBucket   string            `json:"source_bucket"`
+	SourceKey      string            `json:"source_key"`
+	TargetBucket   string            `json:"target_bucket"`
+	TargetKey      string            `json:"target_key"`
+	GetOptions     *GetObjectOptions `json:"get_options,omitempty"`
+	PutOptions     *PutObjectOptions `json:"put_options,omitempty"`
 }
 
 // CrossCloudCopyResult contains the result of cross-cloud copy
@@ -505,11 +527,11 @@ const (
 
 // CrossCloudSyncRequest contains parameters for cross-cloud sync
 type CrossCloudSyncRequest struct {
-	SourceProvider CloudProvider      `json:"source_provider"`
-	TargetProvider CloudProvider      `json:"target_provider"`
-	SourceBucket   string             `json:"source_bucket"`
-	TargetBucket   string             `json:"target_bucket"`
-	SyncMode       SyncMode           `json:"sync_mode"`
+	SourceProvider CloudProvider       `json:"source_provider"`
+	TargetProvider CloudProvider       `json:"target_provider"`
+	SourceBucket   string              `json:"source_bucket"`
+	TargetBucket   string              `json:"target_bucket"`
+	SyncMode       SyncMode            `json:"sync_mode"`
 	ListOptions    *ListObjectsOptions `json:"list_options,omitempty"`
 	GetOptions     *GetObjectOptions   `json:"get_options,omitempty"`
 	PutOptions     *PutObjectOptions   `json:"put_options,omitempty"`
@@ -546,21 +568,21 @@ type SyncError struct {
 
 // MultiCloudSearchRequest contains parameters for multi-cloud search
 type MultiCloudSearchRequest struct {
-	Providers   []CloudProvider      `json:"providers"`
-	Buckets     []string             `json:"buckets"`
-	Criteria    *SearchCriteria      `json:"criteria,omitempty"`
-	ListOptions *ListObjectsOptions  `json:"list_options,omitempty"`
+	Providers   []CloudProvider     `json:"providers"`
+	Buckets     []string            `json:"buckets"`
+	Criteria    *SearchCriteria     `json:"criteria,omitempty"`
+	ListOptions *ListObjectsOptions `json:"list_options,omitempty"`
 }
 
 // SearchCriteria contains search criteria for objects
 type SearchCriteria struct {
-	KeyPattern      string             `json:"key_pattern,omitempty"`
-	MinSize         int64              `json:"min_size,omitempty"`
-	MaxSize         int64              `json:"max_size,omitempty"`
-	ModifiedAfter   *time.Time         `json:"modified_after,omitempty"`
-	ModifiedBefore  *time.Time         `json:"modified_before,omitempty"`
-	StorageClass    *StorageClass      `json:"storage_class,omitempty"`
-	Tags            map[string]string  `json:"tags,omitempty"`
+	KeyPattern     string            `json:"key_pattern,omitempty"`
+	MinSize        int64             `json:"min_size,omitempty"`
+	MaxSize        int64             `json:"max_size,omitempty"`
+	ModifiedAfter  *time.Time        `json:"modified_after,omitempty"`
+	ModifiedBefore *time.Time        `json:"modified_before,omitempty"`
+	StorageClass   *StorageClass     `json:"storage_class,omitempty"`
+	Tags           map[string]string `json:"tags,omitempty"`
 }
 
 // MultiCloudSearchResult contains the result of multi-cloud search

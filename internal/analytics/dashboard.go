@@ -20,27 +20,27 @@ type Dashboard struct {
 
 // Statistics holds aggregated usage statistics
 type Statistics struct {
-	StartTime        time.Time              `json:"start_time"`
-	LastUpdate       time.Time              `json:"last_update"`
-	TotalCommands    int64                  `json:"total_commands"`
-	TotalErrors      int64                  `json:"total_errors"`
-	TotalBytes       int64                  `json:"total_bytes"`
-	TotalObjects     int64                  `json:"total_objects"`
-	AverageThroughput float64              `json:"average_throughput_mbps"`
-	CommandStats     map[string]*CommandStat `json:"command_stats"`
-	ErrorStats       map[string]int64       `json:"error_stats"`
-	Performance      *PerformanceStats      `json:"performance"`
-	System           *SystemStats           `json:"system"`
+	StartTime         time.Time               `json:"start_time"`
+	LastUpdate        time.Time               `json:"last_update"`
+	TotalCommands     int64                   `json:"total_commands"`
+	TotalErrors       int64                   `json:"total_errors"`
+	TotalBytes        int64                   `json:"total_bytes"`
+	TotalObjects      int64                   `json:"total_objects"`
+	AverageThroughput float64                 `json:"average_throughput_mbps"`
+	CommandStats      map[string]*CommandStat `json:"command_stats"`
+	ErrorStats        map[string]int64        `json:"error_stats"`
+	Performance       *PerformanceStats       `json:"performance"`
+	System            *SystemStats            `json:"system"`
 }
 
 // CommandStat holds statistics for a specific command
 type CommandStat struct {
-	Count          int64         `json:"count"`
-	TotalDuration  time.Duration `json:"total_duration"`
+	Count           int64         `json:"count"`
+	TotalDuration   time.Duration `json:"total_duration"`
 	AverageDuration time.Duration `json:"average_duration"`
-	SuccessRate    float64       `json:"success_rate"`
-	LastUsed       time.Time     `json:"last_used"`
-	Errors         int64         `json:"errors"`
+	SuccessRate     float64       `json:"success_rate"`
+	LastUsed        time.Time     `json:"last_used"`
+	Errors          int64         `json:"errors"`
 }
 
 // PerformanceStats holds performance metrics
@@ -61,10 +61,10 @@ type ThroughputPoint struct {
 
 // SystemStats holds system-level statistics
 type SystemStats struct {
-	OSDistribution       map[string]int64 `json:"os_distribution"`
-	ArchDistribution     map[string]int64 `json:"arch_distribution"`
-	ContainerUsage       int64            `json:"container_usage"`
-	CloudProviderUsage   map[string]int64 `json:"cloud_provider_usage"`
+	OSDistribution        map[string]int64 `json:"os_distribution"`
+	ArchDistribution      map[string]int64 `json:"arch_distribution"`
+	ContainerUsage        int64            `json:"container_usage"`
+	CloudProviderUsage    map[string]int64 `json:"cloud_provider_usage"`
 	GoVersionDistribution map[string]int64 `json:"go_version_distribution"`
 }
 
@@ -189,11 +189,11 @@ func (d *Dashboard) UpdateStats(command string, duration time.Duration, success 
 	d.stats.System.OSDistribution[osInfo]++
 	d.stats.System.ArchDistribution[arch]++
 	d.stats.System.GoVersionDistribution[goVersion]++
-	
+
 	if cloudProvider != "" {
 		d.stats.System.CloudProviderUsage[cloudProvider]++
 	}
-	
+
 	if isContainer {
 		d.stats.System.ContainerUsage++
 	}
@@ -215,14 +215,14 @@ func (d *Dashboard) GetStats() *Statistics {
 
 	// Create a deep copy to avoid race conditions
 	statsCopy := *d.stats
-	
+
 	// Copy maps
 	statsCopy.CommandStats = make(map[string]*CommandStat)
 	for k, v := range d.stats.CommandStats {
 		cmdStatCopy := *v
 		statsCopy.CommandStats[k] = &cmdStatCopy
 	}
-	
+
 	statsCopy.ErrorStats = make(map[string]int64)
 	for k, v := range d.stats.ErrorStats {
 		statsCopy.ErrorStats[k] = v
@@ -234,7 +234,7 @@ func (d *Dashboard) GetStats() *Statistics {
 	for k, v := range d.stats.Performance.WorkerPoolSizes {
 		perfCopy.WorkerPoolSizes[k] = v
 	}
-	
+
 	perfCopy.ThroughputHistory = make([]ThroughputPoint, len(d.stats.Performance.ThroughputHistory))
 	copy(perfCopy.ThroughputHistory, d.stats.Performance.ThroughputHistory)
 	statsCopy.Performance = &perfCopy
@@ -245,22 +245,22 @@ func (d *Dashboard) GetStats() *Statistics {
 	for k, v := range d.stats.System.OSDistribution {
 		sysCopy.OSDistribution[k] = v
 	}
-	
+
 	sysCopy.ArchDistribution = make(map[string]int64)
 	for k, v := range d.stats.System.ArchDistribution {
 		sysCopy.ArchDistribution[k] = v
 	}
-	
+
 	sysCopy.CloudProviderUsage = make(map[string]int64)
 	for k, v := range d.stats.System.CloudProviderUsage {
 		sysCopy.CloudProviderUsage[k] = v
 	}
-	
+
 	sysCopy.GoVersionDistribution = make(map[string]int64)
 	for k, v := range d.stats.System.GoVersionDistribution {
 		sysCopy.GoVersionDistribution[k] = v
 	}
-	
+
 	statsCopy.System = &sysCopy
 
 	return &statsCopy
@@ -468,10 +468,10 @@ func (d *Dashboard) handleIndex(w http.ResponseWriter, r *http.Request) {
 // handleStats serves the statistics API endpoint
 func (d *Dashboard) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats := d.GetStats()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	
+
 	json.NewEncoder(w).Encode(stats)
 }
 
@@ -482,7 +482,7 @@ func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().UTC(),
 		"uptime":    time.Since(d.stats.StartTime).String(),
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

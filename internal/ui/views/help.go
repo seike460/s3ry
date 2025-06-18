@@ -9,7 +9,7 @@ import (
 // HelpView represents the help view with comprehensive keyboard shortcuts
 type HelpView struct {
 	list *components.List
-	
+
 	// Styles
 	headerStyle lipgloss.Style
 	keyStyle    lipgloss.Style
@@ -23,15 +23,15 @@ func NewHelpView() *HelpView {
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4")).
 			MarginBottom(2),
-		
+
 		keyStyle: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#04B575")),
-		
+
 		descStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888")),
 	}
-	
+
 	// Create help items
 	items := []components.ListItem{
 		{
@@ -45,7 +45,7 @@ func NewHelpView() *HelpView {
 			Tag:         "Key",
 		},
 		{
-			Title:       "↓/j - Move down", 
+			Title:       "↓/j - Move down",
 			Description: "Navigate to next item in lists",
 			Tag:         "Key",
 		},
@@ -150,9 +150,9 @@ func NewHelpView() *HelpView {
 			Tag:         "Tip",
 		},
 	}
-	
+
 	help.list = components.NewList("📖 S3ry Help - Keyboard Shortcuts & Usage", items)
-	
+
 	return help
 }
 
@@ -168,18 +168,21 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "q":
 			return v, tea.Quit
+		case "esc":
+			// Return to previous view - use a simple welcome for now
+			return NewRegionView(), nil
 		}
-		
+
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
 	}
-	
+
 	return v, nil
 }
 
@@ -188,11 +191,11 @@ func (v *HelpView) View() string {
 	if v.list == nil {
 		return v.headerStyle.Render("Help not available")
 	}
-	
+
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
 		MarginTop(1).
 		Render("esc/q: back • Use keyboard shortcuts shown above for efficient navigation")
-	
+
 	return v.list.View() + "\n" + footer
 }

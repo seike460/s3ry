@@ -1,205 +1,292 @@
-# S3ry Makefile - Modern build system
-.PHONY: help build build-all install test test-integration lint fmt clean release setup dev
-.DEFAULT_GOAL := help
+# S3ry Makefile - Optimized Development Workflow
+# Modern high-performance S3 CLI tool
 
 # Variables
 BINARY_NAME := s3ry
-CMD_PATH := ./cmd/s3ry
-BUILD_DIR := bin
-DIST_DIR := dist
+PACKAGE := github.com/seike460/s3ry
 VERSION := $(shell git describe --tags --always --dirty)
 COMMIT := $(shell git rev-parse HEAD)
 DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-
-# Build flags
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
-BUILD_FLAGS := -ldflags="$(LDFLAGS)"
 
-# Go environment
-export CGO_ENABLED=0
-export GOFLAGS=-mod=readonly
+# Go parameters
+GOCMD := go
+GOBUILD := $(GOCMD) build
+GOCLEAN := $(GOCMD) clean
+GOTEST := $(GOCMD) test
+GOGET := $(GOCMD) get
+GOMOD := $(GOCMD) mod
+GOFMT := gofmt
 
+# Build parameters
+BUILD_DIR := dist
+MAIN_PATH := ./cmd/s3ry
+
+# Colors for output
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+BLUE := \033[0;34m
+NC := \033[0m # No Color
+
+# Default target
+.DEFAULT_GOAL := help
+
+# Help target
+.PHONY: help
 help: ## Show this help message
-	@echo "S3ry Build System"
-	@echo "=================="
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@echo "$(BLUE)🚀 S3ry Development Commands$(NC)"
+	@echo "=============================="
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make $(YELLOW)<target>$(NC)\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  $(YELLOW)%-15s$(NC) %s\n", $$1, $$2 } /^##@/ { printf "\n$(BLUE)%s$(NC)\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-setup: ## Setup development environment using mise
-	@echo "🚀 Setting up development environment..."
-	@if command -v mise >/dev/null 2>&1; then \
-		mise install; \
-		mise run setup; \
-	else \
-		echo "❌ mise not found. Please install mise first: https://mise.jdx.dev/"; \
-		exit 1; \
+##@ Development
+
+.PHONY: setup
+setup: ## Setup development environment
+	@echo "$(BLUE)🔧 Setting up development environment...$(NC)"
+	$(GOMOD) download
+	$(GOMOD) verify
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo "$(YELLOW)Installing golangci-lint...$(NC)"; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.62.2; \
 	fi
+	@if ! command -v govulncheck >/dev/null 2>&1; then \
+		echo "$(YELLOW)Installing govulncheck...$(NC)"; \
+		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+	fi
+	@echo "$(GREEN)✅ Development environment ready!$(NC)"
 
-install-deps: ## Install Go dependencies
-	@echo "📦 Installing dependencies..."
-	@go mod download
-	@go mod tidy
+.PHONY: deps
+deps: ## Download and verify dependencies
+	@echo "$(BLUE)📦 Managing dependencies...$(NC)"
+	$(GOMOD) download
+	$(GOMOD) verify
+	$(GOMOD) tidy
+	@echo "$(GREEN)✅ Dependencies updated$(NC)"
 
+##@ Building
+
+.PHONY: build
 build: ## Build the binary for current platform
-	@echo "🔨 Building $(BINARY_NAME)..."
-	@mkdir -p $(BUILD_DIR)
-	@go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
-	@echo "✅ Binary built: $(BUILD_DIR)/$(BINARY_NAME)"
+	@echo "$(BLUE)🔨 Building $(BINARY_NAME)...$(NC)"
+	mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "$(GREEN)✅ Build completed: $(BUILD_DIR)/$(BINARY_NAME)$(NC)"
 
-build-all: ## Build for all supported platforms
-	@echo "🔨 Building for all platforms..."
-	@mkdir -p $(DIST_DIR)
-	@echo "  • Building for Darwin AMD64..."
-	@GOOS=darwin GOARCH=amd64 go build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 $(CMD_PATH)
-	@echo "  • Building for Darwin ARM64..."
-	@GOOS=darwin GOARCH=arm64 go build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 $(CMD_PATH)
-	@echo "  • Building for Linux AMD64..."
-	@GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 $(CMD_PATH)
-	@echo "  • Building for Linux ARM64..."
-	@GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 $(CMD_PATH)
-	@echo "  • Building for Windows AMD64..."
-	@GOOS=windows GOARCH=amd64 go build $(BUILD_FLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe $(CMD_PATH)
-	@echo "✅ All platforms built in $(DIST_DIR)/"
+.PHONY: build-all
+build-all: ## Build binaries for all platforms
+	@echo "$(BLUE)🌐 Building for all platforms...$(NC)"
+	mkdir -p $(BUILD_DIR)
+	
+	# Linux AMD64
+	@echo "$(YELLOW)Building for Linux AMD64...$(NC)"
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+	
+	# Linux ARM64
+	@echo "$(YELLOW)Building for Linux ARM64...$(NC)"
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 $(MAIN_PATH)
+	
+	# macOS AMD64
+	@echo "$(YELLOW)Building for macOS AMD64...$(NC)"
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 $(MAIN_PATH)
+	
+	# macOS ARM64
+	@echo "$(YELLOW)Building for macOS ARM64...$(NC)"
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 $(MAIN_PATH)
+	
+	# Windows AMD64
+	@echo "$(YELLOW)Building for Windows AMD64...$(NC)"
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
+	
+	@echo "$(GREEN)✅ All builds completed!$(NC)"
+	@ls -la $(BUILD_DIR)/
 
-dev: ## Run in development mode
-	@echo "🚀 Starting development server..."
-	@go run $(CMD_PATH)
+.PHONY: install
+install: build ## Install the binary to GOPATH/bin
+	@echo "$(BLUE)📦 Installing $(BINARY_NAME)...$(NC)"
+	cp $(BUILD_DIR)/$(BINARY_NAME) $(GOPATH)/bin/$(BINARY_NAME)
+	@echo "$(GREEN)✅ Installed to $(GOPATH)/bin/$(BINARY_NAME)$(NC)"
 
-test: ## Run all tests
-	@echo "🧪 Running tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
-	@echo "✅ Tests completed"
+##@ Testing
 
+.PHONY: test
+test: ## Run unit tests
+	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
+	$(GOTEST) -v -race -timeout=10m ./...
+	@echo "$(GREEN)✅ Unit tests completed$(NC)"
+
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage
+	@echo "$(BLUE)📊 Running tests with coverage...$(NC)"
+	$(GOTEST) -v -race -timeout=10m -coverprofile=coverage.out ./...
+	$(GOCMD) tool cover -html=coverage.out -o coverage.html
+	$(GOCMD) tool cover -func=coverage.out
+	@echo "$(GREEN)✅ Coverage report generated: coverage.html$(NC)"
+
+.PHONY: test-integration
 test-integration: ## Run integration tests
-	@echo "🧪 Running integration tests..."
-	@go test -v -tags=integration ./test/integration/...
+	@echo "$(BLUE)🔗 Running integration tests...$(NC)"
+	$(GOTEST) -v -timeout=15m -tags=integration ./test/integration/...
+	@echo "$(GREEN)✅ Integration tests completed$(NC)"
 
-test-coverage: test ## Generate test coverage report
-	@echo "📊 Generating coverage report..."
-	@go tool cover -html=coverage.out -o coverage.html
-	@echo "✅ Coverage report: coverage.html"
+.PHONY: test-e2e
+test-e2e: ## Run end-to-end tests
+	@echo "$(BLUE)🎯 Running e2e tests...$(NC)"
+	RUN_E2E_TESTS=1 $(GOTEST) -v -timeout=20m ./test/e2e/...
+	@echo "$(GREEN)✅ E2E tests completed$(NC)"
 
-lint: ## Run linting
-	@echo "🔍 Running linter..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run --fix; \
+.PHONY: bench
+bench: ## Run benchmarks
+	@echo "$(BLUE)⚡ Running benchmarks...$(NC)"
+	$(GOTEST) -bench=. -benchmem -timeout=10m ./...
+	@echo "$(GREEN)✅ Benchmarks completed$(NC)"
+
+##@ Quality
+
+.PHONY: fmt
+fmt: ## Format Go code
+	@echo "$(BLUE)🎨 Formatting code...$(NC)"
+	$(GOFMT) -s -w .
+	@echo "$(GREEN)✅ Code formatted$(NC)"
+
+.PHONY: lint
+lint: ## Run linter
+	@echo "$(BLUE)🔍 Running linter...$(NC)"
+	golangci-lint run --timeout=5m
+	@echo "$(GREEN)✅ Linting completed$(NC)"
+
+.PHONY: vet
+vet: ## Run go vet
+	@echo "$(BLUE)🔍 Running go vet...$(NC)"
+	$(GOCMD) vet ./...
+	@echo "$(GREEN)✅ Vet completed$(NC)"
+
+.PHONY: security
+security: ## Run security checks
+	@echo "$(BLUE)🔒 Running security checks...$(NC)"
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec ./...; \
 	else \
-		echo "❌ golangci-lint not found. Install with: mise install"; \
+		echo "$(YELLOW)gosec not installed, skipping...$(NC)"; \
 	fi
-
-fmt: ## Format code
-	@echo "🎨 Formatting code..."
-	@if command -v gofumpt >/dev/null 2>&1; then \
-		gofumpt -l -w .; \
-	else \
-		go fmt ./...; \
-	fi
-
-check: fmt lint test ## Run all checks (format, lint, test)
-
-clean: ## Clean build artifacts
-	@echo "🧹 Cleaning build artifacts..."
-	@rm -rf $(BUILD_DIR)/ $(DIST_DIR)/ coverage.out coverage.html
-	@echo "✅ Cleaned"
-
-install: build ## Install binary to GOPATH/bin
-	@echo "📦 Installing $(BINARY_NAME)..."
-	@cp $(BUILD_DIR)/$(BINARY_NAME) $(shell go env GOPATH)/bin/
-	@echo "✅ Installed to $(shell go env GOPATH)/bin/$(BINARY_NAME)"
-
-release: ## Create a new release using goreleaser
-	@echo "🚀 Creating release..."
-	@if command -v goreleaser >/dev/null 2>&1; then \
-		goreleaser release --clean; \
-	else \
-		echo "❌ goreleaser not found. Install with: mise install"; \
-	fi
-
-release-snapshot: ## Create a snapshot release
-	@echo "📸 Creating snapshot release..."
-	@if command -v goreleaser >/dev/null 2>&1; then \
-		goreleaser release --snapshot --clean; \
-	else \
-		echo "❌ goreleaser not found. Install with: mise install"; \
-	fi
-
-version: ## Show version information
-	@echo "Version: $(VERSION)"
-	@echo "Commit:  $(COMMIT)"
-	@echo "Date:    $(DATE)"
-
-# Docker targets
-docker-build: ## Build Docker image
-	@echo "🐳 Building Docker image..."
-	@docker build -t $(BINARY_NAME):$(VERSION) .
-
-docker-run: ## Run Docker container
-	@echo "🐳 Running Docker container..."
-	@docker run --rm -it $(BINARY_NAME):$(VERSION)
-
-# CI targets
-ci-setup: ## Setup CI environment
-	@echo "🤖 Setting up CI environment..."
-	@go mod download
-	@mkdir -p $(BUILD_DIR) $(DIST_DIR)
-
-ci-test: ## Run tests in CI
-	@echo "🤖 Running CI tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out
-
-ci-build: ## Build in CI
-	@echo "🤖 Building in CI..."
-	@$(MAKE) build-all
-
-# Development utilities
-watch: ## Watch for changes and rebuild
-	@echo "👀 Watching for changes..."
-	@if command -v fswatch >/dev/null 2>&1; then \
-		fswatch -o . -e ".*" -i "\\.go$$" | xargs -n1 -I{} make build; \
-	else \
-		echo "❌ fswatch not found. Install with: brew install fswatch"; \
-	fi
-
-deps-update: ## Update dependencies to latest versions
-	@echo "⬆️  Updating dependencies..."
-	@build/scripts/update-deps.sh patch
-
-deps-update-minor: ## Update dependencies to latest minor versions
-	@echo "⬆️  Updating dependencies (minor)..."
-	@build/scripts/update-deps.sh minor
-
-deps-update-major: ## Update dependencies to latest major versions
-	@echo "⬆️  Updating dependencies (major)..."
-	@build/scripts/update-deps.sh major
-
-deps-security: ## Update dependencies with security fixes
-	@echo "🔒 Updating security dependencies..."
-	@build/scripts/update-deps.sh security true
-
-deps-check: ## Check for dependency vulnerabilities
-	@echo "🔒 Checking dependencies for vulnerabilities..."
 	@if command -v govulncheck >/dev/null 2>&1; then \
 		govulncheck ./...; \
 	else \
-		echo "❌ govulncheck not found. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "$(YELLOW)govulncheck not installed, skipping...$(NC)"; \
 	fi
+	@echo "$(GREEN)✅ Security checks completed$(NC)"
 
-# Integration and monitoring
-integration-check: ## Run comprehensive integration checks
-	@echo "🔍 Running integration checks..."
-	@build/scripts/integration-check.sh
+.PHONY: check
+check: fmt vet lint security test ## Run all quality checks
+	@echo "$(GREEN)✅ All quality checks completed!$(NC)"
 
-performance-check: ## Run performance monitoring
-	@echo "📊 Running performance checks..."
-	@build/scripts/performance-monitor.sh
+##@ CI/CD
 
-parallel-dev-status: ## Show parallel development status
-	@echo "👥 Parallel development status..."
-	@build/scripts/integration-check.sh | grep -A 20 "LLM Work Status"
+.PHONY: ci-check
+ci-check: ## Run CI integration check
+	@echo "$(BLUE)🔍 Running CI integration check...$(NC)"
+	./build/scripts/integration-check.sh
+	@echo "$(GREEN)✅ CI check completed$(NC)"
 
-# Documentation generation
-generate-docs: ## Generate comprehensive project documentation
-	@echo "📚 Generating documentation..."
-	@build/scripts/generate-docs.sh
+.PHONY: ci-deps
+ci-deps: ## Run dependency check
+	@echo "$(BLUE)📦 Running dependency check...$(NC)"
+	./build/scripts/dependency-check.sh
+	@echo "$(GREEN)✅ Dependency check completed$(NC)"
 
-docs: generate-docs ## Alias for generate-docs
+.PHONY: ci-perf
+ci-perf: ## Run performance monitoring
+	@echo "$(BLUE)📊 Running performance monitoring...$(NC)"
+	./build/scripts/performance-monitor.sh
+	@echo "$(GREEN)✅ Performance monitoring completed$(NC)"
+
+.PHONY: ci-all
+ci-all: ci-check ci-deps ci-perf check test-integration ## Run all CI checks
+	@echo "$(GREEN)🎉 All CI checks completed successfully!$(NC)"
+
+##@ Docker
+
+.PHONY: docker-build
+docker-build: ## Build Docker image
+	@echo "$(BLUE)🐳 Building Docker image...$(NC)"
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_DATE=$(DATE) \
+		--build-arg VCS_REF=$(COMMIT) \
+		-t $(BINARY_NAME):$(VERSION) \
+		-t $(BINARY_NAME):latest \
+		.
+	@echo "$(GREEN)✅ Docker image built$(NC)"
+
+.PHONY: docker-run
+docker-run: docker-build ## Run Docker container
+	@echo "$(BLUE)🐳 Running Docker container...$(NC)"
+	docker run --rm -it $(BINARY_NAME):latest
+
+##@ Release
+
+.PHONY: release-dry
+release-dry: ## Dry run release with GoReleaser
+	@echo "$(BLUE)🚀 Running release dry run...$(NC)"
+	goreleaser release --snapshot --clean --skip=publish
+	@echo "$(GREEN)✅ Release dry run completed$(NC)"
+
+.PHONY: release
+release: ## Create release with GoReleaser
+	@echo "$(BLUE)🚀 Creating release...$(NC)"
+	goreleaser release --clean
+	@echo "$(GREEN)✅ Release completed$(NC)"
+
+##@ Cleanup
+
+.PHONY: clean
+clean: ## Clean build artifacts
+	@echo "$(BLUE)🧹 Cleaning build artifacts...$(NC)"
+	$(GOCLEAN)
+	rm -rf $(BUILD_DIR)
+	rm -f coverage.out coverage.html
+	rm -f performance.log build-metrics.json
+	rm -f dependency-*.txt dependency-*.md
+	@echo "$(GREEN)✅ Cleanup completed$(NC)"
+
+.PHONY: clean-all
+clean-all: clean ## Clean everything including caches
+	@echo "$(BLUE)🧹 Deep cleaning...$(NC)"
+	$(GOCLEAN) -cache
+	$(GOCLEAN) -testcache
+	$(GOCLEAN) -modcache
+	@echo "$(GREEN)✅ Deep cleanup completed$(NC)"
+
+##@ Information
+
+.PHONY: version
+version: ## Show version information
+	@echo "$(BLUE)📋 Version Information$(NC)"
+	@echo "======================"
+	@echo "Version: $(VERSION)"
+	@echo "Commit:  $(COMMIT)"
+	@echo "Date:    $(DATE)"
+	@echo "Package: $(PACKAGE)"
+
+.PHONY: info
+info: ## Show project information
+	@echo "$(BLUE)📋 S3ry Project Information$(NC)"
+	@echo "============================"
+	@echo "Binary:     $(BINARY_NAME)"
+	@echo "Package:    $(PACKAGE)"
+	@echo "Version:    $(VERSION)"
+	@echo "Commit:     $(COMMIT)"
+	@echo "Build Date: $(DATE)"
+	@echo "Go Version: $$(go version)"
+	@echo "Build Dir:  $(BUILD_DIR)"
+	@echo ""
+	@echo "$(BLUE)📊 Project Stats$(NC)"
+	@echo "=================="
+	@echo "Go files:   $$(find . -name '*.go' | wc -l)"
+	@echo "Test files: $$(find . -name '*_test.go' | wc -l)"
+	@echo "Packages:   $$(go list ./... | wc -l)"
+
+# Phony targets
+.PHONY: all
+all: clean setup check build test-integration ## Run complete build pipeline
+	@echo "$(GREEN)🎉 Complete build pipeline finished!$(NC)"

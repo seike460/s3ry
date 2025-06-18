@@ -20,67 +20,67 @@ import (
 
 // SmartUpdater はスマートアップデートシステム
 type SmartUpdater struct {
-	mu                sync.RWMutex
-	config           *config.Config
-	currentVersion   *semver.Version
-	releaseChannel   string
-	updatePolicy     *UpdatePolicy
+	mu                  sync.RWMutex
+	config              *config.Config
+	currentVersion      *semver.Version
+	releaseChannel      string
+	updatePolicy        *UpdatePolicy
 	notificationManager *NotificationManager
-	downloadManager  *DownloadManager
-	versionChecker   *VersionChecker
-	installManager   *InstallManager
-	rollbackManager *RollbackManager
-	updateHistory    []UpdateRecord
-	lastCheckTime    time.Time
-	checkInterval    time.Duration
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
+	downloadManager     *DownloadManager
+	versionChecker      *VersionChecker
+	installManager      *InstallManager
+	rollbackManager     *RollbackManager
+	updateHistory       []UpdateRecord
+	lastCheckTime       time.Time
+	checkInterval       time.Duration
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	wg                  sync.WaitGroup
 }
 
 // UpdatePolicy はアップデートポリシー
 type UpdatePolicy struct {
-	AutoCheck        bool          `json:"auto_check"`
-	AutoDownload     bool          `json:"auto_download"`
-	AutoInstall      bool          `json:"auto_install"`
-	CheckInterval    time.Duration `json:"check_interval"`
-	ReleaseChannels  []string      `json:"release_channels"`
-	IncludePrerelease bool         `json:"include_prerelease"`
-	NotifyMajor      bool          `json:"notify_major"`
-	NotifyMinor      bool          `json:"notify_minor"`
-	NotifyPatch      bool          `json:"notify_patch"`
-	MaintenanceWindow *MaintenanceWindow `json:"maintenance_window,omitempty"`
-	BackupBeforeUpdate bool        `json:"backup_before_update"`
-	MaxRetries       int           `json:"max_retries"`
-	TimeoutDuration  time.Duration `json:"timeout_duration"`
+	AutoCheck          bool               `json:"auto_check"`
+	AutoDownload       bool               `json:"auto_download"`
+	AutoInstall        bool               `json:"auto_install"`
+	CheckInterval      time.Duration      `json:"check_interval"`
+	ReleaseChannels    []string           `json:"release_channels"`
+	IncludePrerelease  bool               `json:"include_prerelease"`
+	NotifyMajor        bool               `json:"notify_major"`
+	NotifyMinor        bool               `json:"notify_minor"`
+	NotifyPatch        bool               `json:"notify_patch"`
+	MaintenanceWindow  *MaintenanceWindow `json:"maintenance_window,omitempty"`
+	BackupBeforeUpdate bool               `json:"backup_before_update"`
+	MaxRetries         int                `json:"max_retries"`
+	TimeoutDuration    time.Duration      `json:"timeout_duration"`
 }
 
 // MaintenanceWindow はメンテナンスウィンドウ
 type MaintenanceWindow struct {
-	StartTime   string   `json:"start_time"`
-	EndTime     string   `json:"end_time"`
-	DaysOfWeek  []int    `json:"days_of_week"`
-	Timezone    string   `json:"timezone"`
-	Enabled     bool     `json:"enabled"`
+	StartTime  string `json:"start_time"`
+	EndTime    string `json:"end_time"`
+	DaysOfWeek []int  `json:"days_of_week"`
+	Timezone   string `json:"timezone"`
+	Enabled    bool   `json:"enabled"`
 }
 
 // VersionInfo はバージョン情報
 type VersionInfo struct {
-	Version       string            `json:"version"`
-	ReleaseDate   time.Time         `json:"release_date"`
-	ReleaseNotes  string            `json:"release_notes"`
-	DownloadURL   string            `json:"download_url"`
-	Checksum      string            `json:"checksum"`
-	FileSize      int64             `json:"file_size"`
-	Platform      string            `json:"platform"`
-	Architecture  string            `json:"architecture"`
-	IsPrerelease  bool              `json:"is_prerelease"`
-	IsCritical    bool              `json:"is_critical"`
-	Requirements  *Requirements     `json:"requirements,omitempty"`
-	Features      []FeatureInfo     `json:"features"`
-	BugFixes      []BugFixInfo      `json:"bug_fixes"`
-	BreakingChanges []BreakingChange `json:"breaking_changes"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	Version         string                 `json:"version"`
+	ReleaseDate     time.Time              `json:"release_date"`
+	ReleaseNotes    string                 `json:"release_notes"`
+	DownloadURL     string                 `json:"download_url"`
+	Checksum        string                 `json:"checksum"`
+	FileSize        int64                  `json:"file_size"`
+	Platform        string                 `json:"platform"`
+	Architecture    string                 `json:"architecture"`
+	IsPrerelease    bool                   `json:"is_prerelease"`
+	IsCritical      bool                   `json:"is_critical"`
+	Requirements    *Requirements          `json:"requirements,omitempty"`
+	Features        []FeatureInfo          `json:"features"`
+	BugFixes        []BugFixInfo           `json:"bug_fixes"`
+	BreakingChanges []BreakingChange       `json:"breaking_changes"`
+	Metadata        map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Requirements はシステム要件
@@ -110,36 +110,36 @@ type BugFixInfo struct {
 
 // BreakingChange は破壊的変更
 type BreakingChange struct {
-	Description string `json:"description"`
+	Description    string `json:"description"`
 	MigrationGuide string `json:"migration_guide"`
-	Impact      string `json:"impact"`
+	Impact         string `json:"impact"`
 }
 
 // UpdateRecord はアップデート履歴
 type UpdateRecord struct {
-	ID               string    `json:"id"`
-	Timestamp        time.Time `json:"timestamp"`
-	FromVersion      string    `json:"from_version"`
-	ToVersion        string    `json:"to_version"`
-	UpdateType       string    `json:"update_type"`
-	Status           string    `json:"status"`
-	Duration         time.Duration `json:"duration"`
-	ErrorMessage     string    `json:"error_message,omitempty"`
-	RollbackAvailable bool     `json:"rollback_available"`
-	BackupPath       string    `json:"backup_path,omitempty"`
-	DownloadSize     int64     `json:"download_size"`
-	VerificationPassed bool    `json:"verification_passed"`
+	ID                 string        `json:"id"`
+	Timestamp          time.Time     `json:"timestamp"`
+	FromVersion        string        `json:"from_version"`
+	ToVersion          string        `json:"to_version"`
+	UpdateType         string        `json:"update_type"`
+	Status             string        `json:"status"`
+	Duration           time.Duration `json:"duration"`
+	ErrorMessage       string        `json:"error_message,omitempty"`
+	RollbackAvailable  bool          `json:"rollback_available"`
+	BackupPath         string        `json:"backup_path,omitempty"`
+	DownloadSize       int64         `json:"download_size"`
+	VerificationPassed bool          `json:"verification_passed"`
 }
 
 // NotificationManager は通知管理
 type NotificationManager struct {
-	mu            sync.RWMutex
-	channels      map[string]NotificationChannel
-	templates     map[string]*NotificationTemplate
+	mu                sync.RWMutex
+	channels          map[string]NotificationChannel
+	templates         map[string]*NotificationTemplate
 	notificationQueue chan *UpdateNotification
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
+	ctx               context.Context
+	cancel            context.CancelFunc
+	wg                sync.WaitGroup
 }
 
 // NotificationChannel は通知チャネル
@@ -151,10 +151,10 @@ type NotificationChannel interface {
 
 // NotificationTemplate は通知テンプレート
 type NotificationTemplate struct {
-	ID       string `json:"id"`
-	Subject  string `json:"subject"`
-	Body     string `json:"body"`
-	Format   string `json:"format"`
+	ID       string   `json:"id"`
+	Subject  string   `json:"subject"`
+	Body     string   `json:"body"`
+	Format   string   `json:"format"`
 	Channels []string `json:"channels"`
 }
 
@@ -176,20 +176,20 @@ type UpdateNotification struct {
 
 // ActionButton はアクションボタン
 type ActionButton struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
+	ID     string `json:"id"`
+	Label  string `json:"label"`
 	Action string `json:"action"`
-	Style string `json:"style"`
+	Style  string `json:"style"`
 }
 
 // DownloadManager はダウンロード管理
 type DownloadManager struct {
-	mu              sync.RWMutex
-	downloadDir     string
-	progressCallbacks []DownloadProgressCallback
+	mu                  sync.RWMutex
+	downloadDir         string
+	progressCallbacks   []DownloadProgressCallback
 	concurrentDownloads int
-	maxRetries      int
-	timeout         time.Duration
+	maxRetries          int
+	timeout             time.Duration
 }
 
 // DownloadProgressCallback はダウンロード進搱コールバック
@@ -197,12 +197,12 @@ type DownloadProgressCallback func(downloaded, total int64, percentage float64)
 
 // DownloadProgress はダウンロード進搱
 type DownloadProgress struct {
-	Downloaded   int64     `json:"downloaded"`
-	Total        int64     `json:"total"`
-	Percentage   float64   `json:"percentage"`
-	Speed        int64     `json:"speed"`
-	ETA          time.Duration `json:"eta"`
-	StartTime    time.Time `json:"start_time"`
+	Downloaded int64         `json:"downloaded"`
+	Total      int64         `json:"total"`
+	Percentage float64       `json:"percentage"`
+	Speed      int64         `json:"speed"`
+	ETA        time.Duration `json:"eta"`
+	StartTime  time.Time     `json:"start_time"`
 }
 
 // VersionChecker はバージョンチェッカー
@@ -224,11 +224,11 @@ type CachedVersionInfo struct {
 
 // InstallManager はインストール管理
 type InstallManager struct {
-	mu                sync.RWMutex
-	installDir        string
-	backupDir         string
+	mu                  sync.RWMutex
+	installDir          string
+	backupDir           string
 	verificationEnabled bool
-	progressCallbacks []InstallProgressCallback
+	progressCallbacks   []InstallProgressCallback
 }
 
 // InstallProgressCallback はインストール進搱コールバック
@@ -268,23 +268,23 @@ func NewSmartUpdater(cfg *config.Config) (*SmartUpdater, error) {
 		currentVersion: currentVersion,
 		releaseChannel: "stable",
 		updatePolicy: &UpdatePolicy{
-			AutoCheck:        true,
-			AutoDownload:     false,
-			AutoInstall:      false,
-			CheckInterval:    6 * time.Hour,
-			ReleaseChannels:  []string{"stable"},
-			IncludePrerelease: false,
-			NotifyMajor:      true,
-			NotifyMinor:      true,
-			NotifyPatch:      true,
+			AutoCheck:          true,
+			AutoDownload:       false,
+			AutoInstall:        false,
+			CheckInterval:      6 * time.Hour,
+			ReleaseChannels:    []string{"stable"},
+			IncludePrerelease:  false,
+			NotifyMajor:        true,
+			NotifyMinor:        true,
+			NotifyPatch:        true,
 			BackupBeforeUpdate: true,
-			MaxRetries:       3,
-			TimeoutDuration:  30 * time.Minute,
+			MaxRetries:         3,
+			TimeoutDuration:    30 * time.Minute,
 		},
-		updateHistory:  make([]UpdateRecord, 0),
-		checkInterval:  6 * time.Hour,
-		ctx:            ctx,
-		cancel:         cancel,
+		updateHistory: make([]UpdateRecord, 0),
+		checkInterval: 6 * time.Hour,
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
 	// 通知マネージャーを初期化
@@ -459,14 +459,14 @@ func (u *SmartUpdater) InstallUpdate(versionInfo *VersionInfo) error {
 
 	// アップデート履歴を記録
 	updateRecord := UpdateRecord{
-		ID:               fmt.Sprintf("update_%d", time.Now().Unix()),
-		Timestamp:        time.Now(),
-		FromVersion:      u.currentVersion.String(),
-		ToVersion:        versionInfo.Version,
-		UpdateType:       u.determineUpdateType(u.currentVersion.String(), versionInfo.Version),
-		Status:           "completed",
-		RollbackAvailable: u.updatePolicy.BackupBeforeUpdate,
-		DownloadSize:     versionInfo.FileSize,
+		ID:                 fmt.Sprintf("update_%d", time.Now().Unix()),
+		Timestamp:          time.Now(),
+		FromVersion:        u.currentVersion.String(),
+		ToVersion:          versionInfo.Version,
+		UpdateType:         u.determineUpdateType(u.currentVersion.String(), versionInfo.Version),
+		Status:             "completed",
+		RollbackAvailable:  u.updatePolicy.BackupBeforeUpdate,
+		DownloadSize:       versionInfo.FileSize,
 		VerificationPassed: true,
 	}
 
@@ -508,30 +508,30 @@ func (u *SmartUpdater) versionCheckWorker() {
 
 func (u *SmartUpdater) initializeNotificationTemplates() {
 	u.notificationManager.templates["update_available"] = &NotificationTemplate{
-		ID:      "update_available",
-		Subject: "🆕 S3ry アップデートが利用可能: {{.Version}}",
-		Body:    "🚀 S3ry の新しいバージョン {{.Version}} が利用可能です！\n\n新機能:\n{{.Features}}\n\nバグ修正:\n{{.BugFixes}}\n\nアップデートして271,615倍のパフォーマンス改善を体験してください！",
-		Format:  "text",
+		ID:       "update_available",
+		Subject:  "🆕 S3ry アップデートが利用可能: {{.Version}}",
+		Body:     "🚀 S3ry の新しいバージョン {{.Version}} が利用可能です！\n\n新機能:\n{{.Features}}\n\nバグ修正:\n{{.BugFixes}}\n\nアップデートして271,615倍のパフォーマンス改善を体験してください！",
+		Format:   "text",
 		Channels: []string{"console", "system"},
 	}
 
 	u.notificationManager.templates["update_success"] = &NotificationTemplate{
-		ID:      "update_success",
-		Subject: "✨ S3ry アップデート完了: {{.Version}}",
-		Body:    "おめでとうございます！S3ry {{.Version}} へのアップデートが成功しました。\n\nパフォーマンス改善と新機能をお楽しみください！",
-		Format:  "text",
+		ID:       "update_success",
+		Subject:  "✨ S3ry アップデート完了: {{.Version}}",
+		Body:     "おめでとうございます！S3ry {{.Version}} へのアップデートが成功しました。\n\nパフォーマンス改善と新機能をお楽しみください！",
+		Format:   "text",
 		Channels: []string{"console", "system"},
 	}
 }
 
 func (u *SmartUpdater) sendUpdateNotification(versionInfo *VersionInfo) {
 	notification := &UpdateNotification{
-		ID:        fmt.Sprintf("update_available_%d", time.Now().Unix()),
-		Timestamp: time.Now(),
-		Type:      "update_available",
-		Severity:  u.determineSeverity(versionInfo),
-		Title:     fmt.Sprintf("S3ry %s アップデートが利用可能", versionInfo.Version),
-		Message:   u.buildUpdateMessage(versionInfo),
+		ID:          fmt.Sprintf("update_available_%d", time.Now().Unix()),
+		Timestamp:   time.Now(),
+		Type:        "update_available",
+		Severity:    u.determineSeverity(versionInfo),
+		Title:       fmt.Sprintf("S3ry %s アップデートが利用可能", versionInfo.Version),
+		Message:     u.buildUpdateMessage(versionInfo),
 		VersionInfo: versionInfo,
 		ActionButtons: []ActionButton{
 			{ID: "download", Label: "ダウンロード", Action: "download", Style: "primary"},
@@ -550,14 +550,14 @@ func (u *SmartUpdater) sendUpdateNotification(versionInfo *VersionInfo) {
 
 func (u *SmartUpdater) sendInstallSuccessNotification(versionInfo *VersionInfo) {
 	notification := &UpdateNotification{
-		ID:        fmt.Sprintf("update_success_%d", time.Now().Unix()),
-		Timestamp: time.Now(),
-		Type:      "update_success",
-		Severity:  "info",
-		Title:     fmt.Sprintf("S3ry %s アップデート完了", versionInfo.Version),
-		Message:   fmt.Sprintf("アップデートが成功しました。271,615倍のパフォーマンス改善をお楽しみください！"),
+		ID:          fmt.Sprintf("update_success_%d", time.Now().Unix()),
+		Timestamp:   time.Now(),
+		Type:        "update_success",
+		Severity:    "info",
+		Title:       fmt.Sprintf("S3ry %s アップデート完了", versionInfo.Version),
+		Message:     fmt.Sprintf("アップデートが成功しました。271,615倍のパフォーマンス改善をお楽しみください！"),
 		VersionInfo: versionInfo,
-		Channels: []string{"console", "system"},
+		Channels:    []string{"console", "system"},
 	}
 
 	select {

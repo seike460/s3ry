@@ -16,19 +16,19 @@ import (
 
 // DuplicateDetector provides intelligent duplicate file detection and consolidation
 type DuplicateDetector struct {
-	config      *DetectorConfig
-	hashCache   map[string]*FileFingerprint
+	config          *DetectorConfig
+	hashCache       map[string]*FileFingerprint
 	similarityCache map[string][]string
-	mu          sync.RWMutex
-	logger      Logger
+	mu              sync.RWMutex
+	logger          Logger
 }
 
 // DetectorConfig configures the duplicate detector
 type DetectorConfig struct {
-	HashAlgorithms         []string      `json:"hash_algorithms"`
-	EnableContentAnalysis  bool          `json:"enable_content_analysis"`
-	EnableSimilarityCheck  bool          `json:"enable_similarity_check"`
-	SimilarityThreshold    float64       `json:"similarity_threshold"`
+	HashAlgorithms        []string      `json:"hash_algorithms"`
+	EnableContentAnalysis bool          `json:"enable_content_analysis"`
+	EnableSimilarityCheck bool          `json:"enable_similarity_check"`
+	SimilarityThreshold   float64       `json:"similarity_threshold"`
 	MaxFileSize           int64         `json:"max_file_size"`
 	ChunkSize             int           `json:"chunk_size"`
 	ConcurrentWorkers     int           `json:"concurrent_workers"`
@@ -43,53 +43,53 @@ func DefaultDetectorConfig() *DetectorConfig {
 		EnableContentAnalysis: true,
 		EnableSimilarityCheck: true,
 		SimilarityThreshold:   0.95,
-		MaxFileSize:          1024 * 1024 * 1024, // 1GB
-		ChunkSize:            8192,
-		ConcurrentWorkers:    4,
-		CacheEnabled:         true,
-		CacheTTL:             24 * time.Hour,
+		MaxFileSize:           1024 * 1024 * 1024, // 1GB
+		ChunkSize:             8192,
+		ConcurrentWorkers:     4,
+		CacheEnabled:          true,
+		CacheTTL:              24 * time.Hour,
 	}
 }
 
 // FileFingerprint represents a unique fingerprint of a file
 type FileFingerprint struct {
-	FilePath      string            `json:"file_path"`
-	FileName      string            `json:"file_name"`
-	FileSize      int64             `json:"file_size"`
-	ModifiedTime  time.Time         `json:"modified_time"`
-	MD5Hash       string            `json:"md5_hash,omitempty"`
-	SHA256Hash    string            `json:"sha256_hash,omitempty"`
-	ContentType   string            `json:"content_type"`
-	FirstBytes    string            `json:"first_bytes"`   // First 1KB as hex
-	LastBytes     string            `json:"last_bytes"`    // Last 1KB as hex
-	ChunkHashes   []string          `json:"chunk_hashes"`  // Hashes of file chunks
-	TextContent   string            `json:"text_content,omitempty"`
-	Metadata      map[string]string `json:"metadata"`
-	CreatedAt     time.Time         `json:"created_at"`
-}
-
-// DuplicateGroup represents a group of duplicate files
-type DuplicateGroup struct {
-	GroupID        string             `json:"group_id"`
-	Files          []FileInfo         `json:"files"`
-	DuplicateType  DuplicateType      `json:"duplicate_type"`
-	Confidence     float64            `json:"confidence"`
-	TotalSize      int64              `json:"total_size"`
-	PotentialSavings int64            `json:"potential_savings"`
-	Recommendation *ConsolidationRec  `json:"recommendation"`
-	CreatedAt      time.Time          `json:"created_at"`
-}
-
-// FileInfo contains information about a file in a duplicate group
-type FileInfo struct {
 	FilePath     string            `json:"file_path"`
 	FileName     string            `json:"file_name"`
 	FileSize     int64             `json:"file_size"`
 	ModifiedTime time.Time         `json:"modified_time"`
-	Bucket       string            `json:"bucket,omitempty"`
-	IsRecommendedKeep bool          `json:"is_recommended_keep"`
-	Reason       string            `json:"reason,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
+	MD5Hash      string            `json:"md5_hash,omitempty"`
+	SHA256Hash   string            `json:"sha256_hash,omitempty"`
+	ContentType  string            `json:"content_type"`
+	FirstBytes   string            `json:"first_bytes"`  // First 1KB as hex
+	LastBytes    string            `json:"last_bytes"`   // Last 1KB as hex
+	ChunkHashes  []string          `json:"chunk_hashes"` // Hashes of file chunks
+	TextContent  string            `json:"text_content,omitempty"`
+	Metadata     map[string]string `json:"metadata"`
+	CreatedAt    time.Time         `json:"created_at"`
+}
+
+// DuplicateGroup represents a group of duplicate files
+type DuplicateGroup struct {
+	GroupID          string            `json:"group_id"`
+	Files            []FileInfo        `json:"files"`
+	DuplicateType    DuplicateType     `json:"duplicate_type"`
+	Confidence       float64           `json:"confidence"`
+	TotalSize        int64             `json:"total_size"`
+	PotentialSavings int64             `json:"potential_savings"`
+	Recommendation   *ConsolidationRec `json:"recommendation"`
+	CreatedAt        time.Time         `json:"created_at"`
+}
+
+// FileInfo contains information about a file in a duplicate group
+type FileInfo struct {
+	FilePath          string            `json:"file_path"`
+	FileName          string            `json:"file_name"`
+	FileSize          int64             `json:"file_size"`
+	ModifiedTime      time.Time         `json:"modified_time"`
+	Bucket            string            `json:"bucket,omitempty"`
+	IsRecommendedKeep bool              `json:"is_recommended_keep"`
+	Reason            string            `json:"reason,omitempty"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
 }
 
 // DuplicateType represents the type of duplication detected
@@ -119,13 +119,13 @@ func (dt DuplicateType) String() string {
 
 // ConsolidationRec represents a recommendation for consolidating duplicates
 type ConsolidationRec struct {
-	Action          ConsolidationAction `json:"action"`
-	KeepFile        string              `json:"keep_file"`
-	RemoveFiles     []string            `json:"remove_files"`
-	Reason          string              `json:"reason"`
-	EstimatedSavings int64              `json:"estimated_savings"`
-	RiskLevel       RiskLevel           `json:"risk_level"`
-	AutoApproved    bool                `json:"auto_approved"`
+	Action           ConsolidationAction `json:"action"`
+	KeepFile         string              `json:"keep_file"`
+	RemoveFiles      []string            `json:"remove_files"`
+	Reason           string              `json:"reason"`
+	EstimatedSavings int64               `json:"estimated_savings"`
+	RiskLevel        RiskLevel           `json:"risk_level"`
+	AutoApproved     bool                `json:"auto_approved"`
 }
 
 // ConsolidationAction represents the type of consolidation action
@@ -195,10 +195,10 @@ func NewDuplicateDetector(config *DetectorConfig, logger Logger) *DuplicateDetec
 // AnalyzeFile creates a fingerprint for a file
 func (dd *DuplicateDetector) AnalyzeFile(ctx context.Context, filePath string, content io.Reader) (*FileFingerprint, error) {
 	fingerprint := &FileFingerprint{
-		FilePath:    filePath,
-		FileName:    filepath.Base(filePath),
-		Metadata:    make(map[string]string),
-		CreatedAt:   time.Now(),
+		FilePath:  filePath,
+		FileName:  filepath.Base(filePath),
+		Metadata:  make(map[string]string),
+		CreatedAt: time.Now(),
 	}
 
 	// Read content into buffer
@@ -348,7 +348,7 @@ func (dd *DuplicateDetector) analyzeTextContent(fingerprint *FileFingerprint, co
 	}
 
 	text := string(content)
-	
+
 	// Store normalized text content (for similarity analysis)
 	normalizedText := dd.normalizeText(text)
 	if len(normalizedText) > 1000 {
@@ -387,10 +387,10 @@ func (dd *DuplicateDetector) isTextContent(content []byte) bool {
 func (dd *DuplicateDetector) normalizeText(text string) string {
 	// Convert to lowercase
 	text = strings.ToLower(text)
-	
+
 	// Remove extra whitespace
 	text = strings.Join(strings.Fields(text), " ")
-	
+
 	// Remove common punctuation for comparison
 	replacements := []string{
 		".", "",
@@ -402,7 +402,7 @@ func (dd *DuplicateDetector) normalizeText(text string) string {
 		"\"", "",
 		"'", "",
 	}
-	
+
 	for i := 0; i < len(replacements); i += 2 {
 		text = strings.ReplaceAll(text, replacements[i], replacements[i+1])
 	}
@@ -583,7 +583,7 @@ func (dd *DuplicateDetector) calculateNameSimilarity(name1, name2 string) float6
 	if len(name2) > maxLen {
 		maxLen = len(name2)
 	}
-	
+
 	if maxLen == 0 {
 		return 1.0
 	}
@@ -702,7 +702,7 @@ func (dd *DuplicateDetector) generateRecommendation(group *DuplicateGroup) *Cons
 	// Sort files by preference (newest, shortest path, etc.)
 	sortedFiles := make([]FileInfo, len(group.Files))
 	copy(sortedFiles, group.Files)
-	
+
 	sort.Slice(sortedFiles, func(i, j int) bool {
 		// Prefer newer files
 		if !sortedFiles[i].ModifiedTime.Equal(sortedFiles[j].ModifiedTime) {
@@ -714,7 +714,7 @@ func (dd *DuplicateDetector) generateRecommendation(group *DuplicateGroup) *Cons
 
 	// Keep the best file
 	rec.KeepFile = sortedFiles[0].FilePath
-	
+
 	// Remove the rest
 	for i := 1; i < len(sortedFiles); i++ {
 		rec.RemoveFiles = append(rec.RemoveFiles, sortedFiles[i].FilePath)

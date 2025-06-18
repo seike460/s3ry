@@ -22,14 +22,14 @@ type PatternAnalyzer struct {
 
 // PatternConfig configures the pattern analyzer
 type PatternConfig struct {
-	LearningWindow      time.Duration `json:"learning_window"`
-	PredictionHorizon   time.Duration `json:"prediction_horizon"`
-	AnomalyThreshold    float64       `json:"anomaly_threshold"`
-	MinDataPoints       int           `json:"min_data_points"`
-	SeasonalityDetection bool         `json:"seasonality_detection"`
-	TrendDetection      bool          `json:"trend_detection"`
-	EnableMLPrediction  bool          `json:"enable_ml_prediction"`
-	UpdateInterval      time.Duration `json:"update_interval"`
+	LearningWindow       time.Duration `json:"learning_window"`
+	PredictionHorizon    time.Duration `json:"prediction_horizon"`
+	AnomalyThreshold     float64       `json:"anomaly_threshold"`
+	MinDataPoints        int           `json:"min_data_points"`
+	SeasonalityDetection bool          `json:"seasonality_detection"`
+	TrendDetection       bool          `json:"trend_detection"`
+	EnableMLPrediction   bool          `json:"enable_ml_prediction"`
+	UpdateInterval       time.Duration `json:"update_interval"`
 }
 
 // DefaultPatternConfig returns default pattern analyzer configuration
@@ -48,17 +48,17 @@ func DefaultPatternConfig() *PatternConfig {
 
 // UsagePattern represents learned usage patterns
 type UsagePattern struct {
-	PatternID       string                 `json:"pattern_id"`
-	Resource        string                 `json:"resource"`
-	PatternType     PatternType            `json:"pattern_type"`
-	Confidence      float64                `json:"confidence"`
-	LastUpdated     time.Time              `json:"last_updated"`
-	DataPoints      []DataPoint            `json:"data_points"`
-	Statistics      *PatternStatistics     `json:"statistics"`
-	Seasonality     *SeasonalPattern       `json:"seasonality,omitempty"`
-	Trend           *TrendPattern          `json:"trend,omitempty"`
-	Correlations    []PatternCorrelation   `json:"correlations,omitempty"`
-	PredictedNext   []PredictionPoint      `json:"predicted_next"`
+	PatternID     string               `json:"pattern_id"`
+	Resource      string               `json:"resource"`
+	PatternType   PatternType          `json:"pattern_type"`
+	Confidence    float64              `json:"confidence"`
+	LastUpdated   time.Time            `json:"last_updated"`
+	DataPoints    []DataPoint          `json:"data_points"`
+	Statistics    *PatternStatistics   `json:"statistics"`
+	Seasonality   *SeasonalPattern     `json:"seasonality,omitempty"`
+	Trend         *TrendPattern        `json:"trend,omitempty"`
+	Correlations  []PatternCorrelation `json:"correlations,omitempty"`
+	PredictedNext []PredictionPoint    `json:"predicted_next"`
 }
 
 // PatternType represents the type of usage pattern
@@ -94,8 +94,8 @@ func (pt PatternType) String() string {
 
 // DataPoint represents a single data point in the pattern
 type DataPoint struct {
-	Timestamp time.Time `json:"timestamp"`
-	Value     float64   `json:"value"`
+	Timestamp time.Time              `json:"timestamp"`
+	Value     float64                `json:"value"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -115,33 +115,33 @@ type PatternStatistics struct {
 
 // SeasonalPattern represents seasonal patterns in the data
 type SeasonalPattern struct {
-	Detected        bool              `json:"detected"`
-	Period          time.Duration     `json:"period"`
-	Amplitude       float64           `json:"amplitude"`
-	Phase           float64           `json:"phase"`
-	Strength        float64           `json:"strength"`
-	HourlyPattern   [24]float64       `json:"hourly_pattern"`
-	DailyPattern    [7]float64        `json:"daily_pattern"`
-	MonthlyPattern  [12]float64       `json:"monthly_pattern"`
-	Confidence      float64           `json:"confidence"`
+	Detected       bool          `json:"detected"`
+	Period         time.Duration `json:"period"`
+	Amplitude      float64       `json:"amplitude"`
+	Phase          float64       `json:"phase"`
+	Strength       float64       `json:"strength"`
+	HourlyPattern  [24]float64   `json:"hourly_pattern"`
+	DailyPattern   [7]float64    `json:"daily_pattern"`
+	MonthlyPattern [12]float64   `json:"monthly_pattern"`
+	Confidence     float64       `json:"confidence"`
 }
 
 // TrendPattern represents trend patterns in the data
 type TrendPattern struct {
-	Detected    bool    `json:"detected"`
-	Direction   string  `json:"direction"` // "increasing", "decreasing", "stable"
-	Slope       float64 `json:"slope"`
-	Strength    float64 `json:"strength"`
-	R2          float64 `json:"r2"`
-	Confidence  float64 `json:"confidence"`
+	Detected   bool    `json:"detected"`
+	Direction  string  `json:"direction"` // "increasing", "decreasing", "stable"
+	Slope      float64 `json:"slope"`
+	Strength   float64 `json:"strength"`
+	R2         float64 `json:"r2"`
+	Confidence float64 `json:"confidence"`
 }
 
 // PatternCorrelation represents correlation with other patterns
 type PatternCorrelation struct {
-	PatternID     string  `json:"pattern_id"`
-	Correlation   float64 `json:"correlation"`
-	Lag           int     `json:"lag"` // Time lag in hours
-	Significance  float64 `json:"significance"`
+	PatternID    string  `json:"pattern_id"`
+	Correlation  float64 `json:"correlation"`
+	Lag          int     `json:"lag"` // Time lag in hours
+	Significance float64 `json:"significance"`
 }
 
 // PredictionPoint represents a predicted future data point
@@ -155,13 +155,13 @@ type PredictionPoint struct {
 
 // PredictionModel contains the prediction model for a pattern
 type PredictionModel struct {
-	ModelType      ModelType             `json:"model_type"`
-	Parameters     map[string]float64    `json:"parameters"`
-	Accuracy       float64               `json:"accuracy"`
-	LastTrained    time.Time             `json:"last_trained"`
-	TrainingData   []DataPoint           `json:"training_data"`
-	ValidationData []DataPoint           `json:"validation_data"`
-	Predictions    []PredictionPoint     `json:"predictions"`
+	ModelType      ModelType          `json:"model_type"`
+	Parameters     map[string]float64 `json:"parameters"`
+	Accuracy       float64            `json:"accuracy"`
+	LastTrained    time.Time          `json:"last_trained"`
+	TrainingData   []DataPoint        `json:"training_data"`
+	ValidationData []DataPoint        `json:"validation_data"`
+	Predictions    []PredictionPoint  `json:"predictions"`
 }
 
 // ModelType represents the type of prediction model
@@ -197,18 +197,18 @@ func (mt ModelType) String() string {
 
 // AnomalyEvent represents an detected anomaly
 type AnomalyEvent struct {
-	EventID      string                 `json:"event_id"`
-	Timestamp    time.Time              `json:"timestamp"`
-	Resource     string                 `json:"resource"`
-	PatternType  PatternType            `json:"pattern_type"`
-	Severity     AnomalySeverity        `json:"severity"`
-	Description  string                 `json:"description"`
-	ActualValue  float64                `json:"actual_value"`
-	ExpectedValue float64               `json:"expected_value"`
-	Deviation    float64                `json:"deviation"`
-	Confidence   float64                `json:"confidence"`
-	Metadata     map[string]interface{} `json:"metadata"`
-	Resolved     bool                   `json:"resolved"`
+	EventID       string                 `json:"event_id"`
+	Timestamp     time.Time              `json:"timestamp"`
+	Resource      string                 `json:"resource"`
+	PatternType   PatternType            `json:"pattern_type"`
+	Severity      AnomalySeverity        `json:"severity"`
+	Description   string                 `json:"description"`
+	ActualValue   float64                `json:"actual_value"`
+	ExpectedValue float64                `json:"expected_value"`
+	Deviation     float64                `json:"deviation"`
+	Confidence    float64                `json:"confidence"`
+	Metadata      map[string]interface{} `json:"metadata"`
+	Resolved      bool                   `json:"resolved"`
 }
 
 // AnomalySeverity represents the severity of an anomaly
@@ -238,18 +238,18 @@ func (as AnomalySeverity) String() string {
 
 // OptimizationSuggestion represents an optimization suggestion based on patterns
 type OptimizationSuggestion struct {
-	SuggestionID    string                 `json:"suggestion_id"`
-	Type            OptimizationType       `json:"type"`
-	Priority        Priority               `json:"priority"`
-	Resource        string                 `json:"resource"`
-	Description     string                 `json:"description"`
-	ExpectedBenefit string                 `json:"expected_benefit"`
-	Implementation  []string               `json:"implementation"`
-	EstimatedSavings float64               `json:"estimated_savings"`
-	Confidence      float64                `json:"confidence"`
-	BasedOnPatterns []string               `json:"based_on_patterns"`
-	ValidUntil      time.Time              `json:"valid_until"`
-	Metadata        map[string]interface{} `json:"metadata"`
+	SuggestionID     string                 `json:"suggestion_id"`
+	Type             OptimizationType       `json:"type"`
+	Priority         Priority               `json:"priority"`
+	Resource         string                 `json:"resource"`
+	Description      string                 `json:"description"`
+	ExpectedBenefit  string                 `json:"expected_benefit"`
+	Implementation   []string               `json:"implementation"`
+	EstimatedSavings float64                `json:"estimated_savings"`
+	Confidence       float64                `json:"confidence"`
+	BasedOnPatterns  []string               `json:"based_on_patterns"`
+	ValidUntil       time.Time              `json:"valid_until"`
+	Metadata         map[string]interface{} `json:"metadata"`
 }
 
 // NewPatternAnalyzer creates a new pattern analyzer
@@ -490,7 +490,7 @@ func (pa *PatternAnalyzer) detectSeasonality(data []DataPoint) *SeasonalPattern 
 
 	if validHours >= 12 { // At least half the hours have data
 		seasonality.HourlyPattern = hourlyMeans
-		
+
 		// Calculate amplitude as range of hourly means
 		minHourly := hourlyMeans[0]
 		maxHourly := hourlyMeans[0]
@@ -603,7 +603,7 @@ func (pa *PatternAnalyzer) detectTrend(data []DataPoint) *TrendPattern {
 			trend.Detected = true
 			trend.Strength = r2
 			trend.Confidence = r2
-			
+
 			if slope > 0 {
 				trend.Direction = "increasing"
 			} else {
@@ -667,14 +667,14 @@ func (pa *PatternAnalyzer) generatePredictions(data []DataPoint, pattern *UsageP
 	}
 
 	var predictions []PredictionPoint
-	
+
 	// Generate predictions for the next prediction horizon
 	predictionSteps := int(pa.config.PredictionHorizon.Hours())
 	baseTime := data[len(data)-1].Timestamp
 
 	for i := 1; i <= predictionSteps; i++ {
 		timestamp := baseTime.Add(time.Duration(i) * time.Hour)
-		
+
 		// Simple prediction based on trend and seasonality
 		predicted := pattern.Statistics.Mean
 		confidence := 0.5
@@ -695,7 +695,7 @@ func (pa *PatternAnalyzer) generatePredictions(data []DataPoint, pattern *UsageP
 
 		// Calculate confidence intervals
 		errorMargin := pattern.Statistics.StandardDeviation * (1.0 - confidence)
-		
+
 		predictions = append(predictions, PredictionPoint{
 			Timestamp:       timestamp,
 			PredictedValue:  predicted,
@@ -720,7 +720,7 @@ func (pa *PatternAnalyzer) detectPatternAnomalies(pattern *UsagePattern) []Anoma
 
 	for _, dp := range pattern.DataPoints {
 		deviation := math.Abs(dp.Value - pattern.Statistics.Mean)
-		
+
 		if deviation > threshold {
 			severity := LowSeverity
 			if deviation > threshold*2 {
@@ -763,17 +763,17 @@ func (pa *PatternAnalyzer) generatePatternOptimizations(pattern *UsagePattern) [
 	if pattern.PatternType == StoragePattern {
 		if pattern.Trend != nil && pattern.Trend.Direction == "increasing" {
 			suggestions = append(suggestions, OptimizationSuggestion{
-				SuggestionID:    fmt.Sprintf("storage_growth_%s", pattern.Resource),
-				Type:            StorageClassOptimization,
-				Priority:        HighPriority,
-				Resource:        pattern.Resource,
-				Description:     "Storage is growing consistently. Consider lifecycle policies to manage costs.",
-				ExpectedBenefit: "20-40% cost reduction",
-				Implementation:  []string{"Implement lifecycle policies", "Review storage class usage", "Enable Intelligent Tiering"},
+				SuggestionID:     fmt.Sprintf("storage_growth_%s", pattern.Resource),
+				Type:             StorageClassOptimization,
+				Priority:         HighPriority,
+				Resource:         pattern.Resource,
+				Description:      "Storage is growing consistently. Consider lifecycle policies to manage costs.",
+				ExpectedBenefit:  "20-40% cost reduction",
+				Implementation:   []string{"Implement lifecycle policies", "Review storage class usage", "Enable Intelligent Tiering"},
 				EstimatedSavings: pattern.Statistics.Mean * 0.3 * 12, // 30% annual savings
-				Confidence:      pattern.Confidence,
-				BasedOnPatterns: []string{pattern.PatternID},
-				ValidUntil:      time.Now().Add(30 * 24 * time.Hour),
+				Confidence:       pattern.Confidence,
+				BasedOnPatterns:  []string{pattern.PatternID},
+				ValidUntil:       time.Now().Add(30 * 24 * time.Hour),
 			})
 		}
 	}
@@ -782,33 +782,33 @@ func (pa *PatternAnalyzer) generatePatternOptimizations(pattern *UsagePattern) [
 	if pattern.PatternType == AccessPattern {
 		if pattern.Statistics.Mean < 0.1 { // Very low access frequency
 			suggestions = append(suggestions, OptimizationSuggestion{
-				SuggestionID:    fmt.Sprintf("low_access_%s", pattern.Resource),
-				Type:            ArchivalOptimization,
-				Priority:        HighPriority,
-				Resource:        pattern.Resource,
-				Description:     "Very low access frequency detected. Consider archival storage.",
-				ExpectedBenefit: "60-80% cost reduction",
-				Implementation:  []string{"Archive to Glacier", "Set up retrieval policies", "Update access procedures"},
+				SuggestionID:     fmt.Sprintf("low_access_%s", pattern.Resource),
+				Type:             ArchivalOptimization,
+				Priority:         HighPriority,
+				Resource:         pattern.Resource,
+				Description:      "Very low access frequency detected. Consider archival storage.",
+				ExpectedBenefit:  "60-80% cost reduction",
+				Implementation:   []string{"Archive to Glacier", "Set up retrieval policies", "Update access procedures"},
 				EstimatedSavings: pattern.Statistics.Mean * 1000 * 0.7 * 12, // Estimate based on storage size
-				Confidence:      pattern.Confidence,
-				BasedOnPatterns: []string{pattern.PatternID},
-				ValidUntil:      time.Now().Add(30 * 24 * time.Hour),
+				Confidence:       pattern.Confidence,
+				BasedOnPatterns:  []string{pattern.PatternID},
+				ValidUntil:       time.Now().Add(30 * 24 * time.Hour),
 			})
 		}
 
 		if pattern.Seasonality != nil && pattern.Seasonality.Detected {
 			suggestions = append(suggestions, OptimizationSuggestion{
-				SuggestionID:    fmt.Sprintf("seasonal_cache_%s", pattern.Resource),
-				Type:            CachingOptimization,
-				Priority:        MediumPriority,
-				Resource:        pattern.Resource,
-				Description:     "Seasonal access pattern detected. Consider predictive caching.",
-				ExpectedBenefit: "30-50% performance improvement",
-				Implementation:  []string{"Implement predictive caching", "Scale cache based on predicted load", "Monitor cache hit rates"},
+				SuggestionID:     fmt.Sprintf("seasonal_cache_%s", pattern.Resource),
+				Type:             CachingOptimization,
+				Priority:         MediumPriority,
+				Resource:         pattern.Resource,
+				Description:      "Seasonal access pattern detected. Consider predictive caching.",
+				ExpectedBenefit:  "30-50% performance improvement",
+				Implementation:   []string{"Implement predictive caching", "Scale cache based on predicted load", "Monitor cache hit rates"},
 				EstimatedSavings: 100, // Fixed estimate for performance improvements
-				Confidence:      pattern.Seasonality.Confidence,
-				BasedOnPatterns: []string{pattern.PatternID},
-				ValidUntil:      time.Now().Add(30 * 24 * time.Hour),
+				Confidence:       pattern.Seasonality.Confidence,
+				BasedOnPatterns:  []string{pattern.PatternID},
+				ValidUntil:       time.Now().Add(30 * 24 * time.Hour),
 			})
 		}
 	}
@@ -829,20 +829,20 @@ func (pa *PatternAnalyzer) generateCorrelationOptimizations(patterns map[string]
 	for i := 0; i < len(patternList); i++ {
 		for j := i + 1; j < len(patternList); j++ {
 			correlation := pa.calculateCorrelation(patternList[i], patternList[j])
-			
+
 			if correlation > 0.8 { // Strong positive correlation
 				suggestion := OptimizationSuggestion{
-					SuggestionID:    fmt.Sprintf("correlation_%s_%s", patternList[i].PatternID, patternList[j].PatternID),
-					Type:            StorageClassOptimization,
-					Priority:        MediumPriority,
-					Resource:        fmt.Sprintf("%s,%s", patternList[i].Resource, patternList[j].Resource),
-					Description:     "Strong correlation detected between resources. Consider unified optimization strategy.",
-					ExpectedBenefit: "Coordinated optimization benefits",
-					Implementation:  []string{"Analyze correlation causes", "Apply similar optimizations", "Monitor correlation changes"},
+					SuggestionID:     fmt.Sprintf("correlation_%s_%s", patternList[i].PatternID, patternList[j].PatternID),
+					Type:             StorageClassOptimization,
+					Priority:         MediumPriority,
+					Resource:         fmt.Sprintf("%s,%s", patternList[i].Resource, patternList[j].Resource),
+					Description:      "Strong correlation detected between resources. Consider unified optimization strategy.",
+					ExpectedBenefit:  "Coordinated optimization benefits",
+					Implementation:   []string{"Analyze correlation causes", "Apply similar optimizations", "Monitor correlation changes"},
 					EstimatedSavings: 50, // Conservative estimate
-					Confidence:      (patternList[i].Confidence + patternList[j].Confidence) / 2,
-					BasedOnPatterns: []string{patternList[i].PatternID, patternList[j].PatternID},
-					ValidUntil:      time.Now().Add(30 * 24 * time.Hour),
+					Confidence:       (patternList[i].Confidence + patternList[j].Confidence) / 2,
+					BasedOnPatterns:  []string{patternList[i].PatternID, patternList[j].PatternID},
+					ValidUntil:       time.Now().Add(30 * 24 * time.Hour),
 					Metadata: map[string]interface{}{
 						"correlation": correlation,
 					},
@@ -871,7 +871,7 @@ func (pa *PatternAnalyzer) calculateCorrelation(pattern1, pattern2 *UsagePattern
 	for i := 0; i < n; i++ {
 		x := pattern1.DataPoints[i].Value
 		y := pattern2.DataPoints[i].Value
-		
+
 		sumX += x
 		sumY += y
 		sumXY += x * y
