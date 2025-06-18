@@ -21,23 +21,23 @@ type PerformanceBenchmark struct {
 var performanceBaselines = []PerformanceBenchmark{
 	{
 		Name:           "WorkerPool_Creation",
-		BaselineNS:     1000000,  // 1ms baseline
-		ToleranceRatio: 2.0,      // Allow 2x degradation
+		BaselineNS:     1000000, // 1ms baseline
+		ToleranceRatio: 2.0,     // Allow 2x degradation
 	},
 	{
-		Name:           "WorkerPool_JobSubmission", 
-		BaselineNS:     100000,   // 0.1ms baseline
-		ToleranceRatio: 3.0,      // Allow 3x degradation for job submission
+		Name:           "WorkerPool_JobSubmission",
+		BaselineNS:     100000, // 0.1ms baseline
+		ToleranceRatio: 3.0,    // Allow 3x degradation for job submission
 	},
 	{
 		Name:           "Metrics_GlobalAccess",
-		BaselineNS:     50000,    // 0.05ms baseline
-		ToleranceRatio: 2.0,      // Allow 2x degradation
+		BaselineNS:     50000, // 0.05ms baseline
+		ToleranceRatio: 2.0,   // Allow 2x degradation
 	},
 	{
 		Name:           "Metrics_SnapshotGeneration",
-		BaselineNS:     500000,   // 0.5ms baseline
-		ToleranceRatio: 2.0,      // Allow 2x degradation
+		BaselineNS:     500000, // 0.5ms baseline
+		ToleranceRatio: 2.0,    // Allow 2x degradation
 	},
 }
 
@@ -50,7 +50,7 @@ func TestPerformanceRegression(t *testing.T) {
 	for _, baseline := range performanceBaselines {
 		t.Run(baseline.Name, func(t *testing.T) {
 			var actualNS int64
-			
+
 			switch baseline.Name {
 			case "WorkerPool_Creation":
 				actualNS = benchmarkWorkerPoolCreation(t)
@@ -63,15 +63,15 @@ func TestPerformanceRegression(t *testing.T) {
 			default:
 				t.Fatalf("Unknown benchmark: %s", baseline.Name)
 			}
-			
+
 			// Check if performance is within acceptable range
 			maxAllowed := int64(float64(baseline.BaselineNS) * baseline.ToleranceRatio)
-			
+
 			if actualNS > maxAllowed {
 				t.Errorf("Performance regression detected in %s: actual %dns > max allowed %dns (baseline: %dns, tolerance: %.1fx)",
 					baseline.Name, actualNS, maxAllowed, baseline.BaselineNS, baseline.ToleranceRatio)
 			} else {
-				t.Logf("✅ Performance OK for %s: %dns <= %dns (baseline: %dns)", 
+				t.Logf("✅ Performance OK for %s: %dns <= %dns (baseline: %dns)",
 					baseline.Name, actualNS, maxAllowed, baseline.BaselineNS)
 			}
 		})
@@ -81,9 +81,9 @@ func TestPerformanceRegression(t *testing.T) {
 // benchmarkWorkerPoolCreation measures worker pool creation time
 func benchmarkWorkerPoolCreation(t *testing.T) int64 {
 	const iterations = 10
-	
+
 	start := time.Now()
-	
+
 	for i := 0; i < iterations; i++ {
 		config := worker.DefaultConfig()
 		config.Workers = 4
@@ -91,10 +91,10 @@ func benchmarkWorkerPoolCreation(t *testing.T) int64 {
 		pool.Start()
 		pool.Stop()
 	}
-	
+
 	elapsed := time.Since(start)
 	avgNS := elapsed.Nanoseconds() / iterations
-	
+
 	t.Logf("Worker pool creation: %dns avg (%d iterations)", avgNS, iterations)
 	return avgNS
 }
@@ -106,20 +106,20 @@ func benchmarkWorkerPoolJobSubmission(t *testing.T) int64 {
 	pool := worker.NewPool(config)
 	pool.Start()
 	defer pool.Stop()
-	
+
 	// Simple mock job
 	job := &mockJob{}
-	
+
 	const iterations = 100
 	start := time.Now()
-	
+
 	for i := 0; i < iterations; i++ {
 		pool.Submit(job)
 	}
-	
+
 	elapsed := time.Since(start)
 	avgNS := elapsed.Nanoseconds() / iterations
-	
+
 	t.Logf("Job submission: %dns avg (%d iterations)", avgNS, iterations)
 	return avgNS
 }
@@ -127,17 +127,17 @@ func benchmarkWorkerPoolJobSubmission(t *testing.T) int64 {
 // benchmarkMetricsGlobalAccess measures global metrics access time
 func benchmarkMetricsGlobalAccess(t *testing.T) int64 {
 	const iterations = 1000
-	
+
 	start := time.Now()
-	
+
 	for i := 0; i < iterations; i++ {
 		m := metrics.GetGlobalMetrics()
 		_ = m
 	}
-	
+
 	elapsed := time.Since(start)
 	avgNS := elapsed.Nanoseconds() / iterations
-	
+
 	t.Logf("Global metrics access: %dns avg (%d iterations)", avgNS, iterations)
 	return avgNS
 }
@@ -145,24 +145,24 @@ func benchmarkMetricsGlobalAccess(t *testing.T) int64 {
 // benchmarkMetricsSnapshotGeneration measures snapshot generation time
 func benchmarkMetricsSnapshotGeneration(t *testing.T) int64 {
 	m := metrics.GetGlobalMetrics()
-	
+
 	// Add some metrics data
 	for i := 0; i < 10; i++ {
 		m.IncrementS3Downloads()
 		m.AddBytesTransferred(1024)
 	}
-	
+
 	const iterations = 100
 	start := time.Now()
-	
+
 	for i := 0; i < iterations; i++ {
 		snapshot := m.GetSnapshot()
 		_ = snapshot
 	}
-	
+
 	elapsed := time.Since(start)
 	avgNS := elapsed.Nanoseconds() / iterations
-	
+
 	t.Logf("Snapshot generation: %dns avg (%d iterations)", avgNS, iterations)
 	return avgNS
 }
@@ -172,46 +172,46 @@ func TestMemoryUsageRegression(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping memory regression tests in short mode")
 	}
-	
+
 	// Force GC to get accurate baseline
 	runtime.GC()
 	runtime.GC()
-	
+
 	var baseline runtime.MemStats
 	runtime.ReadMemStats(&baseline)
-	
+
 	// Create worker pool and submit jobs
 	config := worker.DefaultConfig()
 	config.Workers = 4
 	pool := worker.NewPool(config)
 	pool.Start()
-	
+
 	// Submit jobs to test memory usage
 	job := &mockJob{}
 	for i := 0; i < 100; i++ {
 		pool.Submit(job)
 	}
-	
+
 	// Wait for jobs to complete
 	time.Sleep(50 * time.Millisecond)
 	pool.Stop()
-	
+
 	// Force GC and measure memory
 	runtime.GC()
 	runtime.GC()
-	
+
 	var after runtime.MemStats
 	runtime.ReadMemStats(&after)
-	
+
 	// Check memory increase
 	memIncreaseBytes := after.Alloc - baseline.Alloc
 	maxAllowedBytes := int64(10 * 1024 * 1024) // 10MB max increase
-	
+
 	if int64(memIncreaseBytes) > maxAllowedBytes {
-		t.Errorf("Memory usage regression: increased by %d bytes (max allowed: %d bytes)", 
+		t.Errorf("Memory usage regression: increased by %d bytes (max allowed: %d bytes)",
 			memIncreaseBytes, maxAllowedBytes)
 	} else {
-		t.Logf("✅ Memory usage OK: increased by %d bytes (<= %d bytes)", 
+		t.Logf("✅ Memory usage OK: increased by %d bytes (<= %d bytes)",
 			memIncreaseBytes, maxAllowedBytes)
 	}
 }
@@ -221,18 +221,18 @@ func TestConcurrentPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping concurrent performance tests in short mode")
 	}
-	
+
 	// Test concurrent metrics access
 	const numGoroutines = 10
 	const operationsPerGoroutine = 100
-	
+
 	start := time.Now()
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer func() { done <- true }()
-			
+
 			m := metrics.GetGlobalMetrics()
 			for j := 0; j < operationsPerGoroutine; j++ {
 				m.IncrementS3Downloads()
@@ -240,24 +240,24 @@ func TestConcurrentPerformance(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < numGoroutines; i++ {
 		<-done
 	}
-	
+
 	elapsed := time.Since(start)
 	totalOps := numGoroutines * operationsPerGoroutine
 	opsPerSecond := float64(totalOps) / elapsed.Seconds()
-	
+
 	// Expect at least 1000 operations per second under concurrent load
 	minOpsPerSec := 1000.0
-	
+
 	if opsPerSecond < minOpsPerSec {
-		t.Errorf("Concurrent performance regression: %.2f ops/sec < %.2f ops/sec required", 
+		t.Errorf("Concurrent performance regression: %.2f ops/sec < %.2f ops/sec required",
 			opsPerSecond, minOpsPerSec)
 	} else {
-		t.Logf("✅ Concurrent performance OK: %.2f ops/sec (>= %.2f ops/sec)", 
+		t.Logf("✅ Concurrent performance OK: %.2f ops/sec (>= %.2f ops/sec)",
 			opsPerSecond, minOpsPerSec)
 	}
 }
@@ -278,16 +278,16 @@ func BenchmarkWorkerPoolThroughput(b *testing.B) {
 	pool := worker.NewPool(config)
 	pool.Start()
 	defer pool.Stop()
-	
+
 	job := &mockJob{}
-	
+
 	// Start a result consumer
 	go func() {
 		for i := 0; i < b.N; i++ {
 			<-pool.Results()
 		}
 	}()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pool.Submit(job)
@@ -297,7 +297,7 @@ func BenchmarkWorkerPoolThroughput(b *testing.B) {
 // BenchmarkMetricsPerformance benchmarks metrics operations
 func BenchmarkMetricsPerformance(b *testing.B) {
 	m := metrics.GetGlobalMetrics()
-	
+
 	b.Run("IncrementOperations", func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
@@ -305,13 +305,13 @@ func BenchmarkMetricsPerformance(b *testing.B) {
 			}
 		})
 	})
-	
+
 	b.Run("GetSnapshot", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = m.GetSnapshot()
 		}
 	})
-	
+
 	b.Run("AddBytesTransferred", func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {

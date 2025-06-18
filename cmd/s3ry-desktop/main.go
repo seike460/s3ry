@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/seike460/s3ry/internal/config"
+	"github.com/seike460/s3ry/internal/desktop"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/seike460/s3ry/internal/config"
-	"github.com/seike460/s3ry/internal/desktop"
 )
 
 //go:embed all:frontend/dist
@@ -34,26 +34,26 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 40, G: 42, B: 54, A: 1},
-		MinWidth:         800,
-		MinHeight:        600,
-		OnStartup:        app.Startup,
-		OnDomReady:       app.DomReady,
-		OnBeforeClose:    app.BeforeClose,
-		OnShutdown:       app.Shutdown,
-		Frameless:        false,
-		StartHidden:      false,
+		BackgroundColour:  &options.RGBA{R: 40, G: 42, B: 54, A: 1},
+		MinWidth:          800,
+		MinHeight:         600,
+		OnStartup:         app.Startup,
+		OnDomReady:        app.DomReady,
+		OnBeforeClose:     app.BeforeClose,
+		OnShutdown:        app.Shutdown,
+		Frameless:         false,
+		StartHidden:       false,
 		HideWindowOnClose: false,
 		FullscreenOnStart: false,
-		AlwaysOnTop:      false,
-		CSSDragProperty:  "--wails-draggable",
-		CSSDragValue:     "drag",
+		AlwaysOnTop:       false,
+		CSSDragProperty:   "--wails-draggable",
+		CSSDragValue:      "drag",
 		Windows: &options.Windows{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
-			DisableWindowIcon:    false,
+			WebviewIsTransparent:              false,
+			WindowIsTranslucent:               false,
+			DisableWindowIcon:                 false,
 			DisableFramelessWindowDecorations: false,
-			ResizeDebounceMS: 10,
+			ResizeDebounceMS:                  10,
 		},
 		Mac: &options.Mac{
 			TitleBarAppearsTransparent: true,
@@ -67,7 +67,7 @@ func main() {
 			},
 		},
 		Linux: &options.Linux{
-			Icon: nil,
+			Icon:                nil,
 			WindowIsTranslucent: false,
 		},
 	})

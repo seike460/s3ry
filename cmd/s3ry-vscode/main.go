@@ -14,11 +14,11 @@ import (
 
 func main() {
 	var (
-		port      = flag.Int("port", 3001, "Port for VS Code extension server")
-		region    = flag.String("region", "us-east-1", "AWS region")
-		profile   = flag.String("profile", "", "AWS profile to use")
-		endpoint  = flag.String("endpoint", "", "Custom S3 endpoint")
-		help      = flag.Bool("help", false, "Show help")
+		port     = flag.Int("port", 3001, "Port for VS Code extension server")
+		region   = flag.String("region", "us-east-1", "AWS region")
+		profile  = flag.String("profile", "", "AWS profile to use")
+		endpoint = flag.String("endpoint", "", "Custom S3 endpoint")
+		help     = flag.Bool("help", false, "Show help")
 	)
 	flag.Parse()
 

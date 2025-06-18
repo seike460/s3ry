@@ -17,11 +17,11 @@ import (
 // E2ETestSuite contains end-to-end tests for the s3ry application
 type E2ETestSuite struct {
 	suite.Suite
-	binaryPath    string
-	testBucket    string
-	testFiles     []string
-	originalDir   string
-	tempDir       string
+	binaryPath  string
+	testBucket  string
+	testFiles   []string
+	originalDir string
+	tempDir     string
 }
 
 // SetupSuite builds the binary and sets up the test environment
@@ -30,31 +30,31 @@ func (suite *E2ETestSuite) SetupSuite() {
 	if os.Getenv("RUN_E2E_TESTS") == "" {
 		suite.T().Skip("Skipping E2E tests. Set RUN_E2E_TESTS=1 to run.")
 	}
-	
+
 	// Skip if AWS credentials are not available
 	if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
 		suite.T().Skip("Skipping E2E tests - AWS credentials not available")
 	}
-	
+
 	// Skip if test bucket is not specified
 	testBucket := os.Getenv("S3RY_TEST_BUCKET")
 	if testBucket == "" {
 		suite.T().Skip("Skipping E2E tests - S3RY_TEST_BUCKET not set")
 	}
-	
+
 	suite.testBucket = testBucket
-	
+
 	// Store original directory
 	originalDir, err := os.Getwd()
 	assert.NoError(suite.T(), err)
 	suite.originalDir = originalDir
-	
+
 	// Create temporary directory for tests
 	suite.tempDir = suite.T().TempDir()
-	
+
 	// Build the binary
 	suite.buildBinary()
-	
+
 	// Create test files
 	suite.createTestFiles()
 }
@@ -65,10 +65,10 @@ func (suite *E2ETestSuite) TearDownSuite() {
 	if suite.originalDir != "" {
 		os.Chdir(suite.originalDir)
 	}
-	
+
 	// Clean up test files
 	suite.cleanupTestFiles()
-	
+
 	// Remove binary
 	if suite.binaryPath != "" {
 		os.Remove(suite.binaryPath)
@@ -98,24 +98,24 @@ func (suite *E2ETestSuite) buildBinary() {
 	// Change to project root
 	err := os.Chdir(suite.originalDir)
 	assert.NoError(suite.T(), err)
-	
+
 	binaryName := "s3ry-test"
 	if os.Getenv("GOOS") == "windows" {
 		binaryName += ".exe"
 	}
-	
+
 	suite.binaryPath = filepath.Join(suite.tempDir, binaryName)
-	
+
 	// Build command
 	cmd := exec.Command("go", "build", "-o", suite.binaryPath, "./cmd/s3ry")
 	cmd.Env = os.Environ()
-	
+
 	output, err := cmd.CombinedOutput()
 	_ = err // Suppress unused variable warning
 	if err != nil {
 		suite.T().Fatalf("Failed to build binary: %v\nOutput: %s", err, output)
 	}
-	
+
 	// Verify binary exists and is executable
 	info, err := os.Stat(suite.binaryPath)
 	assert.NoError(suite.T(), err)
@@ -132,7 +132,7 @@ func (suite *E2ETestSuite) createTestFiles() {
 		{"test-medium.log", strings.Repeat("Line of medium test file\n", 100)},
 		{"test-json.json", `{"test": true, "message": "e2e test file"}`},
 	}
-	
+
 	for _, tf := range testFiles {
 		filePath := filepath.Join(suite.tempDir, tf.name)
 		err := os.WriteFile(filePath, []byte(tf.content), 0644)
@@ -151,19 +151,19 @@ func (suite *E2ETestSuite) cleanupTestFiles() {
 func (suite *E2ETestSuite) runCommand(args []string, input string) (string, string, error) {
 	cmd := exec.Command(suite.binaryPath, args...)
 	cmd.Dir = suite.tempDir
-	
+
 	// Set up environment
 	cmd.Env = os.Environ()
-	
+
 	// Provide input if specified
 	if input != "" {
 		cmd.Stdin = strings.NewReader(input)
 	}
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	err := cmd.Run()
 	return stdout.String(), stderr.String(), err
 }
@@ -171,7 +171,7 @@ func (suite *E2ETestSuite) runCommand(args []string, input string) (string, stri
 // TestBinaryExists tests that the binary was built successfully
 func (suite *E2ETestSuite) TestBinaryExists() {
 	assert.FileExists(suite.T(), suite.binaryPath)
-	
+
 	// Test that binary is executable
 	info, err := os.Stat(suite.binaryPath)
 	assert.NoError(suite.T(), err)
@@ -184,7 +184,7 @@ func (suite *E2ETestSuite) TestBinaryExecution() {
 	// But it verifies that the binary can start
 	stdout, stderr, _ := suite.runCommand([]string{}, "")
 	// Ignore error as binary execution might fail in test environment
-	
+
 	// The binary should start and try to list buckets, then fail or prompt
 	// We're mainly testing that it doesn't crash immediately
 	assert.NotEmpty(suite.T(), stdout+stderr, "Should produce some output")
@@ -194,25 +194,25 @@ func (suite *E2ETestSuite) TestBinaryExecution() {
 func (suite *E2ETestSuite) TestListBuckets() {
 	// Since the app is interactive, we can't easily test the full flow
 	// But we can test that it starts and attempts to list buckets
-	
+
 	// Use timeout to prevent hanging
 	cmd := exec.Command(suite.binaryPath)
 	cmd.Dir = suite.tempDir
 	cmd.Env = os.Environ()
-	
+
 	// Start the command
 	err := cmd.Start()
 	_ = err // Will be checked in assert
 	assert.NoError(suite.T(), err)
-	
+
 	// Wait for a short time
 	time.Sleep(2 * time.Second)
-	
+
 	// Kill the process
 	if cmd.Process != nil {
 		cmd.Process.Kill()
 	}
-	
+
 	// Process should have started successfully
 	assert.NotNil(suite.T(), cmd.Process)
 }
@@ -221,13 +221,13 @@ func (suite *E2ETestSuite) TestListBuckets() {
 func (suite *E2ETestSuite) TestFileOperations() {
 	// This is a complex test that would require mocking user input
 	// For now, we'll test the supporting components
-	
+
 	// Verify test files exist
 	for _, testFile := range suite.testFiles {
 		filePath := filepath.Join(suite.tempDir, testFile)
 		testhelpers.AssertFileExists(suite.T(), filePath)
 	}
-	
+
 	// Test file content
 	content, err := os.ReadFile(filepath.Join(suite.tempDir, "test-small.txt"))
 	assert.NoError(suite.T(), err)
@@ -237,17 +237,17 @@ func (suite *E2ETestSuite) TestFileOperations() {
 // TestConfigFiles tests configuration file handling
 func (suite *E2ETestSuite) TestConfigFiles() {
 	// Test that the binary can handle missing config files gracefully
-	
+
 	// Remove any existing config files
 	configFiles := []string{".s3ry", ".aws/config", ".aws/credentials"}
 	for _, config := range configFiles {
 		os.RemoveAll(filepath.Join(suite.tempDir, config))
 	}
-	
+
 	// The binary should still attempt to run with AWS environment variables
 	stdout, stderr, _ := suite.runCommand([]string{}, "")
 	// Ignore error as binary execution might fail in test environment
-	
+
 	// Should not crash due to missing config files
 	output := stdout + stderr
 	assert.NotContains(suite.T(), strings.ToLower(output), "panic")
@@ -260,11 +260,11 @@ func (suite *E2ETestSuite) TestEnvironmentVariables() {
 	originalSecret := os.Getenv("AWS_SECRET_ACCESS_KEY")
 	_ = originalKey    // Used in defer
 	_ = originalSecret // Used in defer
-	
+
 	// Temporarily remove credentials
 	os.Unsetenv("AWS_ACCESS_KEY_ID")
 	os.Unsetenv("AWS_SECRET_ACCESS_KEY")
-	
+
 	defer func() {
 		// Restore credentials
 		if originalKey != "" {
@@ -274,11 +274,11 @@ func (suite *E2ETestSuite) TestEnvironmentVariables() {
 			os.Setenv("AWS_SECRET_ACCESS_KEY", originalSecret)
 		}
 	}()
-	
+
 	// Run binary - should handle missing credentials gracefully
 	stdout, stderr, _ := suite.runCommand([]string{}, "")
 	// Ignore error as binary execution might fail in test environment
-	
+
 	// Should get an AWS credentials error, not a panic
 	output := strings.ToLower(stdout + stderr)
 	if strings.Contains(output, "error") {
@@ -294,15 +294,15 @@ func (suite *E2ETestSuite) TestLargeFileHandling() {
 	largeFileName := "test-large.txt"
 	largeContent := strings.Repeat("This is a line in a large test file.\n", 1000)
 	largeFilePath := filepath.Join(suite.tempDir, largeFileName)
-	
+
 	err := os.WriteFile(largeFilePath, []byte(largeContent), 0644)
 	assert.NoError(suite.T(), err)
-	
+
 	// Verify file was created
 	info, err := os.Stat(largeFilePath)
 	assert.NoError(suite.T(), err)
 	assert.Greater(suite.T(), info.Size(), int64(10000)) // Should be > 10KB
-	
+
 	// Clean up
 	os.Remove(largeFilePath)
 }
@@ -313,11 +313,11 @@ func (suite *E2ETestSuite) TestErrorHandling() {
 	cmd := exec.Command(suite.binaryPath)
 	cmd.Dir = suite.tempDir
 	cmd.Env = append(os.Environ(), "AWS_DEFAULT_REGION=invalid-region-12345")
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	// Start and quickly terminate
 	err := cmd.Start()
 	_ = err // Used conditionally below
@@ -327,7 +327,7 @@ func (suite *E2ETestSuite) TestErrorHandling() {
 			cmd.Process.Kill()
 		}
 	}
-	
+
 	// Should not panic with invalid region
 	output := strings.ToLower(stdout.String() + stderr.String())
 	assert.NotContains(suite.T(), output, "panic")
@@ -336,7 +336,7 @@ func (suite *E2ETestSuite) TestErrorHandling() {
 // TestConcurrentAccess tests concurrent access scenarios
 func (suite *E2ETestSuite) TestConcurrentAccess() {
 	// Test running multiple instances (though they shouldn't interfere)
-	
+
 	commands := make([]*exec.Cmd, 3)
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command(suite.binaryPath)
@@ -344,16 +344,16 @@ func (suite *E2ETestSuite) TestConcurrentAccess() {
 		cmd.Env = os.Environ()
 		commands[i] = cmd
 	}
-	
+
 	// Start all commands
 	for i, cmd := range commands {
 		err := cmd.Start()
 		assert.NoError(suite.T(), err, "Command %d should start", i)
 	}
-	
+
 	// Wait briefly
 	time.Sleep(1 * time.Second)
-	
+
 	// Terminate all commands
 	for i, cmd := range commands {
 		if cmd.Process != nil {
@@ -373,25 +373,25 @@ func BenchmarkBinaryStartup(b *testing.B) {
 	if os.Getenv("RUN_E2E_TESTS") == "" {
 		b.Skip("Skipping E2E benchmarks. Set RUN_E2E_TESTS=1 to run.")
 	}
-	
+
 	// Build binary once
 	originalDir, _ := os.Getwd()
 	tempDir := b.TempDir()
 	binaryPath := filepath.Join(tempDir, "s3ry-bench")
-	
+
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/s3ry")
 	cmd.Dir = originalDir
 	err := cmd.Run()
 	if err != nil {
 		b.Fatal("Failed to build binary for benchmark")
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		cmd := exec.Command(binaryPath)
 		cmd.Dir = tempDir
-		
+
 		start := time.Now()
 		err := cmd.Start()
 		if err == nil && cmd.Process != nil {
@@ -400,7 +400,7 @@ func BenchmarkBinaryStartup(b *testing.B) {
 			cmd.Wait()
 		}
 		elapsed := time.Since(start)
-		
+
 		b.ReportMetric(float64(elapsed.Nanoseconds()), "startup-ns")
 	}
 }

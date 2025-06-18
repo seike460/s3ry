@@ -12,17 +12,17 @@ import (
 func main() {
 	// Initialize i18n system
 	i18n.Init()
-	
+
 	// Create the initial view (region selection)
 	initialView := views.NewRegionView()
-	
+
 	// Create the Bubble Tea program
 	p := tea.NewProgram(
 		initialView,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
-	
+
 	// Run the program
 	if _, err := p.Run(); err != nil {
 		log.Printf("Error running program: %v", err)

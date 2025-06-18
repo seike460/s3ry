@@ -102,9 +102,15 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Convert bucket info to list items
 		items := make([]components.ListItem, len(msg.Buckets))
 		for i, bucket := range msg.Buckets {
+			// Use default region if bucket region is empty
+			region := bucket.Region
+			if region == "" {
+				region = v.region // Use current region as fallback
+			}
+
 			items[i] = components.ListItem{
 				Title:       bucket.Name,
-				Description: fmt.Sprintf("Region: %s", bucket.Region),
+				Description: fmt.Sprintf("Region: %s", region),
 				Tag:         "Bucket",
 				Data:        bucket,
 			}

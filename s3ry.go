@@ -51,9 +51,19 @@ func SelectBucketAndRegion() (string, string) {
 
 // NewS3ry Create New S3ry struct
 func NewS3ry(region string) *S3ry {
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(region)},
-	))
+	// Add timeout for session creation
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			Region:                        aws.String(region),
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		},
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		fmt.Printf("❌ Failed to create AWS session: %v\n", err)
+		os.Exit(1)
+	}
+
 	svc := s3.New(sess)
 	s := &S3ry{
 		Sess:      sess,
@@ -65,9 +75,19 @@ func NewS3ry(region string) *S3ry {
 
 // NewS3ryWithModernBackend Create New S3ry struct with modern backend enabled
 func NewS3ryWithModernBackend(region string) *S3ry {
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(region)},
-	))
+	// Add timeout for session creation
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			Region:                        aws.String(region),
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		},
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		fmt.Printf("❌ Failed to create AWS session for modern backend: %v\n", err)
+		os.Exit(1)
+	}
+
 	svc := s3.New(sess)
 	modernClient := modernS3.NewClient(region)
 
@@ -122,22 +142,47 @@ func (s S3ry) ListBuckets() []PromptItems {
 
 // ListObjectsPages return ListObjectsPages for PromptItems
 func (s S3ry) ListObjectsPages(bucket string) []PromptItems {
+	fmt.Printf("🔍 Starting to search for objects in bucket: %s\n", bucket)
 	sps(i18n.Sprintf("Searching for objects ..."))
 	items := []PromptItems{}
 	key := 0
-	err := s.Svc.ListObjectsPages(&s3.ListObjectsInput{Bucket: aws.String(bucket)},
+
+	// Add shorter timeout for better responsiveness
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	fmt.Printf("📡 Making AWS API call to ListObjects...\n")
+	err := s.Svc.ListObjectsPagesWithContext(ctx, &s3.ListObjectsInput{
+		Bucket:  aws.String(bucket),
+		MaxKeys: aws.Int64(1000), // Limit initial load
+	},
 		func(listObjects *s3.ListObjectsOutput, lastPage bool) bool {
+			fmt.Printf("📄 Processing page with %d objects (last page: %v)\n", len(listObjects.Contents), lastPage)
 			for _, item := range listObjects.Contents {
 				if strings.HasSuffix(*item.Key, "/") == false {
 					items = append(items, PromptItems{Key: key, Val: *item.Key, LastModified: *item.LastModified, Tag: "Object"})
 					key++
 				}
 			}
+			// For debugging, limit to first 100 objects initially
+			if key >= 100 {
+				fmt.Printf("🛑 Limiting to first 100 objects for better performance\n")
+				return false
+			}
 			return !lastPage
 		})
 	if err != nil {
-		awsErrorPrint(err)
+		if ctx.Err() == context.DeadlineExceeded {
+			fmt.Printf("❌ Timeout: Failed to list objects from bucket %s after 30 seconds\n", bucket)
+		} else {
+			fmt.Printf("❌ AWS API Error: %v\n", err)
+			awsErrorPrint(err)
+		}
+		spe()
+		return items
 	}
+
+	fmt.Printf("✅ Successfully loaded %d objects from bucket %s\n", len(items), bucket)
 	// @todo 並び替えオプションをフラグをグローバルにもたせて、KeyでもSort出来るようにする
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].LastModified.After(items[j].LastModified)
@@ -350,7 +395,14 @@ func (s S3ry) SelectItem(label string, items []PromptItems) string {
 
 	if err != nil {
 		awsErrorPrint(err)
+		return ""
 	}
+
+	// Check if items is empty or index is out of range
+	if len(items) == 0 || i < 0 || i >= len(items) {
+		return ""
+	}
+
 	return items[i].Val
 }
 
@@ -443,16 +495,24 @@ func Operations(region string, bucket string) {
 
 // OperationsWithBackend allows choosing between legacy and modern backend
 func OperationsWithBackend(region string, bucket string, useModernBackend bool) {
+	fmt.Printf("🔧 Creating S3 client for region: %s, bucket: %s\n", region, bucket)
 	var s *S3ry
 	if useModernBackend {
+		fmt.Println("📊 Using modern backend")
 		s = NewS3ryWithModernBackend(region)
 	} else {
+		fmt.Println("🏛️ Using legacy backend")
 		s = NewS3ry(region)
 	}
 	s.Bucket = bucket
+	fmt.Println("✅ S3 client created successfully")
+
 	// show Bucket List & select
+	fmt.Println("📋 Loading operation list...")
 	operations := s.ListOperation()
+	fmt.Printf("🎯 Found %d operations available\n", len(operations))
 	selectOperation := s.SelectItem(i18n.Sprintf("What are you doing?"), operations)
+	fmt.Printf("🎮 Selected operation: %s\n", selectOperation)
 
 	switch selectOperation {
 	case i18n.Sprintf("upload"):

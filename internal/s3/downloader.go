@@ -113,12 +113,14 @@ func (d *Downloader) Download(ctx context.Context, request DownloadRequest, conf
 		return fmt.Errorf("failed to submit download job: %w", err)
 	}
 
-	// Wait for result
+	// Wait for result with timeout safety
 	select {
 	case result := <-d.pool.Results():
 		return result.Error
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("download timed out after 30 seconds - worker pool may be deadlocked")
 	}
 }
 

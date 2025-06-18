@@ -305,17 +305,21 @@ func (v *ObjectView) View() string {
 // loadObjects loads the S3 objects
 func (v *ObjectView) loadObjects() tea.Cmd {
 	return func() tea.Msg {
-		// Add timeout context
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// Even shorter timeout for debugging
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Use interface method for MVP
+		if v.s3Client == nil {
+			return ObjectsLoadedMsg{Error: fmt.Errorf("S3 client is nil")}
+		}
+
+		// Use interface method for MVP with pagination limit
 		objects, err := v.s3Client.ListObjects(ctx, v.bucket, "", "")
 		if err != nil {
 			if ctx.Err() == context.DeadlineExceeded {
-				return ObjectsLoadedMsg{Error: fmt.Errorf("timeout loading objects from bucket %s", v.bucket)}
+				return ObjectsLoadedMsg{Error: fmt.Errorf("timeout loading objects from bucket %s (waited 10s)", v.bucket)}
 			}
-			return ObjectsLoadedMsg{Error: fmt.Errorf("failed to load objects: %w", err)}
+			return ObjectsLoadedMsg{Error: fmt.Errorf("failed to load objects from bucket %s: %w", v.bucket, err)}
 		}
 
 		return ObjectsLoadedMsg{Objects: objects}

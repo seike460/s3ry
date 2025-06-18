@@ -34,25 +34,25 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkIntegration() {
 		"subdir/deep/file5.md": "content5",
 		"another/file6.txt":    "content6",
 	}
-	
+
 	// Create the files
 	for path, content := range testStructure {
 		fullPath := filepath.Join(suite.tempDir, path)
 		dir := filepath.Dir(fullPath)
-		
+
 		err := os.MkdirAll(dir, 0755)
 		assert.NoError(suite.T(), err)
-		
+
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		assert.NoError(suite.T(), err)
 	}
-	
+
 	// Test dirwalk - copy the function locally to avoid import cycles
 	files := dirwalk(suite.tempDir)
-	
+
 	// Should find all files (not directories)
 	assert.Len(suite.T(), files, len(testStructure))
-	
+
 	// Convert to relative paths for easier testing
 	relativePaths := make([]string, len(files))
 	for i, file := range files {
@@ -60,7 +60,7 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkIntegration() {
 		assert.NoError(suite.T(), err)
 		relativePaths[i] = rel
 	}
-	
+
 	// Check that all expected files are found
 	for expectedPath := range testStructure {
 		assert.Contains(suite.T(), relativePaths, expectedPath)
@@ -72,7 +72,7 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkLargeDirectory() {
 	largeDir := filepath.Join(suite.tempDir, "large")
 	err := os.MkdirAll(largeDir, 0755)
 	assert.NoError(suite.T(), err)
-	
+
 	// Create 100 files
 	fileCount := 100
 	for i := 0; i < fileCount; i++ {
@@ -80,7 +80,7 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkLargeDirectory() {
 		err := os.WriteFile(filename, []byte("content"), 0644)
 		assert.NoError(suite.T(), err)
 	}
-	
+
 	// Test dirwalk
 	files := dirwalk(largeDir)
 	assert.Len(suite.T(), files, fileCount)
@@ -92,7 +92,7 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkSymlinks() {
 	regularFile := filepath.Join(suite.tempDir, "regular.txt")
 	err := os.WriteFile(regularFile, []byte("regular content"), 0644)
 	assert.NoError(suite.T(), err)
-	
+
 	// Create a symbolic link to the file
 	linkFile := filepath.Join(suite.tempDir, "link.txt")
 	err = os.Symlink(regularFile, linkFile)
@@ -100,18 +100,18 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkSymlinks() {
 		// Skip if symlinks are not supported (e.g., Windows without admin)
 		suite.T().Skip("Symbolic links not supported on this system")
 	}
-	
+
 	// Test dirwalk
 	files := dirwalk(suite.tempDir)
-	
+
 	// Should include both the regular file and the symlink
 	assert.GreaterOrEqual(suite.T(), len(files), 2)
-	
+
 	var basenames []string
 	for _, file := range files {
 		basenames = append(basenames, filepath.Base(file))
 	}
-	
+
 	assert.Contains(suite.T(), basenames, "regular.txt")
 	assert.Contains(suite.T(), basenames, "link.txt")
 }
@@ -124,24 +124,24 @@ func (suite *UtilsIntegrationTestSuite) TestDirwalkPermissions() {
 		"executable.txt": 0755,
 		"readonly.txt":   0444,
 	}
-	
+
 	for filename, mode := range files {
 		fullPath := filepath.Join(suite.tempDir, filename)
 		err := os.WriteFile(fullPath, []byte("content"), mode)
 		assert.NoError(suite.T(), err)
 	}
-	
+
 	// Test dirwalk
 	foundFiles := dirwalk(suite.tempDir)
-	
+
 	// Should find all files regardless of permissions
 	assert.GreaterOrEqual(suite.T(), len(foundFiles), len(files))
-	
+
 	var basenames []string
 	for _, file := range foundFiles {
 		basenames = append(basenames, filepath.Base(file))
 	}
-	
+
 	for filename := range files {
 		assert.Contains(suite.T(), basenames, filename)
 	}
@@ -153,19 +153,19 @@ func (suite *UtilsIntegrationTestSuite) TestCheckLocalExistsIntegration() {
 	testFile := filepath.Join(suite.tempDir, "existing.txt")
 	err := os.WriteFile(testFile, []byte("content"), 0644)
 	assert.NoError(suite.T(), err)
-	
+
 	// Change to the temp directory for this test
 	originalDir, err := os.Getwd()
 	assert.NoError(suite.T(), err)
 	defer os.Chdir(originalDir)
-	
+
 	err = os.Chdir(suite.tempDir)
 	assert.NoError(suite.T(), err)
-	
+
 	// Test with existing file (note: this will prompt for user input in real usage)
 	// For testing, we just ensure it doesn't panic
 	testhelpers.AssertFileExists(suite.T(), "existing.txt")
-	
+
 	// Test with non-existing file
 	testhelpers.AssertFileNotExists(suite.T(), "nonexistent.txt")
 }
@@ -174,12 +174,12 @@ func (suite *UtilsIntegrationTestSuite) TestCheckLocalExistsIntegration() {
 func (suite *UtilsIntegrationTestSuite) TestSpinnerIntegration() {
 	// Test that spinner functions don't panic
 	sps("Testing spinner")
-	
+
 	// Let it spin briefly
 	time.Sleep(100 * time.Millisecond)
-	
+
 	spe()
-	
+
 	// Test completed without issues
 	assert.True(suite.T(), true)
 }
@@ -189,16 +189,16 @@ func (suite *UtilsIntegrationTestSuite) TestFileOperationsIntegration() {
 	// Test creating and reading files
 	testContent := "Integration test content"
 	testFile := filepath.Join(suite.tempDir, "test_ops.txt")
-	
+
 	// Write file
 	err := os.WriteFile(testFile, []byte(testContent), 0644)
 	assert.NoError(suite.T(), err)
-	
+
 	// Read file back
 	content, err := os.ReadFile(testFile)
 	assert.NoError(suite.T(), err)
 	assert.Equal(suite.T(), testContent, string(content))
-	
+
 	// Test file info
 	info, err := os.Stat(testFile)
 	assert.NoError(suite.T(), err)
@@ -212,7 +212,7 @@ func TestUtilsIntegrationSuite(t *testing.T) {
 	if os.Getenv("RUN_INTEGRATION_TESTS") == "" {
 		t.Skip("Skipping integration tests. Set RUN_INTEGRATION_TESTS=1 to run.")
 	}
-	
+
 	suite.Run(t, new(UtilsIntegrationTestSuite))
 }
 
@@ -221,10 +221,10 @@ func BenchmarkDirwalkIntegration(b *testing.B) {
 	if os.Getenv("RUN_INTEGRATION_TESTS") == "" {
 		b.Skip("Skipping integration benchmarks. Set RUN_INTEGRATION_TESTS=1 to run.")
 	}
-	
+
 	// Create a temporary directory with files
 	tempDir := b.TempDir()
-	
+
 	// Create 50 files for benchmarking
 	for i := 0; i < 50; i++ {
 		filename := filepath.Join(tempDir, "bench_file_"+string(rune('0'+(i%10)))+".txt")
@@ -233,9 +233,9 @@ func BenchmarkDirwalkIntegration(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		files := dirwalk(tempDir)
 		if len(files) != 50 {

@@ -50,7 +50,7 @@ func main() {
 	log.Printf("Starting S3ry Web UI...")
 	log.Printf("Configuration loaded from: %s", cfg.GetConfigPath())
 	log.Printf("AWS Region: %s", cfg.AWS.Region)
-	
+
 	if err := web.RunWebUI(cfg, *port); err != nil {
 		log.Fatalf("Failed to start web server: %v", err)
 	}

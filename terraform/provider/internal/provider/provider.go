@@ -24,14 +24,14 @@ type S3ryProvider struct {
 
 // S3ryProviderModel describes the provider data model
 type S3ryProviderModel struct {
-	S3ryPath         types.String `tfsdk:"s3ry_path"`
-	AWSRegion        types.String `tfsdk:"aws_region"`
-	WorkerPoolSize   types.Int64  `tfsdk:"worker_pool_size"`
-	ChunkSize        types.String `tfsdk:"chunk_size"`
-	EnableTelemetry  types.Bool   `tfsdk:"enable_telemetry"`
-	PerformanceMode  types.String `tfsdk:"performance_mode"`
-	Timeout          types.Int64  `tfsdk:"timeout"`
-	MaxRetries       types.Int64  `tfsdk:"max_retries"`
+	S3ryPath        types.String `tfsdk:"s3ry_path"`
+	AWSRegion       types.String `tfsdk:"aws_region"`
+	WorkerPoolSize  types.Int64  `tfsdk:"worker_pool_size"`
+	ChunkSize       types.String `tfsdk:"chunk_size"`
+	EnableTelemetry types.Bool   `tfsdk:"enable_telemetry"`
+	PerformanceMode types.String `tfsdk:"performance_mode"`
+	Timeout         types.Int64  `tfsdk:"timeout"`
+	MaxRetries      types.Int64  `tfsdk:"max_retries"`
 }
 
 // New creates a new S3ry provider instance
@@ -54,7 +54,7 @@ func (p *S3ryProvider) Schema(ctx context.Context, req provider.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "The S3ry provider enables infrastructure-as-code management for ultra-high performance S3 operations. " +
 			"S3ry achieves 271,615x performance improvement over traditional tools with 143GB/s throughput and 35,000+ fps TUI.",
-		
+
 		Attributes: map[string]schema.Attribute{
 			"s3ry_path": schema.StringAttribute{
 				Description: "Path to the s3ry binary. Defaults to 's3ry' (searches PATH).",

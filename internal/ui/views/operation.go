@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/seike460/s3ry/internal/ui/components"
@@ -97,8 +98,10 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter", " ":
 			selectedItem := v.list.GetCurrentItem()
 			if selectedItem != nil {
+				fmt.Printf("🔍 DEBUG: OperationView selected item: %s\n", selectedItem.Tag)
 				switch selectedItem.Tag {
 				case "Download":
+					fmt.Printf("🔍 DEBUG: Creating ObjectView for download\n")
 					return NewObjectView(v.region, v.bucket, "download"), nil
 				case "Upload":
 					return NewUploadView(v.region, v.bucket), nil

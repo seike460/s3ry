@@ -303,7 +303,7 @@ func (c *S3ryClient) executeCommand(ctx context.Context, args ...string) ([]byte
 	output, err := cmd.Output()
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("s3ry command failed with exit code %d: %s", 
+			return nil, fmt.Errorf("s3ry command failed with exit code %d: %s",
 				exitError.ExitCode(), string(exitError.Stderr))
 		}
 		return nil, err

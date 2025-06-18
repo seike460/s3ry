@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-06-16T01:03:00.672417",
+  "source_video": "shibata_shinoya_vs_nishi_sato_xd_final_78th_all_japan.mp4",
+  "transcribe_job": "badminton-transcribe-20250616_010000",
+  "highlights": {
+    "highlights": [
+      {
+        "start_time": 30.0,
+        "end_time": 40.0,
+        "description": "音声ハイライト（歓声検出）- 信頼度0.742",
+        "intensity": 0.742
+      },
+      {
+        "start_time": 40.0,
+        "end_time": 50.0,
+        "description": "音声ハイライト（歓声検出）- 信頼度0.751",
+        "intensity": 0.751
+      },
+      {
+        "start_time": 50.0,
+        "end_time": 60.0,
+        "description": "音声ハイライト（歓声検出）- 信頼度0.916",
+        "intensity": 0.916
+      },
+      {
+        "start_time": 60.0,
+        "end_time": 70.0,
+        "description": "音声ハイライト（歓声検出）- 信頼度0.799",
+        "intensity": 0.799
+      },
+      {
+        "start_time": 70.0,
+        "end_time": 80.0,
+        "description": "音声ハイライト（歓声検出）- 信頼度0.890",
+        "intensity": 0.89
+      }
+    ]
+  },
+  "total_highlights": 5,
+  "analysis_method": "v4_audio_analysis"
+}

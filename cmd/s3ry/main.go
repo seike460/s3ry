@@ -75,7 +75,8 @@ func loadConfig(flags *Flags) (*config.Config, error) {
 		cfg.UI.Mode = "bubbles"
 	}
 	// Store modern backend preference in config for later use
-	if flags.ModernBackend {
+	// Default to modern backend for better performance
+	if flags.ModernBackend || !flags.LegacyUI {
 		cfg.Performance.Workers = 5 // Enable worker pool
 	}
 
@@ -135,7 +136,9 @@ func runLegacyUI(cfg *config.Config, flags *Flags) {
 	}
 
 	// Original legacy implementation
+	fmt.Println("🔍 Starting bucket and region selection...")
 	selectedRegion, selectBucket := s3ry.SelectBucketAndRegion()
+	fmt.Printf("✅ Selected bucket: %s in region: %s\n", selectBucket, selectedRegion)
 
 	// Override region if specified in config/flags
 	if region != "ap-northeast-1" && region != selectedRegion {
@@ -153,12 +156,31 @@ func runLegacyUI(cfg *config.Config, flags *Flags) {
 
 // isNewUIAvailable checks if the new UI implementation is ready
 func isNewUIAvailable() bool {
-	// Check if we're in a TTY environment
-	if _, err := os.Stat("/dev/tty"); os.IsNotExist(err) {
+	// Re-enable new UI with improved display handling
+
+	// Check if we're in a TTY environment by actually testing TTY access
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
 		return false
 	}
-	// The new UI implementation is now ready!
+	tty.Close()
+
+	// Additional check for stdin/stdout TTY capability
+	if !isatty(os.Stdin.Fd()) || !isatty(os.Stdout.Fd()) {
+		return false
+	}
+
 	return true
+}
+
+// isatty checks if file descriptor is a TTY
+func isatty(fd uintptr) bool {
+	// Simple TTY check - this will be false in non-interactive environments
+	fileInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
 // setupLogging configures logging based on configuration

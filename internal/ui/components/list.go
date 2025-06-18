@@ -69,6 +69,9 @@ type List struct {
 	lastRender    time.Time
 	frameInterval time.Duration
 
+	// Key press debouncing
+	lastKeyPress time.Time
+
 	// Styles
 	titleStyle    lipgloss.Style
 	itemStyle     lipgloss.Style
@@ -99,11 +102,11 @@ func NewList(title string, items []ListItem) *List {
 		cacheSize:    0,
 		maxCacheSize: 100, // Cache up to 100 rendered items
 
-		// Initialize async rendering (60fps = ~16.67ms per frame)
-		renderQueue:   make(chan RenderRequest, 100),
-		renderResults: make(chan RenderResult, 100),
-		renderWorkers: 4,                     // Optimal worker count for UI rendering
-		frameInterval: time.Millisecond * 16, // 60fps target
+		// Simplified synchronous rendering to fix display issues
+		renderQueue:   make(chan RenderRequest, 10),
+		renderResults: make(chan RenderResult, 10),
+		renderWorkers: 1,                     // Single worker to prevent race conditions
+		frameInterval: time.Millisecond * 50, // Slower, more stable 20fps
 		lastRender:    time.Now(),
 
 		titleStyle: lipgloss.NewStyle().
@@ -217,6 +220,13 @@ func (l *List) Update(msg tea.Msg) (*List, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// Prevent rapid key processing (debounce)
+		now := time.Now()
+		if now.Sub(l.lastKeyPress) < time.Millisecond*50 {
+			return l, nil // Ignore rapid key presses
+		}
+		l.lastKeyPress = now
+
 		switch msg.String() {
 		case "up", "k":
 			if l.cursor > 0 {
@@ -269,16 +279,8 @@ func (l *List) tick60fps() tea.Cmd {
 	})
 }
 
-// View renders the list component with async rendering and 60fps optimization
+// View renders the list component with simplified synchronous rendering
 func (l *List) View() string {
-	// 60fps frame rate limiting
-	now := time.Now()
-	if now.Sub(l.lastRender) < l.frameInterval {
-		// Skip frame if too early (maintain 60fps)
-		return l.getCachedView()
-	}
-	l.lastRender = now
-
 	var s strings.Builder
 
 	// Title
@@ -302,48 +304,12 @@ func (l *List) View() string {
 		end = len(l.items)
 	}
 
-	// Async rendering optimization: only render visible items
+	// Simple synchronous rendering to fix duplicate selection issue
 	for i := start; i < end; i++ {
-		// Check cache first for memory efficiency
-		if cachedItem, exists := l.itemCache[i]; exists && !l.cacheDirty {
-			s.WriteString(cachedItem)
-			continue
-		}
-
-		// Queue async render request for 60fps performance
-		select {
-		case l.renderQueue <- RenderRequest{
-			Index:    i,
-			Item:     l.items[i],
-			IsCursor: i == l.cursor,
-		}:
-		default:
-			// If queue is full, render synchronously to maintain display
-			renderedItem := l.renderItem(i)
-			if l.cacheSize < l.maxCacheSize {
-				l.itemCache[i] = renderedItem
-				l.cacheSize++
-			}
-			s.WriteString(renderedItem)
-		}
-
-		// Check for completed async renders
-		select {
-		case result := <-l.renderResults:
-			if result.Index >= start && result.Index < end && result.Error == nil {
-				l.itemCache[result.Index] = result.RenderedItem
-				s.WriteString(result.RenderedItem)
-			}
-		default:
-			// No async result available, use sync render
-			if _, exists := l.itemCache[i]; !exists {
-				renderedItem := l.renderItem(i)
-				s.WriteString(renderedItem)
-			}
-		}
+		s.WriteString(l.renderItem(i))
 	}
 
-	// Show performance-optimized scrolling indicators
+	// Show scrolling indicators
 	l.renderScrollIndicators(&s, start, end)
 
 	// Help text

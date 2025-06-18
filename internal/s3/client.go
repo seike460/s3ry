@@ -19,6 +19,11 @@ type Client struct {
 
 // NewClient creates a new S3 client with the given region
 func NewClient(region string) *Client {
+	// Default to ap-northeast-1 if region is empty
+	if region == "" {
+		region = "ap-northeast-1"
+	}
+
 	awsConfig := &aws.Config{
 		Region: aws.String(region),
 	}
@@ -35,6 +40,11 @@ func NewClient(region string) *Client {
 
 // NewClientWithEndpoint creates a new S3 client with custom endpoint (for MinIO)
 func NewClientWithEndpoint(region, endpoint string, forcePathStyle bool) *Client {
+	// Default to ap-northeast-1 if region is empty
+	if region == "" {
+		region = "ap-northeast-1"
+	}
+
 	awsConfig := &aws.Config{
 		Region:           aws.String(region),
 		Endpoint:         aws.String(endpoint),
