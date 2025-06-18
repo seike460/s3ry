@@ -94,8 +94,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - CHANGELOG.md
-      - docs/**/*
+      - RELEASE_NOTES.md
     
     # Format overrides
     format_overrides:
