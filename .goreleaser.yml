@@ -200,10 +200,10 @@ release:
   prerelease: auto
   mode: replace
   
-  # Extra files
-  extra_files:
-    - glob: ./build-metrics.json
-    - glob: ./performance.log
+  # Extra files (disabled for clean release)
+  # extra_files:
+  #   - glob: ./build-metrics.json
+  #   - glob: ./performance.log
 
 # Docker images (disabled for release)
 # Temporarily disabled for this release due to Docker daemon requirements
