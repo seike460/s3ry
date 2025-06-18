@@ -282,14 +282,14 @@ nfpms:
       - src: ./LICENSE
         dst: /usr/share/doc/s3ry/LICENSE
 
-# Publishers
-publishers:
-  - name: fury.io
-    ids:
-      - packages
-    dir: "{{ dir .ArtifactPath }}"
-    cmd: |
-      curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/seike460/
+# Publishers (disabled for this release)
+# publishers:
+#   - name: fury.io
+#     ids:
+#       - packages
+#     dir: "{{ dir .ArtifactPath }}"
+#     cmd: |
+#       curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/seike460/
 
 # Announce
 announce:
