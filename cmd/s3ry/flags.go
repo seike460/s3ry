@@ -35,7 +35,7 @@ func parseFlags() *Flags {
 
 	// Custom usage function
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "S3ry - Modern S3 file manager\n\n")
+		fmt.Fprintf(os.Stderr, "s3ry - interactive terminal client for Amazon S3\n\n")
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
