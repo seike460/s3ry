@@ -133,9 +133,6 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "s":
 			// Show settings
 			return NewSettingsView(), nil
-		case "l":
-			// Show logs
-			return NewLogsView(), nil
 		case "r":
 			// Retry loading buckets
 			v.loading = true
@@ -212,7 +209,7 @@ func (v *BucketView) View() string {
 	// Add helpful footer
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
-		Render("↑↓: navigate • enter: select • r: retry • ?: help • s: settings • l: logs • q: quit")
+		Render("↑↓: navigate • enter: select • r: retry • ?: help • s: settings • q: quit")
 
 	result.WriteString("\n\n" + footer)
 

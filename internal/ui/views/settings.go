@@ -11,18 +11,10 @@ import (
 	"github.com/seike460/s3ry/internal/ui/components"
 )
 
-// SettingInfo represents information about a setting
-type SettingInfo struct {
-	Key   string
-	Name  string
-	Value string
-}
-
 // SettingsView represents the settings configuration view
 type SettingsView struct {
 	list   *components.List
 	config *config.Config
-	status string
 
 	// Styles
 	headerStyle lipgloss.Style
@@ -84,21 +76,6 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.config = cfg
 			v.buildSettingsList()
 			return v, nil
-		case "enter", " ":
-			if v.list != nil {
-				selectedItem := v.list.GetCurrentItem()
-				if selectedItem != nil && selectedItem.Data != nil {
-					setting := selectedItem.Data.(SettingInfo)
-					switch setting.Key {
-					case "theme":
-						// Navigate to theme settings
-						return NewThemeSettingsView(), nil
-					default:
-						// For other settings, show a message
-						v.status = fmt.Sprintf("Selected: %s", setting.Name)
-					}
-				}
-			}
 		}
 
 		if v.list != nil {
@@ -175,7 +152,6 @@ func (v *SettingsView) buildSettingsList() {
 			Title:       fmt.Sprintf("Theme: %s", v.getConfigValue("Theme", v.config.UI.Theme)),
 			Description: "Color theme for the interface",
 			Tag:         "Setting",
-			Data:        SettingInfo{Key: "theme", Name: "Theme", Value: v.config.UI.Theme},
 		},
 		{
 			Title:       fmt.Sprintf("Mode: %s", v.getConfigValue("Mode", v.config.UI.Mode)),

@@ -40,11 +40,6 @@ func NewOperationView(region, bucket string) *OperationView {
 			Description: "Generate a list of all objects in the bucket",
 			Tag:         "List",
 		},
-		{
-			Title:       "☁️ Cloud integration",
-			Description: "View related AWS services and their status",
-			Tag:         "Cloud",
-		},
 	}
 
 	return &OperationView{
@@ -83,9 +78,6 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "s":
 			// Show settings
 			return NewSettingsView(), nil
-		case "l":
-			// Show logs
-			return NewLogsView(), nil
 		case "d":
 			// Direct download shortcut
 			return NewObjectView(v.region, v.bucket, "download"), nil
@@ -109,8 +101,6 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return NewObjectView(v.region, v.bucket, "delete"), nil
 				case "List":
 					return NewListGeneratorView(v.region, v.bucket), nil
-				case "Cloud":
-					return NewCloudIntegrationView(v.region, v.bucket), nil
 				}
 			}
 		}
@@ -130,7 +120,7 @@ func (v *OperationView) View() string {
 
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
-		Render("d: download • u: upload • delete: delete • ?: help • s: settings • l: logs • esc: back • q: quit")
+		Render("d: download • u: upload • delete: delete • ?: help • s: settings • esc: back • q: quit")
 
 	return header + "\n" + context + "\n\n" + v.list.View() + "\n\n" + footer
 }

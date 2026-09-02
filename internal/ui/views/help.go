@@ -110,11 +110,6 @@ func NewHelpView() *HelpView {
 			Tag:         "Key",
 		},
 		{
-			Title:       "l - Logs",
-			Description: "View application logs and operations",
-			Tag:         "Key",
-		},
-		{
 			Title:       "Ctrl+C/q - Quit",
 			Description: "Exit the application",
 			Tag:         "Key",
@@ -132,11 +127,6 @@ func NewHelpView() *HelpView {
 		{
 			Title:       "Modern UI Mode",
 			Description: "Use --new-ui flag for enhanced TUI experience",
-			Tag:         "Tip",
-		},
-		{
-			Title:       "Parallel Downloads",
-			Description: "Use --modern-backend for 5x faster operations",
 			Tag:         "Tip",
 		},
 		{
@@ -173,9 +163,6 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return v, tea.Quit
-		case "esc":
-			// Return to previous view - use a simple welcome for now
-			return NewRegionView(), nil
 		}
 
 		if v.list != nil {

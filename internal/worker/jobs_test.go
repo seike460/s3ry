@@ -136,7 +136,7 @@ func TestS3UploadJob_ExecuteWithMockError(t *testing.T) {
 
 	// Should error due to file not found, before client is used
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to open file")
+	assert.Contains(t, err.Error(), "failed to get file info")
 }
 
 func TestS3DeleteJob_ExecuteWithMockError(t *testing.T) {

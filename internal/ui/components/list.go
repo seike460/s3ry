@@ -3,32 +3,10 @@ package components
 import (
 	"fmt"
 	"strings"
-	"sync"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-// RenderRequest represents an async render request
-type RenderRequest struct {
-	Index    int
-	Item     ListItem
-	IsCursor bool
-	Style    lipgloss.Style
-}
-
-// RenderResult represents an async render result
-type RenderResult struct {
-	Index        int
-	RenderedItem string
-	Error        error
-}
-
-// FrameRateMsg represents a 60fps frame rate message
-type FrameRateMsg struct {
-	Timestamp time.Time
-}
 
 // ListItem represents a selectable item in a list
 type ListItem struct {
@@ -38,7 +16,7 @@ type ListItem struct {
 	Data        interface{} // Additional data for the item
 }
 
-// List represents a selectable list component with virtual scrolling and async rendering
+// List represents a selectable list component with virtual scrolling
 type List struct {
 	title    string
 	items    []ListItem
@@ -49,28 +27,8 @@ type List struct {
 	showHelp bool
 
 	// Virtual scrolling for performance
-	viewportTop    int
-	viewportHeight int
-	maxVisible     int
-
-	// Memory optimization
-	itemCache    map[int]string
-	cacheDirty   bool
-	cacheSize    int
-	maxCacheSize int
-
-	// Async rendering optimization
-	renderQueue   chan RenderRequest
-	renderResults chan RenderResult
-	renderWorkers int
-	isRendering   bool
-
-	// Frame rate limiting for 60fps
-	lastRender    time.Time
-	frameInterval time.Duration
-
-	// Key press debouncing
-	lastKeyPress time.Time
+	viewportTop int
+	maxVisible  int
 
 	// Styles
 	titleStyle    lipgloss.Style
@@ -82,7 +40,7 @@ type List struct {
 	borderStyle   lipgloss.Style
 }
 
-// NewList creates a new List component with performance optimizations
+// NewList creates a new List component
 func NewList(title string, items []ListItem) *List {
 	l := &List{
 		title:    title,
@@ -92,22 +50,8 @@ func NewList(title string, items []ListItem) *List {
 		showHelp: true,
 
 		// Initialize virtual scrolling
-		viewportTop:    0,
-		viewportHeight: 20, // Default viewport size
-		maxVisible:     20,
-
-		// Initialize memory optimization
-		itemCache:    make(map[int]string),
-		cacheDirty:   true,
-		cacheSize:    0,
-		maxCacheSize: 100, // Cache up to 100 rendered items
-
-		// Simplified synchronous rendering to fix display issues
-		renderQueue:   make(chan RenderRequest, 10),
-		renderResults: make(chan RenderResult, 10),
-		renderWorkers: 1,                     // Single worker to prevent race conditions
-		frameInterval: time.Millisecond * 50, // Slower, more stable 20fps
-		lastRender:    time.Now(),
+		viewportTop: 0,
+		maxVisible:  20,
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
@@ -151,51 +95,7 @@ func NewList(title string, items []ListItem) *List {
 			Padding(1),
 	}
 
-	// Start async render workers for 60fps performance
-	l.startRenderWorkers()
-
 	return l
-}
-
-// startRenderWorkers initializes async rendering workers for 60fps performance
-func (l *List) startRenderWorkers() {
-	for i := 0; i < l.renderWorkers; i++ {
-		go func() {
-			for req := range l.renderQueue {
-				result := RenderResult{
-					Index: req.Index,
-				}
-
-				// Render item with style optimization
-				if req.IsCursor {
-					cursor := "❯"
-					line := fmt.Sprintf("%s %s", cursor, req.Item.Title)
-					if req.Item.Tag != "" {
-						line += l.tagStyle.Render(fmt.Sprintf("[%s]", req.Item.Tag))
-					}
-					result.RenderedItem = l.selectedStyle.Render(line) + "\n"
-
-					// Show description if available and item is selected
-					if req.Item.Description != "" {
-						result.RenderedItem += l.descStyle.Render(req.Item.Description) + "\n"
-					}
-				} else {
-					cursor := " "
-					line := fmt.Sprintf("%s %s", cursor, req.Item.Title)
-					if req.Item.Tag != "" {
-						line += l.tagStyle.Render(fmt.Sprintf("[%s]", req.Item.Tag))
-					}
-					result.RenderedItem = l.itemStyle.Render(line) + "\n"
-				}
-
-				select {
-				case l.renderResults <- result:
-				default:
-					// Drop frame if channel is full (maintain 60fps)
-				}
-			}
-		}()
-	}
 }
 
 // Update handles messages for the list component
@@ -208,78 +108,47 @@ func (l *List) Update(msg tea.Msg) (*List, tea.Cmd) {
 		// Update viewport parameters for virtual scrolling
 		l.updateViewport()
 
-	case FrameRateMsg:
-		// Handle 60fps frame rate limiting
-		return l, l.tick60fps()
-
-	case RenderResult:
-		// Handle async render results
-		if msg.Index >= 0 && msg.Index < len(l.items) && msg.Error == nil {
-			l.itemCache[msg.Index] = msg.RenderedItem
-			l.cacheSize++
-		}
-
 	case tea.KeyMsg:
-		// Prevent rapid key processing (debounce)
-		now := time.Now()
-		if now.Sub(l.lastKeyPress) < time.Millisecond*50 {
-			return l, nil // Ignore rapid key presses
-		}
-		l.lastKeyPress = now
-
 		switch msg.String() {
 		case "up", "k":
 			if l.cursor > 0 {
 				l.cursor--
 				l.updateViewport()
-				l.invalidateCache()
 			}
 		case "down", "j":
 			if l.cursor < len(l.items)-1 {
 				l.cursor++
 				l.updateViewport()
-				l.invalidateCache()
 			}
-		case "page_up", "ctrl+b":
+		case "pgup", "ctrl+b":
 			// Page up navigation
 			l.cursor -= l.maxVisible
 			if l.cursor < 0 {
 				l.cursor = 0
 			}
 			l.updateViewport()
-			l.invalidateCache()
-		case "page_down", "ctrl+f":
+		case "pgdown", "ctrl+f":
 			// Page down navigation
 			l.cursor += l.maxVisible
 			if l.cursor >= len(l.items) {
 				l.cursor = len(l.items) - 1
 			}
 			l.updateViewport()
-			l.invalidateCache()
 		case "enter", " ":
 			l.selected = l.cursor
 		case "home":
 			l.cursor = 0
 			l.updateViewport()
-			l.invalidateCache()
 		case "end":
 			l.cursor = len(l.items) - 1
 			l.updateViewport()
-			l.invalidateCache()
 		}
 	}
 
-	return l, l.tick60fps()
+	return l, nil
 }
 
-// tick60fps returns a command for 60fps frame rate limiting
-func (l *List) tick60fps() tea.Cmd {
-	return tea.Tick(l.frameInterval, func(t time.Time) tea.Msg {
-		return FrameRateMsg{Timestamp: t}
-	})
-}
-
-// View renders the list component with simplified synchronous rendering
+// View renders the list component
 func (l *List) View() string {
 	var s strings.Builder
 
@@ -332,35 +201,6 @@ func (l *List) View() string {
 	return result
 }
 
-// getCachedView returns a cached view for frame rate optimization
-func (l *List) getCachedView() string {
-	// Return previously rendered view to maintain 60fps
-	// This is a simplified cache - in practice would store complete rendered view
-	var s strings.Builder
-	s.WriteString(l.titleStyle.Render(l.title))
-	s.WriteString("\n\n")
-
-	if len(l.items) == 0 {
-		s.WriteString(l.helpStyle.Render("No items available"))
-		return s.String()
-	}
-
-	// Use cached items for fast display
-	start := l.viewportTop
-	end := l.viewportTop + l.maxVisible
-	if end > len(l.items) {
-		end = len(l.items)
-	}
-
-	for i := start; i < end; i++ {
-		if cachedItem, exists := l.itemCache[i]; exists {
-			s.WriteString(cachedItem)
-		}
-	}
-
-	return s.String()
-}
-
 // GetCursor returns the current cursor position
 func (l *List) GetCursor() int {
 	return l.cursor
@@ -387,13 +227,12 @@ func (l *List) GetCurrentItem() *ListItem {
 	return nil
 }
 
-// SetItems updates the list items with performance optimizations
+// SetItems updates the list items
 func (l *List) SetItems(items []ListItem) {
 	l.items = items
 	l.cursor = 0
 	l.selected = -1
 	l.viewportTop = 0
-	l.clearCache() // Clear cache when items change
 	l.updateViewport()
 }
 
@@ -402,12 +241,11 @@ func (l *List) SetShowHelp(show bool) {
 	l.showHelp = show
 }
 
-// Reset resets the list state with performance optimizations
+// Reset resets the list state
 func (l *List) Reset() {
 	l.cursor = 0
 	l.selected = -1
 	l.viewportTop = 0
-	l.clearCache()
 	l.updateViewport()
 }
 
@@ -444,23 +282,6 @@ func (l *List) updateViewport() {
 	}
 }
 
-// invalidateCache marks the render cache as dirty
-func (l *List) invalidateCache() {
-	l.cacheDirty = true
-	l.cacheSize = 0
-	// Clear the cache map
-	for k := range l.itemCache {
-		delete(l.itemCache, k)
-	}
-}
-
-// clearCache clears the entire cache
-func (l *List) clearCache() {
-	l.itemCache = make(map[int]string)
-	l.cacheDirty = true
-	l.cacheSize = 0
-}
-
 // renderItem renders a single item
 func (l *List) renderItem(i int) string {
 	item := l.items[i]
@@ -489,7 +310,7 @@ func (l *List) renderItem(i int) string {
 	}
 }
 
-// renderScrollIndicators renders scrolling indicators with performance info
+// renderScrollIndicators renders scrolling indicators
 func (l *List) renderScrollIndicators(s *strings.Builder, start, end int) {
 	totalItems := len(l.items)
 
@@ -511,86 +332,4 @@ func (l *List) renderScrollIndicators(s *strings.Builder, start, end int) {
 			s.WriteString("\n")
 		}
 	}
-}
-
-// Memory pools for object reuse (reduce GC pressure)
-var (
-	stringBuilderPool = sync.Pool{
-		New: func() interface{} {
-			return &strings.Builder{}
-		},
-	}
-	renderRequestPool = sync.Pool{
-		New: func() interface{} {
-			return &RenderRequest{}
-		},
-	}
-	renderResultPool = sync.Pool{
-		New: func() interface{} {
-			return &RenderResult{}
-		},
-	}
-)
-
-// getStringBuilder gets a pooled string builder
-func getStringBuilder() *strings.Builder {
-	sb := stringBuilderPool.Get().(*strings.Builder)
-	sb.Reset()
-	return sb
-}
-
-// putStringBuilder returns a string builder to pool
-func putStringBuilder(sb *strings.Builder) {
-	stringBuilderPool.Put(sb)
-}
-
-// GetPerformanceStats returns performance statistics for monitoring
-func (l *List) GetPerformanceStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_items":       len(l.items),
-		"cache_size":        l.cacheSize,
-		"max_cache_size":    l.maxCacheSize,
-		"viewport_top":      l.viewportTop,
-		"viewport_height":   l.viewportHeight,
-		"max_visible":       l.maxVisible,
-		"cache_efficiency":  float64(l.cacheSize) / float64(l.maxCacheSize) * 100,
-		"memory_optimized":  len(l.items) > l.maxVisible,
-		"virtual_scrolling": true,
-		"async_rendering":   true,
-		"frame_rate_target": "60fps",
-		"render_workers":    l.renderWorkers,
-		"queue_capacity":    cap(l.renderQueue),
-		"results_capacity":  cap(l.renderResults),
-	}
-}
-
-// OptimizeForLargeList configures the list for optimal performance with large datasets
-func (l *List) OptimizeForLargeList() {
-	l.maxCacheSize = 200 // Increase cache for large lists
-	l.cacheDirty = true
-	l.clearCache()
-
-	// Increase render workers for large datasets
-	if len(l.items) > 1000 {
-		l.renderWorkers = 8 // More workers for very large lists
-	}
-
-	// Optimize frame interval for heavy rendering
-	if len(l.items) > 5000 {
-		l.frameInterval = time.Millisecond * 20 // 50fps for very large datasets
-	}
-}
-
-// Close properly shuts down the list component and cleans up resources
-func (l *List) Close() {
-	// Close render channels to stop workers
-	if l.renderQueue != nil {
-		close(l.renderQueue)
-	}
-	if l.renderResults != nil {
-		close(l.renderResults)
-	}
-
-	// Clear caches to free memory
-	l.clearCache()
 }

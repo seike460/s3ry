@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/seike460/s3ry/internal/errors"
-	"github.com/seike460/s3ry/internal/metrics"
 	"github.com/seike460/s3ry/pkg/interfaces"
 )
 
@@ -27,7 +26,6 @@ type Pool struct {
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 	once       sync.Once
-	metrics    *metrics.Metrics
 }
 
 // PoolConfig configures the worker pool
@@ -64,7 +62,6 @@ func NewPool(config PoolConfig) *Pool {
 		resultChan: make(chan Result, config.QueueSize),
 		ctx:        ctx,
 		cancel:     cancel,
-		metrics:    metrics.GetGlobalMetrics(),
 	}
 
 	return pool
@@ -141,10 +138,6 @@ func (p *Pool) worker(id int) {
 
 // executeJob executes a job with timeout, retry logic, and error recovery
 func (p *Pool) executeJob(job Job) Result {
-	// Start performance timer
-	timer := p.metrics.StartTimer("job_execution")
-	defer timer.Stop()
-
 	ctx, cancel := context.WithTimeout(p.ctx, 30*time.Second)
 	defer cancel()
 
@@ -192,11 +185,6 @@ func (p *Pool) executeJob(job Job) Result {
 			lastErr = p.wrapJobError(err, "job_execution")
 			break
 		}
-	}
-
-	// Update metrics based on result
-	if lastErr != nil {
-		p.metrics.IncrementFailedOperations()
 	}
 
 	return Result{
@@ -286,11 +274,6 @@ func (bp *BatchProcessor) Progress() (completed, total int) {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
 	return bp.completedJobs, bp.totalJobs
-}
-
-// GetMetrics returns the pool's metrics
-func (p *Pool) GetMetrics() *metrics.Metrics {
-	return p.metrics
 }
 
 // GetWorkerStats returns worker pool statistics

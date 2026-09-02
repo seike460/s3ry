@@ -178,9 +178,6 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "s":
 			// Show settings
 			return NewSettingsView(), nil
-		case "l":
-			// Show logs
-			return NewLogsView(), nil
 		case "p":
 			// Toggle preview
 			v.showPreview = !v.showPreview
@@ -282,7 +279,7 @@ func (v *ObjectView) View() string {
 
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
-		Render("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • l: logs • esc: back • q: quit")
+		Render("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit")
 
 	if v.showPreview && v.preview != nil {
 		// Split view: list on left, preview on right

@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/seike460/s3ry/internal/errors"
-	"github.com/seike460/s3ry/internal/metrics"
 	"github.com/seike460/s3ry/pkg/interfaces"
 	"github.com/seike460/s3ry/pkg/types"
 )
@@ -20,11 +19,6 @@ type S3DownloadJob struct {
 
 // Execute implements the Job interface for S3DownloadJob
 func (j *S3DownloadJob) Execute(ctx context.Context) error {
-	// Get metrics instance
-	m := metrics.GetGlobalMetrics()
-	timer := m.StartTimer("s3_download")
-	defer timer.Stop()
-
 	// For MVP: Use basic download without head request
 	// Real file size will be determined during download
 	fileSize := int64(0)
@@ -39,7 +33,7 @@ func (j *S3DownloadJob) Execute(ctx context.Context) error {
 		})
 	}
 
-	// Get file size for progress and metrics
+	// Get file size for progress
 	fileInfo, err := os.Stat(j.Request.FilePath)
 	if err == nil && fileInfo != nil {
 		fileSize = fileInfo.Size()
@@ -47,9 +41,6 @@ func (j *S3DownloadJob) Execute(ctx context.Context) error {
 		if j.Progress != nil {
 			j.Progress(fileSize, fileSize)
 		}
-		// Update metrics on successful download
-		m.IncrementS3Downloads()
-		m.AddBytesTransferred(fileSize)
 	}
 
 	return nil
@@ -64,11 +55,6 @@ type S3UploadJob struct {
 
 // Execute implements the Job interface for S3UploadJob
 func (j *S3UploadJob) Execute(ctx context.Context) error {
-	// Get metrics instance
-	m := metrics.GetGlobalMetrics()
-	timer := m.StartTimer("s3_upload")
-	defer timer.Stop()
-
 	// Get file info for size and progress
 	fileInfo, err := os.Stat(j.Request.FilePath)
 	if err != nil {
@@ -80,10 +66,6 @@ func (j *S3UploadJob) Execute(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to upload %s: %w", j.Request.FilePath, err)
 	}
-
-	// Update metrics on successful upload
-	m.IncrementS3Uploads()
-	m.AddBytesTransferred(fileInfo.Size())
 
 	// Report completion
 	if j.Progress != nil {
@@ -102,18 +84,10 @@ type S3DeleteJob struct {
 
 // Execute implements the Job interface for S3DeleteJob
 func (j *S3DeleteJob) Execute(ctx context.Context) error {
-	// Get metrics instance
-	m := metrics.GetGlobalMetrics()
-	timer := m.StartTimer("s3_delete")
-	defer timer.Stop()
-
 	err := j.Client.DeleteObject(ctx, j.Bucket, j.Key)
 	if err != nil {
 		return fmt.Errorf("failed to delete %s: %w", j.Key, err)
 	}
-
-	// Update metrics on successful delete
-	m.IncrementS3Deletes()
 
 	return nil
 }
@@ -127,11 +101,6 @@ type S3ListJob struct {
 
 // Execute implements the Job interface for S3ListJob
 func (j *S3ListJob) Execute(ctx context.Context) error {
-	// Get metrics instance
-	m := metrics.GetGlobalMetrics()
-	timer := m.StartTimer("s3_list")
-	defer timer.Stop()
-
 	var objects []types.Object
 
 	// Use S3Client interface for listing
@@ -150,9 +119,6 @@ func (j *S3ListJob) Execute(ctx context.Context) error {
 			ETag:         obj.ETag,
 		})
 	}
-
-	// Update metrics on successful list operation
-	m.IncrementS3Lists()
 
 	// Send results to the channel
 	select {

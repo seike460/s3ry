@@ -66,7 +66,6 @@ func TestNewPool(t *testing.T) {
 	assert.NotNil(t, pool.resultChan)
 	assert.NotNil(t, pool.ctx)
 	assert.NotNil(t, pool.cancel)
-	assert.NotNil(t, pool.metrics)
 
 	// Clean up
 	pool.Stop()
@@ -303,16 +302,6 @@ func TestPool_GetWorkerStats(t *testing.T) {
 
 	stats = pool.GetWorkerStats()
 	assert.False(t, stats.IsRunning)
-}
-
-func TestPool_GetMetrics(t *testing.T) {
-	config := DefaultConfig()
-	pool := NewPool(config)
-
-	metrics := pool.GetMetrics()
-	assert.NotNil(t, metrics)
-
-	pool.Stop()
 }
 
 func TestPool_MultipleStops(t *testing.T) {
