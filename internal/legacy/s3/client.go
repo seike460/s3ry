@@ -1,3 +1,4 @@
+// Package s3 is the legacy aws-sdk-go v1 backend. It is retained only until the TUI is ported to internal/s3 (aws-sdk-go-v2). Do not add code here.
 package s3
 
 import (

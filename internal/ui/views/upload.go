@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/seike460/s3ry/internal/s3"
+	"github.com/seike460/s3ry/internal/legacy/s3"
 	"github.com/seike460/s3ry/internal/ui/components"
 	"github.com/seike460/s3ry/pkg/interfaces"
 )
