@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -156,37 +155,4 @@ func (c *Client) DeleteObject(ctx context.Context, bucket, key string) error {
 	}
 
 	return nil
-}
-
-// Extended operations - MVP dummy implementations
-func (c *Client) CreateBucket(ctx context.Context, bucket string) error {
-	return fmt.Errorf("CreateBucket not implemented in MVP")
-}
-
-func (c *Client) DeleteBucket(ctx context.Context, bucket string) error {
-	return fmt.Errorf("DeleteBucket not implemented in MVP")
-}
-
-func (c *Client) GetBucketInfo(ctx context.Context, bucket string) (*interfaces.BucketInfo, error) {
-	return nil, fmt.Errorf("GetBucketInfo not implemented in MVP")
-}
-
-func (c *Client) ListObjectsWithLimit(ctx context.Context, bucket, prefix string, maxKeys int) (*interfaces.ObjectList, error) {
-	return nil, fmt.Errorf("ListObjectsWithLimit not implemented in MVP")
-}
-
-func (c *Client) UploadObject(ctx context.Context, bucket, key string, content []byte) (*interfaces.PutResult, error) {
-	return nil, fmt.Errorf("UploadObject not implemented in MVP")
-}
-
-func (c *Client) GetPresignedURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error) {
-	return "", fmt.Errorf("GetPresignedURL not implemented in MVP")
-}
-
-func (c *Client) StreamObject(ctx context.Context, bucket, key string) (*interfaces.Object, error) {
-	return nil, fmt.Errorf("StreamObject not implemented in MVP")
-}
-
-func (c *Client) GetObjectMetadata(ctx context.Context, bucket, key string) (*interfaces.ObjectMetadata, error) {
-	return nil, fmt.Errorf("GetObjectMetadata not implemented in MVP")
 }

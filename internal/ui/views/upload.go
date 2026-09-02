@@ -243,7 +243,7 @@ func (v *UploadView) loadFiles() tea.Cmd {
 			}
 
 			// Skip hidden files and directories
-			if filepath.Base(path)[0] == '.' {
+			if path != "." && filepath.Base(path)[0] == '.' {
 				if d.IsDir() {
 					return fs.SkipDir
 				}

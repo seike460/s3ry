@@ -8,27 +8,20 @@ import (
 
 // Flags represents command-line flags
 type Flags struct {
-	NewUI         bool
-	LegacyUI      bool
-	ModernBackend bool
-	Region        string
-	Profile       string
-	ConfigFile    string
-	Verbose       bool
-	Version       bool
-	Help          bool
-	Language      string
-	LogLevel      string
+	Region     string
+	Profile    string
+	ConfigFile string
+	Verbose    bool
+	Version    bool
+	Help       bool
+	Language   string
+	LogLevel   string
 }
 
 // parseFlags parses command-line flags
 func parseFlags() *Flags {
 	flags := &Flags{}
 
-	flag.BoolVar(&flags.NewUI, "new-ui", false, "Explicitly use new Bubble Tea UI (enabled by default)")
-	flag.BoolVar(&flags.NewUI, "bubbles", false, "Use new Bubble Tea UI (alias for --new-ui)")
-	flag.BoolVar(&flags.LegacyUI, "legacy-ui", false, "Use legacy promptui interface instead of modern UI")
-	flag.BoolVar(&flags.ModernBackend, "modern-backend", false, "Use modern S3 backend with worker pool for better performance")
 	flag.StringVar(&flags.Region, "region", "", "AWS region to use")
 	flag.StringVar(&flags.Profile, "profile", "", "AWS profile to use")
 	flag.StringVar(&flags.ConfigFile, "config", "", "Path to config file")
@@ -42,21 +35,19 @@ func parseFlags() *Flags {
 
 	// Custom usage function
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "S3ry - Modern S3 file manager\n\n")
+		fmt.Fprintf(os.Stderr, "s3ry - interactive terminal client for Amazon S3\n\n")
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s                      # Start with modern Bubble Tea UI (default)\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --legacy-ui          # Use legacy promptui interface\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s --modern-backend     # Use modern S3 backend\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s                      # Start with the Bubble Tea UI\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s --region us-west-2   # Use specific AWS region\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s --profile dev      # Use specific AWS profile\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s --config ./s3ry.yml # Use a specific configuration file\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s --lang en          # Use English language\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
 		fmt.Fprintf(os.Stderr, "  AWS_REGION            # AWS region\n")
 		fmt.Fprintf(os.Stderr, "  AWS_PROFILE           # AWS profile\n")
-		fmt.Fprintf(os.Stderr, "  S3RY_UI_MODE          # UI mode (legacy, bubbles)\n")
 		fmt.Fprintf(os.Stderr, "  S3RY_LANGUAGE         # Language (en, ja)\n")
 		fmt.Fprintf(os.Stderr, "  S3RY_LOG_LEVEL        # Log level\n")
 	}

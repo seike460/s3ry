@@ -16,7 +16,6 @@ func TestDefault(t *testing.T) {
 	assert.Equal(t, "", cfg.AWS.Profile)
 	assert.Equal(t, "", cfg.AWS.Endpoint)
 
-	assert.Equal(t, "bubbles", cfg.UI.Mode)
 	assert.Equal(t, "ja", cfg.UI.Language)
 	assert.Equal(t, "default", cfg.UI.Theme)
 
@@ -44,7 +43,6 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	assert.NotNil(t, cfg)
 	// Should return default configuration
 	assert.Equal(t, "ap-northeast-1", cfg.AWS.Region)
-	assert.Equal(t, "bubbles", cfg.UI.Mode)
 }
 
 func TestLoad_WithConfigFile(t *testing.T) {
@@ -58,7 +56,6 @@ aws:
   region: us-west-2
   profile: test-profile
 ui:
-  mode: bubbles
   language: en
   theme: dark
 performance:
@@ -86,7 +83,6 @@ logging:
 	assert.NotNil(t, cfg)
 	assert.Equal(t, "us-west-2", cfg.AWS.Region)
 	assert.Equal(t, "test-profile", cfg.AWS.Profile)
-	assert.Equal(t, "bubbles", cfg.UI.Mode)
 	assert.Equal(t, "en", cfg.UI.Language)
 	assert.Equal(t, "dark", cfg.UI.Theme)
 	assert.Equal(t, 8, cfg.Performance.Workers)
@@ -97,6 +93,28 @@ logging:
 	assert.Equal(t, "/var/log/s3ry.log", cfg.Logging.File)
 }
 
+func TestLoadFromFile_ReadsAWSRegion(t *testing.T) {
+	t.Setenv("AWS_REGION", "")
+
+	configPath := filepath.Join(t.TempDir(), "config.yml")
+	configContent := []byte("aws:\n  region: us-west-2\n")
+	assert.NoError(t, os.WriteFile(configPath, configContent, 0644))
+
+	cfg, err := LoadFromFile(configPath)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Equal(t, "us-west-2", cfg.AWS.Region)
+}
+
+func TestLoadFromFile_MissingFile(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "missing.yml")
+
+	_, err := LoadFromFile(configPath)
+
+	assert.Error(t, err)
+}
+
 func TestLoadFromEnv(t *testing.T) {
 	// Save original environment variables
 	originalVars := map[string]string{
@@ -104,7 +122,6 @@ func TestLoadFromEnv(t *testing.T) {
 		"AWS_DEFAULT_REGION": os.Getenv("AWS_DEFAULT_REGION"),
 		"AWS_PROFILE":        os.Getenv("AWS_PROFILE"),
 		"AWS_ENDPOINT_URL":   os.Getenv("AWS_ENDPOINT_URL"),
-		"S3RY_UI_MODE":       os.Getenv("S3RY_UI_MODE"),
 		"S3RY_LANGUAGE":      os.Getenv("S3RY_LANGUAGE"),
 		"S3RY_LOG_LEVEL":     os.Getenv("S3RY_LOG_LEVEL"),
 	}
@@ -124,7 +141,6 @@ func TestLoadFromEnv(t *testing.T) {
 	os.Setenv("AWS_REGION", "eu-west-1")
 	os.Setenv("AWS_PROFILE", "env-profile")
 	os.Setenv("AWS_ENDPOINT_URL", "http://localhost:4566")
-	os.Setenv("S3RY_UI_MODE", "bubbles")
 	os.Setenv("S3RY_LANGUAGE", "en")
 	os.Setenv("S3RY_LOG_LEVEL", "debug")
 
@@ -134,7 +150,6 @@ func TestLoadFromEnv(t *testing.T) {
 	assert.Equal(t, "eu-west-1", cfg.AWS.Region)
 	assert.Equal(t, "env-profile", cfg.AWS.Profile)
 	assert.Equal(t, "http://localhost:4566", cfg.AWS.Endpoint)
-	assert.Equal(t, "bubbles", cfg.UI.Mode)
 	assert.Equal(t, "en", cfg.UI.Language)
 	assert.Equal(t, "debug", cfg.Logging.Level)
 }
@@ -174,7 +189,6 @@ func TestSave(t *testing.T) {
 
 	cfg := Default()
 	cfg.AWS.Region = "us-west-2"
-	cfg.UI.Mode = "bubbles"
 	cfg.UI.Language = "en"
 
 	err := cfg.Save(configPath)
@@ -187,7 +201,6 @@ func TestSave(t *testing.T) {
 	data, err := os.ReadFile(configPath)
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), "region: us-west-2")
-	assert.Contains(t, string(data), "mode: bubbles")
 	assert.Contains(t, string(data), "language: en")
 }
 
@@ -203,25 +216,6 @@ func TestSave_CreateDirectory(t *testing.T) {
 	assert.NoError(t, err)
 	assert.FileExists(t, configPath)
 	assert.DirExists(t, configDir)
-}
-
-func TestIsNewUIEnabled(t *testing.T) {
-	cfg := Default()
-
-	// Test default (bubbles)
-	assert.True(t, cfg.IsNewUIEnabled())
-
-	// Test bubbles mode
-	cfg.UI.Mode = "bubbles"
-	assert.True(t, cfg.IsNewUIEnabled())
-
-	// Test new mode
-	cfg.UI.Mode = "new"
-	assert.True(t, cfg.IsNewUIEnabled())
-
-	// Test legacy mode
-	cfg.UI.Mode = "legacy"
-	assert.False(t, cfg.IsNewUIEnabled())
 }
 
 func TestGetRegion(t *testing.T) {
@@ -305,11 +299,9 @@ func TestConfig_FieldAccess(t *testing.T) {
 	assert.Equal(t, "test-profile", cfg.AWS.Profile)
 	assert.Equal(t, "test-endpoint", cfg.AWS.Endpoint)
 
-	cfg.UI.Mode = "test-mode"
 	cfg.UI.Language = "test-lang"
 	cfg.UI.Theme = "test-theme"
 
-	assert.Equal(t, "test-mode", cfg.UI.Mode)
 	assert.Equal(t, "test-lang", cfg.UI.Language)
 	assert.Equal(t, "test-theme", cfg.UI.Theme)
 

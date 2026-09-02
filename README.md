@@ -1,268 +1,171 @@
-[![Build Status](https://github.com/seike460/s3ry/workflows/CI/badge.svg)](https://github.com/seike460/s3ry/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/seike460/s3ry)](https://goreportcard.com/report/github.com/seike460/s3ry)
-[![codecov](https://codecov.io/gh/seike460/s3ry/branch/master/graph/badge.svg)](https://codecov.io/gh/seike460/s3ry)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/v/release/seike460/s3ry)](https://github.com/seike460/s3ry/releases)
+[![CI](https://github.com/seike460/s3ry/actions/workflows/ci.yml/badge.svg)](https://github.com/seike460/s3ry/actions/workflows/ci.yml)
 
-# S3ry - AWS S3 Interactive Terminal Client
+# s3ry
 
-S3ry is a modern, interactive terminal-based AWS S3 management tool written in Go. It provides both traditional prompt-based interface and modern Bubble Tea TUI for efficient S3 operations.
+s3ry is an interactive terminal client for Amazon S3. It is written in Go and uses Bubble Tea.
 
-> 📚 **[ROADMAP](ROADMAP.md)** | 📋 **[RELEASE NOTES](RELEASE_NOTES.md)**
+## Status
 
-## ✨ Features
+This project is being rebuilt. The current binary works but is limited; see Known limitations. The v2.0.0 release notes were corrected on 2026-09-03.
 
-### 🎨 **Dual Interface Options**
-- **Modern Bubble Tea TUI** - Interactive terminal interface (default)
-- **Legacy promptui interface** - Traditional prompt-based selection via `--legacy-ui`
-- **Automatic fallback** - Switches to legacy mode when TTY is unavailable
+## What works today
 
-### ⚡ **Performance Options**  
-- **Modern backend** - Enhanced performance with worker pool (`--modern-backend`)
-- **Legacy backend** - Traditional AWS SDK operations (default)
-- **Concurrent operations** - Configurable worker pool for bulk operations
-- **Progress tracking** - Real-time feedback for long-running operations
+- List S3 buckets.
+- Browse objects in a selected bucket as a flat list. The current UI displays the first 1000 keys.
+- Download a selected object to the current directory.
+- Upload a selected file that is not hidden (hidden files and directories are skipped) from the current directory tree to the selected bucket.
+- Delete a selected object.
+- Export the selected bucket's object list to `ObjectList-<timestamp>.txt` in the current directory; the 1000-object limit also applies to export.
 
-### 🔄 **Core S3 Operations**
-- **📥 Download** - Single and bulk file downloads  
-- **📤 Upload** - File uploads with progress tracking
-- **🗑️ Delete** - Object deletion with confirmation
-- **📋 List** - Bucket and object browsing with search
-- **📄 Export** - Generate object lists for analysis
+![s3ry logo](doc/S3ry.png)
 
-### 🌍 **Multi-language Support**
-- **English** - Default interface language
-- **Japanese** - Full Japanese localization (`--lang ja`)
-- **i18n framework** - Extensible internationalization system
+## Known limitations
 
-![S3ry Modern TUI](doc/S3ry.png)
+- Object browsing uses one `ListObjectsV2` request and is limited to the first 1000 keys. Pagination is not connected to the UI.
+- Delete and overwrite operations do not ask for confirmation.
+- `--region` and `AWS_REGION` affect only the bucket list; object operations (download / upload / delete / export) always use a client configured for `ap-northeast-1`.
+- `--profile` and `AWS_ENDPOINT_URL` are read or accepted but are not applied to the active S3 client.
+- `--lang` and `S3RY_LANGUAGE` have no effect in the current UI.
+- `--log-level` and `--verbose` do not change the logging output level; the UI does not emit logs.
+- The binary exits with an error when stdin or stdout is not a TTY. Non-interactive commands are not available.
+- The Japanese UI is temporarily unavailable while it is being rebuilt.
 
-## 🚀 Installation
+## Installation
 
-### Download Pre-built Binaries
-```bash
-# Linux
-curl -LO https://github.com/seike460/s3ry/releases/latest/download/s3ry-linux-amd64
-chmod +x s3ry-linux-amd64
-sudo mv s3ry-linux-amd64 /usr/local/bin/s3ry
+### GitHub Releases
 
-# macOS
-curl -LO https://github.com/seike460/s3ry/releases/latest/download/s3ry-darwin-amd64
-chmod +x s3ry-darwin-amd64
-sudo mv s3ry-darwin-amd64 /usr/local/bin/s3ry
+Download the asset for your platform from [GitHub Releases](https://github.com/seike460/s3ry/releases):
 
-# Windows
-# Download s3ry-windows-amd64.exe from releases and add to PATH
+- `s3ry_Linux_x86_64.tar.gz`
+- `s3ry_Linux_arm64.tar.gz`
+- `s3ry_Darwin_arm64.tar.gz`
+- `s3ry_Darwin_x86_64.tar.gz`
+- `s3ry_Windows_x86_64.zip`
+- `s3ry_Freebsd_x86_64.tar.gz`
+
+### Homebrew
+
+```sh
+brew install seike460/tap/s3ry
 ```
 
-### Package Managers
-```bash
-# Arch Linux (AUR)
-yay -S s3ry
+### Build from source
 
-# Windows (Chocolatey) 
-choco install s3ry
+Use Go 1.25 or later:
 
-# macOS (Homebrew)
-brew install s3ry
+```sh
+go build ./cmd/s3ry
 ```
 
-### Build from Source
-```bash
-git clone https://github.com/seike460/s3ry.git
-cd s3ry
-go build -o s3ry ./cmd/s3ry
-```
+## Usage
 
-## 🎯 Usage
+Start the interactive client:
 
-### Prerequisites
-- AWS credentials configured via:
-  - AWS CLI (`aws configure`)
-  - Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
-  - IAM roles or instance profiles
-
-### Basic Usage
-```bash
-# Start interactive mode (modern TUI by default)
+```sh
 s3ry
-
-# Use legacy promptui interface
-s3ry --legacy-ui
-
-# Enable modern backend for better performance
-s3ry --modern-backend
-
-# Specify AWS region and profile
-s3ry --region us-west-2 --profile production
-
-# Enable Japanese interface
-s3ry --lang ja
-
-# Debug mode with verbose logging
-s3ry --verbose --log-level debug
 ```
 
-### Command Line Options
-```bash
-s3ry [OPTIONS]
+The current binary's `--help` output is:
 
-OPTIONS:
-  --legacy-ui           Use legacy promptui interface instead of Bubble Tea TUI
-  --new-ui             Force modern Bubble Tea interface (default)
-  --modern-backend     Enable enhanced performance backend with worker pool
-  --region REGION      AWS region (overrides AWS_REGION)
-  --profile PROFILE    AWS profile (overrides AWS_PROFILE)
-  --lang LANGUAGE      Interface language: en (default) or ja
-  --config FILE        Configuration file path
-  --log-level LEVEL    Log level: debug, info, warn, error
-  --verbose            Enable verbose/debug output
-  --version            Show version information
-  --help               Show help message
+```text
+s3ry - interactive terminal client for Amazon S3
+
+Usage: s3ry [OPTIONS]
+
+Options:
+  -config string
+    	Path to config file
+  -h	Show help (short)
+  -help
+    	Show help
+  -lang string
+    	Language (en, ja)
+  -log-level string
+    	Log level (debug, info, warn, error)
+  -profile string
+    	AWS profile to use
+  -region string
+    	AWS region to use
+  -v	Enable verbose logging (short)
+  -verbose
+    	Enable verbose logging
+  -version
+    	Show version information
+
+Examples:
+  s3ry                      # Start with the Bubble Tea UI
+  s3ry --region us-west-2   # Use specific AWS region
+  s3ry --profile dev      # Use specific AWS profile
+  s3ry --config ./s3ry.yml # Use a specific configuration file
+  s3ry --lang en          # Use English language
+
+Environment Variables:
+  AWS_REGION            # AWS region
+  AWS_PROFILE           # AWS profile
+  S3RY_LANGUAGE         # Language (en, ja)
+  S3RY_LOG_LEVEL        # Log level
 ```
 
-## ⚙️ Configuration
+The executable name in the `Usage` and example lines follows the name used to start the binary.
 
-### Environment Variables
-```bash
-# AWS Configuration
-export AWS_REGION=us-west-2
-export AWS_PROFILE=production
-export AWS_ENDPOINT_URL=https://custom.s3.endpoint
+### Keyboard controls
 
-# S3ry Configuration  
-export S3RY_UI_MODE=bubbles          # or "legacy"
-export S3RY_LANGUAGE=en              # or "ja"
-export S3RY_LOG_LEVEL=info           # debug, info, warn, error
-```
+- In lists, `↑`/`↓` or `k`/`j` move between items. `PgUp`/`PgDn`, `Ctrl+B`/`Ctrl+F`, and `Home`/`End` provide page and position navigation. `Enter` or `Space` selects the current item.
+- In the operation view, `d` starts download, `u` starts upload, and `Delete` starts delete.
+- In the object view, `p` toggles the object metadata preview, `r` reloads the list, `?` opens help, `s` opens settings, and `Esc` returns to the operation view.
+- In the bucket view, `r` retries loading buckets, `?` opens help, and `s` opens settings.
+- In the upload view, `r` rescans local files and `Esc` returns to the operation view.
+- Globally, `Ctrl+H` or `F1` opens help, and `Ctrl+S` opens settings.
+- `q` or `Ctrl+C` exits the client.
 
-### Configuration File
-S3ry looks for configuration in these locations:
+## Configuration
+
+### Environment variables
+
+The configuration loader reads these variables:
+
+- `AWS_REGION`
+- `AWS_DEFAULT_REGION` when the configured region is still the default
+- `AWS_PROFILE`
+- `AWS_ENDPOINT_URL`
+- `S3RY_LANGUAGE`
+- `S3RY_LOG_LEVEL`
+
+The `AWS_PROFILE` and `AWS_ENDPOINT_URL` values are currently not applied to the active S3 client; see Known limitations.
+
+### Configuration files
+
+Without `--config`, the loader checks these relative paths and then the home-directory paths:
+
+- `s3ry.yml`
+- `s3ry.yaml`
+- `.s3ry.yml`
+- `.s3ry.yaml`
 - `~/.s3ry.yml`
+- `~/.s3ry.yaml`
 - `~/.config/s3ry/config.yml`
-- `./s3ry.yml`
+- `~/.config/s3ry/config.yaml`
 
-Basic configuration example:
-```yaml
-ui:
-  mode: "bubbles"        # "bubbles" (modern) or "legacy"
-  language: "en"         # "en" or "ja"
+With `--config PATH`, the specified YAML file is read and environment variables are applied afterward.
 
-aws:
-  region: "us-west-2"
-  profile: "default"
+The YAML keys defined by the configuration type are:
 
-performance:
-  workers: 5             # Worker pool size for modern backend
+- `aws.region`, `aws.profile`, `aws.endpoint`
+- `ui.language`, `ui.theme`
+- `performance.workers`, `performance.chunk_size`, `performance.timeout`, `performance.max_concurrent_downloads`, `performance.max_concurrent_uploads`
+- `logging.level`, `logging.format`, `logging.file`
+- `log_level`, `log_format`, `log_file`, `debug_level`, `debug_file`, `profile_dir`, `environment`, `version`
 
-logging:
-  level: "info"          # debug, info, warn, error
-  file: ""               # Log file path (empty = console only)
-```
+In the current binary, only `aws.region` affects behavior, and only for the bucket list; the other keys are read but not used. `logging.level` does not change output because the UI does not emit logs.
 
-## 🎮 Interface Overview
+## Roadmap
 
-### Modern Bubble Tea TUI (Default)
-When you run `s3ry`, you'll see an interactive terminal interface with:
-- **Arrow keys** - Navigate buckets and objects
-- **Enter** - Select and perform actions  
-- **Tab** - Switch between panels
-- **?** - Show help and keyboard shortcuts
-- **q** - Quit application
+See [ROADMAP.md](ROADMAP.md).
 
-### Legacy promptui Interface
-When using `--legacy-ui`, you get a traditional prompt-based workflow:
-1. Select bucket from list
-2. Choose operation (download, upload, delete, list)
-3. Select specific objects or files
-4. Confirm actions
+## Contributing
 
-## 📁 Project Structure
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The project includes several applications:
+## License
 
-```
-s3ry/
-├── cmd/
-│   ├── s3ry/          # Main CLI application
-│   ├── s3ry-desktop/  # Desktop application (Wails)
-│   ├── s3ry-web/      # Web server
-│   ├── s3ry-tui/      # Standalone TUI
-│   └── s3ry-vscode/   # VSCode extension backend
-├── internal/          # Core implementation
-│   ├── s3/           # S3 operations engine
-│   ├── ui/           # UI components
-│   ├── config/       # Configuration management
-│   ├── worker/       # Worker pool implementation
-│   └── i18n/         # Internationalization
-├── vscode-extension/  # VSCode extension
-└── test/             # Test suites
-```
-
-## 🔧 Development
-
-### Requirements
-- Go 1.23.0+
-- Make (optional, for development tasks)
-
-### Build from Source
-```bash
-git clone https://github.com/seike460/s3ry.git
-cd s3ry
-
-# Build main CLI
-go build -o s3ry ./cmd/s3ry
-
-# Build all applications
-make build-all
-
-# Run tests
-go test ./...
-
-# Run with race detection
-go test -race ./...
-```
-
-### Architecture
-S3ry provides dual backend implementations:
-- **Legacy backend** - Uses AWS SDK v1 with traditional operations
-- **Modern backend** - Enhanced performance with worker pools and optimized operations
-
-Both backends support the same operations but the modern backend provides:
-- Concurrent processing via worker pools
-- Progress tracking for long operations
-- Enhanced error handling and recovery
-- Resource pooling for better performance
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass (`go test ./...`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-### Code Quality Guidelines
-- Follow Go best practices and conventions
-- Maintain backward compatibility
-- Add tests for new features
-- Update documentation as needed
-- Use meaningful commit messages
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Go Team** - For the excellent programming language and ecosystem
-- **Bubble Tea** - For the modern TUI framework  
-- **AWS SDK** - For robust S3 integration capabilities
-- **promptui** - For the legacy interface implementation
-- **Community** - For feedback, contributions, and support
-
+This project is licensed under the MIT License. See [LICENSE](LICENSE).

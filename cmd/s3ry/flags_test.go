@@ -10,7 +10,6 @@ import (
 
 func TestFlags_Structure(t *testing.T) {
 	flags := &Flags{
-		NewUI:      true,
 		Region:     "us-west-2",
 		Profile:    "test",
 		ConfigFile: "/path/to/config",
@@ -21,7 +20,6 @@ func TestFlags_Structure(t *testing.T) {
 		LogLevel:   "debug",
 	}
 
-	assert.True(t, flags.NewUI)
 	assert.Equal(t, "us-west-2", flags.Region)
 	assert.Equal(t, "test", flags.Profile)
 	assert.Equal(t, "/path/to/config", flags.ConfigFile)
@@ -130,7 +128,6 @@ func TestVersionInformation(t *testing.T) {
 func BenchmarkFlagsCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		flags := &Flags{
-			NewUI:      true,
 			Region:     "us-west-2",
 			Profile:    "test",
 			ConfigFile: "/path/to/config",

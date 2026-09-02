@@ -18,6 +18,30 @@ type mockS3Client struct {
 	downloader  *s3manager.Downloader
 }
 
+func (m *mockS3Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
+	return nil, nil
+}
+
+func (m *mockS3Client) ListObjects(ctx context.Context, bucket, prefix, delimiter string) ([]ObjectInfo, error) {
+	return nil, nil
+}
+
+func (m *mockS3Client) UploadFile(ctx context.Context, localPath, bucket, key string) error {
+	return nil
+}
+
+func (m *mockS3Client) DownloadFile(ctx context.Context, bucket, key, localPath string) error {
+	return nil
+}
+
+func (m *mockS3Client) DeleteObject(ctx context.Context, bucket, key string) error {
+	return nil
+}
+
+func (m *mockS3Client) GetBucketRegion(ctx context.Context, bucket string) (string, error) {
+	return "", nil
+}
+
 func (m *mockS3Client) S3() *s3.S3 {
 	return m.s3
 }
@@ -71,7 +95,8 @@ func (m *mockJob) Execute(ctx context.Context) error {
 }
 
 func TestS3Client_Interface(t *testing.T) {
-	var client S3Client = &mockS3Client{}
+	client := &mockS3Client{}
+	var _ S3Client = client
 
 	// Test S3 getter
 	s3Client := client.S3()
@@ -87,7 +112,8 @@ func TestS3Client_Interface(t *testing.T) {
 }
 
 func TestS3Client_ErrorHandling(t *testing.T) {
-	var client S3Client = &mockS3Client{shouldError: true}
+	client := &mockS3Client{shouldError: true}
+	var _ S3Client = client
 
 	// Test that the interface methods are accessible
 	s3Client := client.S3()

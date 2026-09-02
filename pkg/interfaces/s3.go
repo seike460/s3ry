@@ -15,16 +15,6 @@ type S3Client interface {
 	DownloadFile(ctx context.Context, bucket, key, localPath string) error
 	DeleteObject(ctx context.Context, bucket, key string) error
 
-	// Extended operations for API compatibility
-	CreateBucket(ctx context.Context, bucket string) error
-	DeleteBucket(ctx context.Context, bucket string) error
-	GetBucketInfo(ctx context.Context, bucket string) (*BucketInfo, error)
-	ListObjectsWithLimit(ctx context.Context, bucket, prefix string, maxKeys int) (*ObjectList, error)
-	UploadObject(ctx context.Context, bucket, key string, content []byte) (*PutResult, error)
-	GetPresignedURL(ctx context.Context, bucket, key string, expires time.Duration) (string, error)
-	StreamObject(ctx context.Context, bucket, key string) (*Object, error)
-	GetObjectMetadata(ctx context.Context, bucket, key string) (*ObjectMetadata, error)
-
 	// Utility operations
 	GetBucketRegion(ctx context.Context, bucket string) (string, error)
 }

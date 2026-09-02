@@ -1,0 +1,68 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- A CI workflow covering build, vet, race tests, vulnerability checks with govulncheck, and cross-compilation.
+- CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, issue and pull request templates, and Dependabot configuration.
+
+### Removed
+
+- The release workflow; release automation is unavailable until it is rebuilt for v3.0.0.
+- The `cmd/s3ry-tui` command.
+- The legacy promptui UI and the public Go package `github.com/seike460/s3ry`.
+- The former flags `--legacy-ui`, `--new-ui`, `--bubbles`, and `--modern-backend`.
+- The `ui.mode` and `S3RY_UI_MODE` settings.
+- The desktop, web, and vscode commands and extensions.
+- The terraform provider, SDK, Helm chart, and the Scoop, AUR, Snap, Docker, and Chocolatey packaging files and GoReleaser settings.
+- Unreachable internal package groups including `sla`, `chaos`, `security`, `ai`, `analytics`, `telemetry`, `backup`, `dashboard`, `api`, `docs`, `updater`, and `cloud`.
+- The CodeGuru workflow, the codecov configuration files, and the Dockerfile.
+
+### Changed
+
+- A non-TTY invocation no longer starts the interactive UI and exits with an error.
+- The Japanese UI is temporarily hidden until it is rebuilt.
+- `--config` now reads the specified configuration file.
+- The Go directive is 1.25.
+
+### Fixed
+
+- `go.sum` is tracked.
+- `.gitignore` no longer hides new files under `cmd/s3ry`.
+- List key input that was dropped within the 50ms window and the three failing tests were fixed.
+- The upload file picker was always empty.
+
+### Security
+
+- Updated `gopkg.in/yaml.v2` to v2.4.0 for `GO-2022-0956`, `GO-2021-0061`, and `GO-2020-0036`.
+- Updated `golang.org/x/text` to v0.39.0 and `golang.org/x/sys` to v0.44.0.
+
+## [2.0.0] - 2025-06-18
+
+Release notes were corrected on 2026-09-03; the unsupported claims were retracted.
+
+## [0.2] - 2019-12-20
+
+## [0.1.4] - 2019-12-20
+
+## [0.1.3] - 2018-11-24
+
+## [0.1.2] - 2018-11-24
+
+## [0.1.1] - 2018-11-14
+
+## [0.1] - 2018-04-29
+
+[Unreleased]: https://github.com/seike460/s3ry/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/seike460/s3ry/releases/tag/v2.0.0
+[0.2]: https://github.com/seike460/s3ry/releases/tag/0.2
+[0.1.4]: https://github.com/seike460/s3ry/releases/tag/0.1.4
+[0.1.3]: https://github.com/seike460/s3ry/releases/tag/0.1.3
+[0.1.2]: https://github.com/seike460/s3ry/releases/tag/0.1.2
+[0.1.1]: https://github.com/seike460/s3ry/releases/tag/0.1.1
+[0.1]: https://github.com/seike460/s3ry/releases/tag/0.1

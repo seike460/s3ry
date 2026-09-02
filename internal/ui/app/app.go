@@ -55,14 +55,8 @@ func New(cfg *config.Config) *App {
 			MarginLeft(2),
 	}
 
-	// Initialize with region view, using configured region if available
-	if cfg.AWS.Region != "" {
-		// If region is pre-configured, skip region selection and go directly to bucket selection
-		app.view = views.NewBucketView(cfg.AWS.Region)
-	} else {
-		// Start with region selection
-		app.view = views.NewRegionView()
-	}
+	// Initialize with bucket view, using the configured region if available
+	app.view = views.NewBucketView(cfg.AWS.Region)
 
 	return app
 }
@@ -87,10 +81,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+s":
 			// Global settings shortcut
 			a.view = views.NewSettingsView()
-			return a, a.view.Init()
-		case "ctrl+l":
-			// Global logs shortcut
-			a.view = views.NewLogsView()
 			return a, a.view.Init()
 		}
 	}
