@@ -16,7 +16,6 @@ type Config struct {
 	} `yaml:"aws" json:"aws"`
 
 	UI struct {
-		Mode     string `yaml:"mode" json:"mode"`         // "legacy", "bubbles"
 		Language string `yaml:"language" json:"language"` // "en", "ja"
 		Theme    string `yaml:"theme" json:"theme"`       // "default", "dark", "light"
 	} `yaml:"ui" json:"ui"`
@@ -58,11 +57,9 @@ func Default() *Config {
 			Profile: "",
 		},
 		UI: struct {
-			Mode     string `yaml:"mode" json:"mode"`
 			Language string `yaml:"language" json:"language"`
 			Theme    string `yaml:"theme" json:"theme"`
 		}{
-			Mode:     "bubbles", // Default to new UI
 			Language: "ja",
 			Theme:    "default",
 		},
@@ -119,6 +116,23 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// LoadFromFile loads configuration from the specified YAML file and applies
+// environment variable overrides in the same order as Load.
+func LoadFromFile(path string) (*Config, error) {
+	cfg := Default()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.loadFromEnv()
+	return cfg, nil
+}
+
 // loadFromFile loads configuration from YAML file
 func (c *Config) loadFromFile() error {
 	configPaths := []string{
@@ -161,9 +175,6 @@ func (c *Config) loadFromEnv() {
 	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
 		c.AWS.Endpoint = endpoint
 	}
-	if mode := os.Getenv("S3RY_UI_MODE"); mode != "" {
-		c.UI.Mode = mode
-	}
 	if lang := os.Getenv("S3RY_LANGUAGE"); lang != "" {
 		c.UI.Language = lang
 	}
@@ -187,11 +198,6 @@ func (c *Config) Save(path string) error {
 	}
 
 	return os.WriteFile(path, data, 0644)
-}
-
-// IsNewUIEnabled returns true if the new Bubble Tea UI should be used
-func (c *Config) IsNewUIEnabled() bool {
-	return c.UI.Mode == "bubbles" || c.UI.Mode == "new"
 }
 
 // GetRegion returns the configured AWS region

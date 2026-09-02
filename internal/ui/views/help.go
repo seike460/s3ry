@@ -125,11 +125,6 @@ func NewHelpView() *HelpView {
 			Tag:         "Category",
 		},
 		{
-			Title:       "Modern UI Mode",
-			Description: "Use --new-ui flag for enhanced TUI experience",
-			Tag:         "Tip",
-		},
-		{
 			Title:       "Configuration",
 			Description: "Set AWS_REGION, AWS_PROFILE, or use ~/.s3ry.yaml",
 			Tag:         "Tip",

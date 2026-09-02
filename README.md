@@ -6,20 +6,17 @@
 
 # S3ry - AWS S3 Interactive Terminal Client
 
-S3ry is a modern, interactive terminal-based AWS S3 management tool written in Go. It provides both traditional prompt-based interface and modern Bubble Tea TUI for efficient S3 operations.
+S3ry is a modern, interactive terminal-based AWS S3 management tool written in Go. It provides a Bubble Tea TUI for efficient S3 operations.
 
 > 📚 **[ROADMAP](ROADMAP.md)** | 📋 **[RELEASE NOTES](RELEASE_NOTES.md)**
 
 ## ✨ Features
 
-### 🎨 **Dual Interface Options**
+### 🎨 **Interactive Interface**
 - **Modern Bubble Tea TUI** - Interactive terminal interface (default)
-- **Legacy promptui interface** - Traditional prompt-based selection via `--legacy-ui`
-- **Automatic fallback** - Switches to legacy mode when TTY is unavailable
+- **Terminal requirement** - stdin and stdout must both be interactive terminals
 
 ### ⚡ **Performance Options**  
-- **Modern backend** - Enhanced performance with worker pool (`--modern-backend`)
-- **Legacy backend** - Traditional AWS SDK operations (default)
 - **Concurrent operations** - Configurable worker pool for bulk operations
 - **Progress tracking** - Real-time feedback for long-running operations
 
@@ -87,14 +84,11 @@ go build -o s3ry ./cmd/s3ry
 # Start interactive mode (modern TUI by default)
 s3ry
 
-# Use legacy promptui interface
-s3ry --legacy-ui
-
-# Enable modern backend for better performance
-s3ry --modern-backend
-
 # Specify AWS region and profile
 s3ry --region us-west-2 --profile production
+
+# Use a specific configuration file
+s3ry --config ./s3ry.yml
 
 # Enable Japanese interface
 s3ry --lang ja
@@ -108,9 +102,6 @@ s3ry --verbose --log-level debug
 s3ry [OPTIONS]
 
 OPTIONS:
-  --legacy-ui           Use legacy promptui interface instead of Bubble Tea TUI
-  --new-ui             Force modern Bubble Tea interface (default)
-  --modern-backend     Enable enhanced performance backend with worker pool
   --region REGION      AWS region (overrides AWS_REGION)
   --profile PROFILE    AWS profile (overrides AWS_PROFILE)
   --lang LANGUAGE      Interface language: en (default) or ja
@@ -131,7 +122,6 @@ export AWS_PROFILE=production
 export AWS_ENDPOINT_URL=https://custom.s3.endpoint
 
 # S3ry Configuration  
-export S3RY_UI_MODE=bubbles          # or "legacy"
 export S3RY_LANGUAGE=en              # or "ja"
 export S3RY_LOG_LEVEL=info           # debug, info, warn, error
 ```
@@ -145,7 +135,6 @@ S3ry looks for configuration in these locations:
 Basic configuration example:
 ```yaml
 ui:
-  mode: "bubbles"        # "bubbles" (modern) or "legacy"
   language: "en"         # "en" or "ja"
 
 aws:
@@ -163,19 +152,15 @@ logging:
 ## 🎮 Interface Overview
 
 ### Modern Bubble Tea TUI (Default)
-When you run `s3ry`, you'll see an interactive terminal interface with:
+When you run `s3ry` in an interactive terminal, you'll see an interface with:
 - **Arrow keys** - Navigate buckets and objects
 - **Enter** - Select and perform actions  
 - **Tab** - Switch between panels
 - **?** - Show help and keyboard shortcuts
 - **q** - Quit application
 
-### Legacy promptui Interface
-When using `--legacy-ui`, you get a traditional prompt-based workflow:
-1. Select bucket from list
-2. Choose operation (download, upload, delete, list)
-3. Select specific objects or files
-4. Confirm actions
+### Non-interactive terminals
+The CLI currently requires both stdin and stdout to be interactive terminals. Non-interactive subcommands are planned.
 
 ## 📁 Project Structure
 
@@ -263,6 +248,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Go Team** - For the excellent programming language and ecosystem
 - **Bubble Tea** - For the modern TUI framework  
 - **AWS SDK** - For robust S3 integration capabilities
-- **promptui** - For the legacy interface implementation
 - **Community** - For feedback, contributions, and support
-

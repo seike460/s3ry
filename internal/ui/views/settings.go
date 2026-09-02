@@ -154,11 +154,6 @@ func (v *SettingsView) buildSettingsList() {
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("Mode: %s", v.getConfigValue("Mode", v.config.UI.Mode)),
-			Description: "UI mode (legacy/bubbles)",
-			Tag:         "Setting",
-		},
-		{
 			Title:       "",
 			Description: "",
 			Tag:         "Separator",
