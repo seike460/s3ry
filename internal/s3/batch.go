@@ -378,7 +378,7 @@ func (j *BatchDeleteJob) Execute(ctx context.Context) error {
 	errorMap := make(map[string]error)
 	for _, deleteError := range output.Errors {
 		if deleteError.Key != nil && deleteError.Message != nil {
-			errorMap[*deleteError.Key] = fmt.Errorf(*deleteError.Message)
+			errorMap[*deleteError.Key] = fmt.Errorf("%s", *deleteError.Message)
 		}
 	}
 
