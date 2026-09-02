@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
