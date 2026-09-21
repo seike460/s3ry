@@ -1,72 +1,71 @@
 package views
 
 import (
-	"context"
+	"bufio"
 	"fmt"
 	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/seike460/s3ry/internal/legacy/s3"
+
+	"github.com/seike460/s3ry/internal/s3"
 	"github.com/seike460/s3ry/internal/ui/components"
-	"github.com/seike460/s3ry/pkg/interfaces"
 )
 
-// ListGeneratorView represents the object list generator view
+// ListGeneratorView streams the bucket's object list into a timestamped
+// local file.
 type ListGeneratorView struct {
-	spinner    *components.Spinner
-	progress   *components.Progress
-	processing bool
-	region     string
-	bucket     string
-	s3Client   interfaces.S3Client
-
-	// Styles
-	headerStyle lipgloss.Style
-	errorStyle  lipgloss.Style
+	deps     Deps
+	bucket   string
+	spinner  *components.Spinner
+	transfer transferState
 }
 
-// NewListGeneratorView creates a new list generator view
-func NewListGeneratorView(region, bucket string) *ListGeneratorView {
-	// Create S3 client using the new architecture
-	s3Client := s3.NewClient(region)
-
+// NewListGeneratorView creates a new list generator view.
+func NewListGeneratorView(deps Deps, bucket string) *ListGeneratorView {
 	return &ListGeneratorView{
-		region:     region,
-		bucket:     bucket,
-		s3Client:   s3Client,
-		processing: true,
-		spinner:    components.NewSpinner("Generating object list..."),
-
-		headerStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			MarginBottom(2),
-
-		errorStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")).
-			MarginTop(1),
+		deps:     deps,
+		bucket:   bucket,
+		spinner:  components.NewSpinner(T("Generating object list...")),
+		transfer: transferState{active: true, doneDelay: 3 * time.Second},
 	}
 }
 
-// Init initializes the list generator view
+// Init starts the spinner and the generation.
 func (v *ListGeneratorView) Init() tea.Cmd {
-	return tea.Batch(
-		v.spinner.Start(),
-		v.generateList(),
-	)
+	return tea.Batch(v.spinner.Start(), v.generateList())
 }
 
-// Update handles messages for the list generator view
+// Update handles messages for the list generator view.
 func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
+		v.transfer.resize(msg)
+
+	case transferProgressMsg:
+		message := fmt.Sprintf(T("%d objects written"), msg.event.Transferred)
+		if cmd := v.transfer.onProgress(msg.event, message); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case transferDoneMsg:
+		v.spinner.Stop()
+		if cmd := v.transfer.finish(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case backToOperationMsg:
+		return NewOperationView(v.deps, v.bucket), nil
+
+	case brokerClosedMsg:
+		// The broker was closed while a read was in flight; nothing to do.
+
+	case components.SpinnerTickMsg:
+		if v.transfer.active && v.spinner.IsActive() {
+			v.spinner, _ = v.spinner.Update(msg)
+			cmds = append(cmds, v.spinner.Start())
 		}
 
 	case tea.KeyMsg:
@@ -74,118 +73,79 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return v, tea.Quit
 		case "esc":
-			if !v.processing {
-				// Go back to operation selection
-				return NewOperationView(v.region, v.bucket), nil
+			if v.transfer.active {
+				v.transfer.cancelTransfer()
+				return v, nil
 			}
-		}
-
-	case components.SpinnerTickMsg:
-		if v.processing && v.spinner.IsActive() {
-			v.spinner, _ = v.spinner.Update(msg)
-			cmds = append(cmds, v.spinner.Start())
-		}
-
-	case components.ProgressMsg:
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
-		}
-
-	case components.CompletedMsg:
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
-			v.processing = false
-			v.spinner.Stop()
-			// Wait a moment to show completion, then allow going back
-			return v, tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
-				return tea.KeyMsg{Type: tea.KeyEsc}
-			})
+			return NewOperationView(v.deps, v.bucket), nil
 		}
 	}
 
 	return v, tea.Batch(cmds...)
 }
 
-// View renders the list generator view
+// View renders the list generator view.
 func (v *ListGeneratorView) View() string {
-	context := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888")).
-		Render("Region: " + v.region + " | Bucket: " + v.bucket)
+	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
+		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
 
 	var content string
-	if v.progress != nil {
-		content = v.progress.View()
+	if v.transfer.progress != nil {
+		content = v.transfer.progress.View()
 	} else {
-		content = v.headerStyle.Render("📝 Generating Object List") + "\n\n" + v.spinner.View()
+		content = headerStyle.Render(T("Generating Object List")) + "\n\n" + v.spinner.View()
 	}
 
 	help := ""
-	if !v.processing {
-		help = "\n\n" + lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262")).
-			Render("esc: back • q: quit")
+	if !v.transfer.active {
+		help = "\n\n" + footerStyle.Render(T("esc: back • q: quit"))
 	}
-
 	return context + "\n\n" + content + help
 }
 
-// generateList generates the object list file
+// generateList walks the bucket with the session's concurrency and writes
+// each object as it is discovered, so memory use stays flat.
 func (v *ListGeneratorView) generateList() tea.Cmd {
-	return func() tea.Msg {
-		// Use interface method for MVP
-		ctx := context.Background()
-
-		// Create filename with timestamp
-		t := time.Now()
-		filename := fmt.Sprintf("ObjectList-%s.txt", t.Format("2006-01-02-15-04-05"))
-
-		// Create file
-		file, err := os.Create(filename)
-		if err != nil {
-			return components.CompletedMsg{
-				Success: false,
-				Message: fmt.Sprintf("Failed to create file: %v", err),
-			}
-		}
-		defer file.Close()
-
-		// List objects using interface method for MVP
-		objects, err := v.s3Client.ListObjects(ctx, v.bucket, "", "")
-		if err != nil {
-			return components.CompletedMsg{
-				Success: false,
-				Message: fmt.Sprintf("Failed to list objects: %v", err),
-			}
-		}
-
-		// Create progress tracker
-		totalObjects := int64(len(objects))
-		v.progress = components.NewProgress("📝 Writing object list", totalObjects)
-
-		// Generate list with progress
-		for i, obj := range objects {
-			if !obj.IsPrefix { // Skip directories
-				line := fmt.Sprintf("./%s,%d\n", obj.Key, obj.Size)
-				_, writeErr := file.WriteString(line)
-				if writeErr != nil {
-					return components.CompletedMsg{
-						Success: false,
-						Message: fmt.Sprintf("Failed to write to file: %v", writeErr),
-					}
-				}
-
-				processedObjects := int64(i + 1)
-				// Update progress every 100 objects to avoid too many updates
-				if processedObjects%100 == 0 || processedObjects == totalObjects {
-					v.progress.SetProgress(processedObjects, totalObjects,
-						fmt.Sprintf("Processed %d of %d objects", processedObjects, totalObjects))
-				}
-			}
-		}
-
-		return components.CompletedMsg{
-			Success: true,
-			Message: fmt.Sprintf("Object list created: %s (%d objects)", filename, totalObjects),
-		}
+	if err := v.deps.sessionErr(); err != nil {
+		return func() tea.Msg { return transferDoneMsg{err: err} }
 	}
+
+	ctx, wait := v.transfer.begin(T("Generating object list"), -1)
+	progressFn := v.transfer.callback()
+
+	session, bucket := v.deps.Session, v.bucket
+	concurrency := session.Options().Concurrency
+
+	return tea.Batch(
+		func() tea.Msg {
+			filename := fmt.Sprintf("ObjectList-%s.txt", time.Now().Format("2006-01-02-15-04-05"))
+			file, err := os.Create(filename)
+			if err != nil {
+				return transferDoneMsg{err: err}
+			}
+			defer func() { _ = file.Close() }()
+
+			writer := bufio.NewWriter(file)
+			var count int64
+			walkErr := session.Walk(ctx, bucket, "", s3.WalkOptions{Concurrency: concurrency}, func(object s3.Object) error {
+				if _, err := fmt.Fprintf(writer, "./%s,%d\n", object.Key, object.Size); err != nil {
+					return err
+				}
+				count++
+				if count%100 == 0 {
+					progressFn(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: -1})
+				}
+				return nil
+			})
+			if walkErr == nil {
+				walkErr = writer.Flush()
+			}
+			progressFn(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: count, Done: true, Err: walkErr})
+			return transferDoneMsg{
+				err:     walkErr,
+				summary: T("Object list created: %s (%d objects)", filename, count),
+			}
+		},
+		wait,
+	)
 }

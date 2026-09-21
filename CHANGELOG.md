@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - A CI workflow covering build, vet, race tests, vulnerability checks with govulncheck, and cross-compilation.
 - CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, issue and pull request templates, and Dependabot configuration.
+- `version` and `completion` subcommands; typed exit codes (1 general, 2 usage, 3 not found, 4 access denied or no credentials, 130 canceled).
 
 ### Removed
 
@@ -26,6 +27,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Changed
 
 - A non-TTY invocation no longer starts the interactive UI and exits with an error.
+- The CLI is built on cobra; `--help` output changed.
 - The Japanese UI is temporarily hidden until it is rebuilt.
 - `--config` now reads the specified configuration file.
 - The Go directive is 1.25.

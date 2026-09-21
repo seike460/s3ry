@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,17 +15,28 @@ import (
 	"github.com/aws/smithy-go"
 )
 
+// Kind classifies an Error so callers can switch on the failure mode
+// instead of matching message text.
 type Kind int
 
 const (
+	// KindUnknown is an error that did not match a known category.
 	KindUnknown Kind = iota
+	// KindNotFound means the bucket or object does not exist.
 	KindNotFound
+	// KindAccessDenied means the request was authenticated but rejected.
 	KindAccessDenied
+	// KindNoCredentials means no usable AWS credentials were found.
 	KindNoCredentials
+	// KindThrottled means the service asked the client to slow down.
 	KindThrottled
+	// KindCanceled means the caller canceled the operation.
 	KindCanceled
+	// KindInvalid means the request arguments failed validation.
 	KindInvalid
+	// KindExists means the local destination already exists.
 	KindExists
+	// KindUnsupported means the endpoint does not implement the operation.
 	KindUnsupported
 )
 
@@ -74,6 +86,8 @@ func (k Kind) sentence() string {
 	}
 }
 
+// Error is the package's classified error. Kind is the machine-readable
+// category; Op, Bucket, and Key locate the failed operation.
 type Error struct {
 	Kind   Kind
 	Op     string
@@ -118,11 +132,14 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
+// Is reports whether target is an Error of the same Kind, enabling
+// errors.Is(err, s3.ErrNotFound) style checks.
 func (e *Error) Is(target error) bool {
 	targetErr, ok := target.(*Error)
 	return ok && e != nil && targetErr != nil && e.Kind == targetErr.Kind
 }
 
+// Sentinel errors for errors.Is checks against a classified Kind.
 var (
 	ErrNotFound      = &Error{Kind: KindNotFound}
 	ErrAccessDenied  = &Error{Kind: KindAccessDenied}
@@ -134,6 +151,8 @@ var (
 	ErrUnsupported   = &Error{Kind: KindUnsupported}
 )
 
+// Classify wraps err in an *Error with the best matching Kind. Errors that
+// are already *Error values pass through unchanged.
 func Classify(op, bucket, key string, err error) error {
 	if err == nil {
 		return nil
@@ -177,9 +196,8 @@ func Classify(op, bucket, key string, err error) error {
 		return &Error{Kind: KindThrottled, Op: op, Bucket: bucket, Key: key, Err: err}
 	}
 
-	var responseErr *awshttp.ResponseError
-	if errors.As(err, &responseErr) && responseErr != nil && responseErr.ResponseError != nil && responseErr.ResponseError.Response != nil && responseErr.ResponseError.Response.Response != nil {
-		switch responseErr.HTTPStatusCode() {
+	if status, ok := responseStatus(err); ok {
+		switch status {
 		case 404:
 			return &Error{Kind: KindNotFound, Op: op, Bucket: bucket, Key: key, Err: err}
 		case 401, 403:
@@ -201,6 +219,31 @@ func Classify(op, bucket, key string, err error) error {
 	return &Error{Kind: KindUnknown, Op: op, Bucket: bucket, Key: key, Err: err}
 }
 
+func deleteNotImplemented(err error) bool {
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && apiErr != nil && apiErr.ErrorCode() == "NotImplemented" {
+		return true
+	}
+
+	status, ok := responseStatus(err)
+	return ok && status == http.StatusNotImplemented
+}
+
+// responseStatus extracts the HTTP status code from an error chain. The
+// embedded *smithyhttp.ResponseError may be nil, and promoted field access
+// through a nil embedded pointer panics, so each link is checked directly.
+func responseStatus(err error) (int, bool) {
+	var responseErr *awshttp.ResponseError
+	if !errors.As(err, &responseErr) || responseErr == nil {
+		return 0, false
+	}
+	embedded := responseErr.ResponseError
+	if embedded == nil || embedded.Response == nil || embedded.Response.Response == nil {
+		return 0, false
+	}
+	return responseErr.HTTPStatusCode(), true
+}
+
 func isCredentialService(serviceID string) bool {
 	switch serviceID {
 	case "ec2imds", "SSO", "SSO OIDC", "STS":
@@ -210,11 +253,13 @@ func isCredentialService(serviceID string) bool {
 	}
 }
 
+// KeyError pairs a failed object key with its error in bulk operations.
 type KeyError struct {
 	Key string
 	Err error
 }
 
+// BulkError aggregates the per-key failures of a multi-object operation.
 type BulkError struct {
 	Errors []KeyError
 }
@@ -231,17 +276,17 @@ func (b *BulkError) Unwrap() []error {
 	return errs
 }
 
-func (e *BulkError) Error() string {
-	if e == nil || len(e.Errors) == 0 {
+func (b *BulkError) Error() string {
+	if b == nil || len(b.Errors) == 0 {
 		return "0 errors"
 	}
 
-	limit := len(e.Errors)
+	limit := len(b.Errors)
 	if limit > 3 {
 		limit = 3
 	}
 	summary := make([]string, 0, limit+1)
-	for _, item := range e.Errors[:limit] {
+	for _, item := range b.Errors[:limit] {
 		if item.Err == nil {
 			summary = append(summary, item.Key)
 			continue
@@ -252,12 +297,12 @@ func (e *BulkError) Error() string {
 		}
 		summary = append(summary, fmt.Sprintf("%s: %v", item.Key, item.Err))
 	}
-	if len(e.Errors) > limit {
-		summary = append(summary, fmt.Sprintf("... and %d more", len(e.Errors)-limit))
+	if len(b.Errors) > limit {
+		summary = append(summary, fmt.Sprintf("... and %d more", len(b.Errors)-limit))
 	}
 	countName := "errors"
-	if len(e.Errors) == 1 {
+	if len(b.Errors) == 1 {
 		countName = "error"
 	}
-	return fmt.Sprintf("%d %s: %s", len(e.Errors), countName, strings.Join(summary, "; "))
+	return fmt.Sprintf("%d %s: %s", len(b.Errors), countName, strings.Join(summary, "; "))
 }

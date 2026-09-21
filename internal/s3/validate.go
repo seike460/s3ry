@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 )
 
+// ValidateBucketName checks name against the S3 bucket naming rules.
 func ValidateBucketName(name string) error {
 	if len(name) < 3 || len(name) > 63 {
 		return newInvalidError("validate", name, "", "bucket name must be between 3 and 63 characters")
@@ -69,6 +70,8 @@ func isIPv4DottedQuad(name string) bool {
 	return true
 }
 
+// ValidateKey checks that key is a non-empty, valid UTF-8 object key within
+// the S3 length limit and without NUL bytes.
 func ValidateKey(key string) error {
 	if key == "" {
 		return newInvalidError("validate", "", key, "object key must not be empty")
@@ -85,6 +88,8 @@ func ValidateKey(key string) error {
 	return nil
 }
 
+// LocalPath maps an object key under prefix to a safe path below destDir.
+// It rejects keys that escape the prefix or contain path traversal segments.
 func LocalPath(destDir, prefix, key string) (string, error) {
 	return localPath(destDir, prefix, key, runtime.GOOS == "windows")
 }
@@ -135,6 +140,8 @@ func newInvalidError(op, bucket, key, reason string) *Error {
 	return &Error{Kind: KindInvalid, Op: op, Bucket: bucket, Key: key, Err: errors.New(reason)}
 }
 
+// DetectContentType guesses the MIME type of path, first by extension and
+// then by sniffing the file's first 512 bytes.
 func DetectContentType(path string) string {
 	if contentType := mime.TypeByExtension(filepath.Ext(path)); contentType != "" {
 		return contentType
@@ -144,7 +151,7 @@ func DetectContentType(path string) string {
 	if err != nil {
 		return "application/octet-stream"
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	buf := make([]byte, 512)
 	read, err := io.ReadFull(file, buf)

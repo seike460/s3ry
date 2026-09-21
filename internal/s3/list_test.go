@@ -263,7 +263,7 @@ func TestWalkCallbackErrorStopsParallelRequests(t *testing.T) {
 	var seen atomic.Int64
 	delivered := make(map[string]int)
 	var deliveredMu sync.Mutex
-	err := walkWithTimeout(t, session, t.Context(), bucket, WalkOptions{Concurrency: 8, MaxKeys: 3}, func(object Object) error {
+	err := walkWithTimeout(t.Context(), t, session, bucket, WalkOptions{Concurrency: 8, MaxKeys: 3}, func(object Object) error {
 		deliveredMu.Lock()
 		delivered[object.Key]++
 		deliveredMu.Unlock()
@@ -302,7 +302,7 @@ func TestWalkParallelCancellationStopsRequests(t *testing.T) {
 	var seen atomic.Int64
 	delivered := make(map[string]int)
 	var deliveredMu sync.Mutex
-	err := walkWithTimeout(t, session, ctx, bucket, WalkOptions{Concurrency: 8, MaxKeys: 3}, func(object Object) error {
+	err := walkWithTimeout(ctx, t, session, bucket, WalkOptions{Concurrency: 8, MaxKeys: 3}, func(object Object) error {
 		deliveredMu.Lock()
 		delivered[object.Key]++
 		deliveredMu.Unlock()
@@ -434,7 +434,7 @@ func TestOpenRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	got, err := io.ReadAll(body)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -463,7 +463,7 @@ func TestOpenWithoutRangeReturnsFullBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	got, err := io.ReadAll(body)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -480,7 +480,7 @@ func TestOpenMissingKey(t *testing.T) {
 
 	body, err := session.Open(t.Context(), bucket, "missing", "")
 	if body != nil {
-		body.Close()
+		_ = body.Close()
 		t.Fatalf("Open missing body = %#v, want nil", body)
 	}
 	if !errors.Is(err, ErrNotFound) {
@@ -614,7 +614,7 @@ func dropListObjectFields(sawStorageClass, sawETag *atomic.Bool) func(http.Handl
 
 func removeXMLElement(body []byte, element string) ([]byte, bool) {
 	open := []byte("<" + element + ">")
-	close := []byte("</" + element + ">")
+	closing := []byte("</" + element + ">")
 	changed := false
 	for {
 		start := bytes.Index(body, open)
@@ -622,11 +622,11 @@ func removeXMLElement(body []byte, element string) ([]byte, bool) {
 			return body, changed
 		}
 		contentStart := start + len(open)
-		end := bytes.Index(body[contentStart:], close)
+		end := bytes.Index(body[contentStart:], closing)
 		if end < 0 {
 			return body, changed
 		}
-		end += contentStart + len(close)
+		end += contentStart + len(closing)
 		rewritten := make([]byte, 0, len(body)-(end-start))
 		rewritten = append(rewritten, body[:start]...)
 		rewritten = append(rewritten, body[end:]...)
@@ -676,7 +676,7 @@ func makeWalkTreeKeys() []string {
 	return keys
 }
 
-func walkWithTimeout(t *testing.T, session *Session, ctx context.Context, bucket string, options WalkOptions, fn func(Object) error) error {
+func walkWithTimeout(ctx context.Context, t *testing.T, session *Session, bucket string, options WalkOptions, fn func(Object) error) error {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() {

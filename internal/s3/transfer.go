@@ -7,173 +7,25 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	transfertypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 )
 
-// Tests that change progressInterval must not call t.Parallel.
-var progressInterval = 100 * time.Millisecond
-
-type meter struct {
-	mu   sync.Mutex
-	fn   ProgressFunc
-	base Progress
-	n    atomic.Int64
-	last atomic.Int64
-	done atomic.Bool
-}
-
-func (m *meter) add(delta int64) {
-	if delta <= 0 {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.done.Load() {
-		return
-	}
-
-	m.n.Add(delta)
-	m.reportLocked()
-}
-
-func (m *meter) addAt(offset, delta int64) {
-	if delta <= 0 || offset < 0 {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.done.Load() {
-		return
-	}
-
-	end := offset + delta
-	if end < offset {
-		end = int64(^uint64(0) >> 1)
-	}
-	if m.base.Total >= 0 && end > m.base.Total {
-		end = m.base.Total
-	}
-	if end <= m.n.Load() {
-		return
-	}
-
-	m.n.Store(end)
-	m.reportLocked()
-}
-
-func (m *meter) reportLocked() {
-	if m.fn == nil {
-		return
-	}
-
-	now := time.Now().UnixNano()
-	last := m.last.Load()
-	if now-last < progressInterval.Nanoseconds() {
-		return
-	}
-	m.last.Store(now)
-
-	progress := m.base
-	progress.Transferred = m.n.Load()
-	progress.Done = false
-	progress.Err = nil
-	m.fn(progress)
-}
-
-func (m *meter) finish(err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if !m.done.CompareAndSwap(false, true) {
-		return
-	}
-	if m.fn == nil {
-		return
-	}
-
-	progress := m.base
-	progress.Transferred = m.n.Load()
-	progress.Done = true
-	progress.Err = err
-	m.fn(progress)
-}
-
-func (m *meter) finishSkipped() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if !m.done.CompareAndSwap(false, true) {
-		return
-	}
-	if m.fn == nil {
-		return
-	}
-
-	progress := m.base
-	progress.Transferred = m.n.Load()
-	progress.Done = true
-	progress.Skipped = true
-	m.fn(progress)
-}
-
-func (m *meter) setTotal(total int64) {
-	m.mu.Lock()
-	if !m.done.Load() {
-		m.base.Total = total
-		if total >= 0 && m.n.Load() > total {
-			m.n.Store(total)
-		}
-	}
-	m.mu.Unlock()
-}
-
-type countingFile struct {
-	*os.File
-	m *meter
-}
-
-func (f *countingFile) Read(p []byte) (int, error) {
-	n, err := f.File.Read(p)
-	if n > 0 && f.m != nil {
-		f.m.add(int64(n))
-	}
-	return n, err
-}
-
-type downloadProgressListener struct {
-	m *meter
-}
-
-func (l *downloadProgressListener) OnObjectTransferStart(_ context.Context, event *transfermanager.ObjectTransferStartEvent) {
-	if event != nil {
-		l.m.setTotal(event.TotalBytes)
-	}
-}
-
-func (f *countingFile) WriteAt(p []byte, offset int64) (int, error) {
-	n, err := f.File.WriteAt(p, offset)
-	if n > 0 && f.m != nil {
-		f.m.addAt(offset, int64(n))
-	}
-	return n, err
-}
-
+// UploadOptions controls a single object upload.
 type UploadOptions struct {
-	ContentType  string
+	// ContentType overrides the MIME type detected from the file.
+	ContentType string
+	// StorageClass selects an S3 storage class; empty uses STANDARD.
 	StorageClass string
-	Progress     ProgressFunc
+	// Progress receives transfer progress events.
+	Progress ProgressFunc
 }
 
+// Upload streams localPath to s3://bucket/key using the region-aware
+// transfer manager. Files larger than the configured part size are uploaded
+// in parallel parts.
 func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o UploadOptions) (err error) {
 	m := &meter{
 		fn: o.Progress,
@@ -187,7 +39,7 @@ func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o U
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			finishTransfer(m, "upload", bucket, key, panicError(recovered))
+			_ = finishTransfer(m, "upload", bucket, key, panicError(recovered))
 			panic(recovered)
 		}
 		err = finishTransfer(m, "upload", bucket, key, err)
@@ -218,7 +70,7 @@ func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o U
 	if err != nil {
 		return localFileError("upload", bucket, key, localPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	tm, err := s.transfer(ctx, bucket)
 	if err != nil {
@@ -242,11 +94,17 @@ func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o U
 	return err
 }
 
+// DownloadOptions controls a single object download.
 type DownloadOptions struct {
+	// Overwrite selects how an existing localPath is handled.
 	Overwrite OverwriteMode
-	Progress  ProgressFunc
+	// Progress receives transfer progress events.
+	Progress ProgressFunc
 }
 
+// Download streams s3://bucket/key to localPath through the region-aware
+// transfer manager. The object is fetched in parallel ranges when the part
+// size allows it.
 func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o DownloadOptions) (err error) {
 	m := &meter{
 		fn: o.Progress,
@@ -260,7 +118,7 @@ func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			finishTransfer(m, "download", bucket, key, panicError(recovered))
+			_ = finishTransfer(m, "download", bucket, key, panicError(recovered))
 			panic(recovered)
 		}
 		err = finishTransfer(m, "download", bucket, key, err)
@@ -294,7 +152,7 @@ func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o
 		return statErr
 	}
 
-	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o750); err != nil {
 		return err
 	}
 
@@ -314,13 +172,13 @@ func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o
 			return cleanupErr
 		}
 		if classified, ok := primary.(*Error); ok {
-			copy := *classified
-			if copy.Err == nil {
-				copy.Err = cleanupErr
+			cloned := *classified
+			if cloned.Err == nil {
+				cloned.Err = cleanupErr
 			} else {
-				copy.Err = errors.Join(copy.Err, cleanupErr)
+				cloned.Err = errors.Join(cloned.Err, cleanupErr)
 			}
-			return &copy
+			return &cloned
 		}
 		return errors.Join(primary, cleanupErr)
 	}
@@ -412,31 +270,33 @@ func publishDownload(tmpPath, localPath string, overwrite OverwriteMode) (exists
 		return false, os.Rename(tmpPath, localPath)
 	}
 
-	if err := os.Link(tmpPath, localPath); err == nil {
+	err = os.Link(tmpPath, localPath)
+	if err == nil {
 		return false, os.Remove(tmpPath)
-	} else if errors.Is(err, fs.ErrExist) {
-		return true, nil
-	} else {
-		if _, statErr := os.Lstat(localPath); statErr == nil {
-			return true, nil
-		} else if !errors.Is(statErr, fs.ErrNotExist) {
-			return false, statErr
-		}
-
-		// This fallback supports filesystems without hard links. A creator can
-		// still win between Lstat and Rename, so that residual race remains.
-		if renameErr := os.Rename(tmpPath, localPath); renameErr != nil {
-			if errors.Is(renameErr, fs.ErrExist) {
-				return true, nil
-			}
-			return false, renameErr
-		}
-		return false, nil
 	}
+	if errors.Is(err, fs.ErrExist) {
+		return true, nil
+	}
+
+	if _, statErr := os.Lstat(localPath); statErr == nil {
+		return true, nil
+	} else if !errors.Is(statErr, fs.ErrNotExist) {
+		return false, statErr
+	}
+
+	// This fallback supports filesystems without hard links. A creator can
+	// still win between Lstat and Rename, so that residual race remains.
+	if renameErr := os.Rename(tmpPath, localPath); renameErr != nil {
+		if errors.Is(renameErr, fs.ErrExist) {
+			return true, nil
+		}
+		return false, renameErr
+	}
+	return false, nil
 }
 
 func localFileError(op, bucket, key, localPath string, err error) error {
-	kind := KindUnknown
+	var kind Kind
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		kind = KindNotFound

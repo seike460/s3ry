@@ -157,8 +157,8 @@ func (s *Spinner) GetFrameRate() int {
 }
 
 // GetPerformanceInfo returns performance statistics
-func (s *Spinner) GetPerformanceInfo() map[string]interface{} {
-	return map[string]interface{}{
+func (s *Spinner) GetPerformanceInfo() map[string]any {
+	return map[string]any{
 		"target_fps":    s.targetFPS,
 		"frame_rate_ms": s.frameRate.Milliseconds(),
 		"frame_counter": s.frameCounter,

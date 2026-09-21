@@ -1,3 +1,5 @@
+// Package s3 wraps AWS SDK for Go v2 behind a region-aware Session that
+// caches clients and transfer managers per bucket region.
 package s3
 
 import (
@@ -214,11 +216,13 @@ func (s *Session) BucketRegion(ctx context.Context, bucket string) (string, erro
 
 func regionFromError(err error) string {
 	var responseErr *awshttp.ResponseError
-	if !errors.As(err, &responseErr) ||
-		responseErr == nil ||
-		responseErr.ResponseError == nil ||
-		responseErr.ResponseError.Response == nil ||
-		responseErr.ResponseError.Response.Response == nil {
+	if !errors.As(err, &responseErr) || responseErr == nil {
+		return ""
+	}
+	// The embedded *smithyhttp.ResponseError may be nil; promoted field
+	// access through a nil embedded pointer panics, so check it directly.
+	embedded := responseErr.ResponseError
+	if embedded == nil || embedded.Response == nil || embedded.Response.Response == nil {
 		return ""
 	}
 

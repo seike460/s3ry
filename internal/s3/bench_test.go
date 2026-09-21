@@ -201,7 +201,7 @@ func BenchmarkUpload16MiB(b *testing.B) {
 	const bucket = "benchmark-upload-16mib"
 	payload := benchmarkTransferPayload()
 	source := filepath.Join(b.TempDir(), "upload.bin")
-	if err := os.WriteFile(source, payload, 0o644); err != nil {
+	if err := os.WriteFile(source, payload, 0o600); err != nil {
 		b.Fatalf("WriteFile: %v", err)
 	}
 

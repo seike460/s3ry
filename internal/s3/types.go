@@ -89,16 +89,23 @@ func (u URL) IsPrefix() bool {
 	return u.Key == "" || strings.HasSuffix(u.Key, "/")
 }
 
+// MaxDeleteBatch is the S3 DeleteObjects per-request key limit.
 const MaxDeleteBatch = 1000
 
+// Op identifies which S3 operation produced a Progress event.
 type Op int
 
 const (
+	// OpUpload is a local-to-S3 transfer.
 	OpUpload Op = iota + 1
+	// OpDownload is an S3-to-local transfer.
 	OpDownload
+	// OpDelete is an object deletion.
 	OpDelete
 )
 
+// Progress is one progress event emitted while an operation runs. Total is
+// -1 while the size is still unknown; Done marks the final event.
 type Progress struct {
 	Op          Op
 	Bucket      string
@@ -111,13 +118,19 @@ type Progress struct {
 	Err         error
 }
 
+// ProgressFunc receives Progress events. It may be called from worker
+// goroutines and must be safe for concurrent use.
 type ProgressFunc func(Progress)
 
+// OverwriteMode selects how Download treats an existing local file.
 type OverwriteMode int
 
 const (
+	// OverwriteFail aborts when the destination exists.
 	OverwriteFail OverwriteMode = iota
+	// OverwriteSkip leaves the existing file and reports success.
 	OverwriteSkip
+	// OverwriteAlways replaces the existing file.
 	OverwriteAlways
 )
 

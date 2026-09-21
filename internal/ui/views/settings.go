@@ -7,55 +7,35 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/seike460/s3ry/internal/config"
 	"github.com/seike460/s3ry/internal/ui/components"
 )
 
-// SettingsView represents the settings configuration view
+// SettingsView displays the resolved configuration for the running process.
 type SettingsView struct {
-	list   *components.List
+	deps   Deps
 	config *config.Config
-
-	// Styles
-	headerStyle lipgloss.Style
-	valueStyle  lipgloss.Style
-	errorStyle  lipgloss.Style
+	list   *components.List
 }
 
-// NewSettingsView creates a new settings view
-func NewSettingsView() *SettingsView {
-	// Load current configuration
-	cfg, err := config.Load()
-	if err != nil {
+// NewSettingsView creates a settings view bound to the active configuration.
+func NewSettingsView(deps Deps) *SettingsView {
+	cfg := deps.Config
+	if cfg == nil {
 		cfg = config.Default()
 	}
-
-	settings := &SettingsView{
-		config: cfg,
-		headerStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			MarginBottom(2),
-
-		valueStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#04B575")),
-
-		errorStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")),
-	}
-
-	settings.buildSettingsList()
-	return settings
+	v := &SettingsView{deps: deps, config: cfg}
+	v.buildSettingsList()
+	return v
 }
 
-// Init initializes the settings view
+// Init initializes the settings view.
 func (v *SettingsView) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages for the settings view
+// Update handles messages for the settings view.
 func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -65,17 +45,10 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q", "esc":
+		case "ctrl+c", "q":
 			return v, tea.Quit
-		case "r":
-			// Refresh settings
-			cfg, err := config.Load()
-			if err != nil {
-				cfg = config.Default()
-			}
-			v.config = cfg
-			v.buildSettingsList()
-			return v, nil
+		case "esc":
+			return NewBucketView(v.deps), nil
 		}
 
 		if v.list != nil {
@@ -86,204 +59,102 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return v, nil
 }
 
-// View renders the settings view
+// View renders the settings view.
 func (v *SettingsView) View() string {
 	if v.list == nil {
-		return v.errorStyle.Render("Settings not available")
+		return errorStyle.Render(T("Settings not available"))
 	}
-
-	footer := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#626262")).
-		MarginTop(1).
-		Render("r: refresh • esc/q: back • Edit ~/.s3ry.yaml to modify settings")
-
+	footer := footerStyle.Render(T("esc: back • q: quit"))
 	return v.list.View() + "\n" + footer
 }
 
-// buildSettingsList creates the settings list items
+// buildSettingsList renders the current configuration into list items.
 func (v *SettingsView) buildSettingsList() {
 	items := []components.ListItem{
+		{Title: T("AWS Configuration"), Tag: "Category"},
 		{
-			Title:       "⚙️ Current Configuration",
-			Description: "Active settings for S3ry application",
-			Tag:         "Header",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "🌍 AWS Configuration",
-			Description: "AWS service settings",
-			Tag:         "Category",
-		},
-		{
-			Title:       fmt.Sprintf("Region: %s", v.getConfigValue("Region", v.config.AWS.Region)),
-			Description: "Current AWS region for S3 operations",
+			Title:       fmt.Sprintf("%s %s", T("Region:"), v.value(v.config.AWS.Region)),
+			Description: T("Empty follows the AWS SDK default chain"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("Profile: %s", v.getConfigValue("Profile", v.config.AWS.Profile)),
-			Description: "AWS CLI profile being used",
+			Title:       fmt.Sprintf("%s %s", T("Profile:"), v.value(v.config.AWS.Profile)),
+			Description: T("AWS shared config profile"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("Endpoint: %s", v.getConfigValue("Endpoint", v.config.AWS.Endpoint)),
-			Description: "Custom S3 endpoint URL (if configured)",
+			Title:       fmt.Sprintf("%s %s", T("Endpoint:"), v.value(v.config.AWS.Endpoint)),
+			Description: T("Custom S3 endpoint URL, for example LocalStack"),
+			Tag:         "Setting",
+		},
+		{Title: T("UI Configuration"), Tag: "Category"},
+		{
+			Title:       fmt.Sprintf("%s %s", T("Language:"), v.value(v.config.UI.Language)),
+			Description: T("Interface language (en/ja)"),
+			Tag:         "Setting",
+		},
+		{Title: T("Performance"), Tag: "Category"},
+		{
+			Title:       fmt.Sprintf("%s %d", T("Concurrency:"), v.config.Performance.Concurrency),
+			Description: T("Parallel S3 workers for transfers and listing"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "🎨 UI Configuration",
-			Description: "User interface settings",
-			Tag:         "Category",
-		},
-		{
-			Title:       fmt.Sprintf("Language: %s", v.getConfigValue("Language", v.config.UI.Language)),
-			Description: "Application language (en/ja)",
+			Title:       fmt.Sprintf("%s %s", T("Part size:"), formatBytes(v.config.Performance.PartSize)),
+			Description: T("Multipart chunk size in bytes"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("Theme: %s", v.getConfigValue("Theme", v.config.UI.Theme)),
-			Description: "Color theme for the interface",
+			Title:       fmt.Sprintf("%s %s", T("Timeout:"), fmt.Sprintf("%ds", v.config.Performance.Timeout)),
+			Description: T("Timeout for each blocking S3 request"),
 			Tag:         "Setting",
 		},
+		{Title: T("Environment"), Tag: "Category"},
 		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "🚀 Performance Settings",
-			Description: "Optimization and performance configuration",
-			Tag:         "Category",
-		},
-		{
-			Title:       fmt.Sprintf("Workers: %d", v.config.Performance.Workers),
-			Description: "Number of parallel workers",
-			Tag:         "Setting",
-		},
-		{
-			Title:       fmt.Sprintf("Chunk Size: %s", v.formatBytes(int64(v.config.Performance.ChunkSize))),
-			Description: "Size of individual transfer chunks",
-			Tag:         "Setting",
-		},
-		{
-			Title:       fmt.Sprintf("Timeout: %d seconds", v.config.Performance.Timeout),
-			Description: "Operation timeout duration",
-			Tag:         "Setting",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "🔧 Environment Variables",
-			Description: "System environment configuration",
-			Tag:         "Category",
-		},
-		{
-			Title:       fmt.Sprintf("AWS_REGION: %s", v.getEnvValue("AWS_REGION")),
-			Description: "AWS region from environment",
+			Title:       fmt.Sprintf("AWS_REGION: %s", v.envValue("AWS_REGION")),
+			Description: T("Region override from the environment"),
 			Tag:         "EnvVar",
 		},
 		{
-			Title:       fmt.Sprintf("AWS_PROFILE: %s", v.getEnvValue("AWS_PROFILE")),
-			Description: "AWS profile from environment",
+			Title:       fmt.Sprintf("AWS_PROFILE: %s", v.envValue("AWS_PROFILE")),
+			Description: T("Profile override from the environment"),
 			Tag:         "EnvVar",
 		},
 		{
-			Title:       fmt.Sprintf("AWS_ACCESS_KEY_ID: %s", v.getMaskedEnvValue("AWS_ACCESS_KEY_ID")),
-			Description: "AWS access key (masked for security)",
+			Title:       fmt.Sprintf("AWS_ACCESS_KEY_ID: %s", v.maskedEnv("AWS_ACCESS_KEY_ID")),
+			Description: T("Access key from the environment (masked)"),
 			Tag:         "EnvVar",
 		},
 		{
-			Title:       fmt.Sprintf("AWS_SECRET_ACCESS_KEY: %s", v.getMaskedEnvValue("AWS_SECRET_ACCESS_KEY")),
-			Description: "AWS secret key (masked for security)",
+			Title:       fmt.Sprintf("AWS_SECRET_ACCESS_KEY: %s", v.maskedEnv("AWS_SECRET_ACCESS_KEY")),
+			Description: T("Secret key from the environment (masked)"),
 			Tag:         "EnvVar",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "📁 Configuration File",
-			Description: "Settings file information",
-			Tag:         "Category",
-		},
-		{
-			Title:       fmt.Sprintf("Config Path: %s", v.getConfigPath()),
-			Description: "Location of the configuration file",
-			Tag:         "Info",
-		},
-		{
-			Title:       "Edit Config File",
-			Description: "Modify ~/.s3ry.yaml to change these settings",
-			Tag:         "Action",
 		},
 	}
 
-	v.list = components.NewList("⚙️ S3ry Settings & Configuration", items)
+	v.list = components.NewList(T("Settings"), items)
 }
 
-// Helper methods
-func (v *SettingsView) getConfigValue(key, value string) string {
-	if value == "" {
-		return v.errorStyle.Render("(not set)")
+var valueStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#04B575"))
+
+func (v *SettingsView) value(s string) string {
+	if s == "" {
+		return errorStyle.Render(T("(not set)"))
 	}
-	return v.valueStyle.Render(value)
+	return valueStyle.Render(s)
 }
 
-func (v *SettingsView) getBoolValue(value bool) string {
-	if value {
-		return v.valueStyle.Render("✓ Enabled")
-	}
-	return "✗ Disabled"
+func (v *SettingsView) envValue(key string) string {
+	return v.value(os.Getenv(key))
 }
 
-func (v *SettingsView) getEnvValue(key string) string {
+func (v *SettingsView) maskedEnv(key string) string {
 	value := os.Getenv(key)
 	if value == "" {
-		return v.errorStyle.Render("(not set)")
-	}
-	return v.valueStyle.Render(value)
-}
-
-func (v *SettingsView) getMaskedEnvValue(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return v.errorStyle.Render("(not set)")
+		return errorStyle.Render(T("(not set)"))
 	}
 	if len(value) > 8 {
-		return v.valueStyle.Render(value[:4] + strings.Repeat("*", len(value)-8) + value[len(value)-4:])
+		return valueStyle.Render(value[:4] + strings.Repeat("*", len(value)-8) + value[len(value)-4:])
 	}
-	return v.valueStyle.Render(strings.Repeat("*", len(value)))
-}
-
-func (v *SettingsView) getConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return v.errorStyle.Render("(unknown)")
-	}
-	return v.valueStyle.Render(home + "/.s3ry.yaml")
-}
-
-func (v *SettingsView) formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return valueStyle.Render(strings.Repeat("*", len(value)))
 }

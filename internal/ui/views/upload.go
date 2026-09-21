@@ -1,85 +1,60 @@
 package views
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/seike460/s3ry/internal/legacy/s3"
+
+	"github.com/seike460/s3ry/internal/s3"
 	"github.com/seike460/s3ry/internal/ui/components"
-	"github.com/seike460/s3ry/pkg/interfaces"
 )
 
-// FilesLoadedMsg represents local files being loaded
+// FilesLoadedMsg carries the result of a local directory scan.
 type FilesLoadedMsg struct {
 	Files []FileInfo
-	Error error
+	Err   error
 }
 
-// FileInfo represents local file information
+// FileInfo describes one local file offered for upload.
 type FileInfo struct {
 	Path         string
 	RelativePath string
 	Size         int64
 	ModTime      time.Time
-	IsDir        bool
 }
 
-// UploadView represents the upload view
+// UploadView is the local file picker that uploads to the bucket root.
 type UploadView struct {
-	list       *components.List
-	spinner    *components.Spinner
-	progress   *components.Progress
-	loading    bool
-	processing bool
-	region     string
-	bucket     string
-	s3Client   interfaces.S3Client
-
-	// Styles
-	headerStyle lipgloss.Style
-	errorStyle  lipgloss.Style
+	deps     Deps
+	bucket   string
+	list     *components.List
+	spinner  *components.Spinner
+	errors   *components.ErrorDisplay
+	loading  bool
+	transfer transferState
 }
 
-// NewUploadView creates a new upload view
-func NewUploadView(region, bucket string) *UploadView {
-	// Create S3 client using the new architecture
-	s3Client := s3.NewClient(region)
-
+// NewUploadView creates a new upload view.
+func NewUploadView(deps Deps, bucket string) *UploadView {
 	return &UploadView{
-		region:   region,
-		bucket:   bucket,
-		s3Client: s3Client,
-		loading:  true,
-		spinner:  components.NewSpinner("Scanning local files..."),
-
-		headerStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			MarginBottom(2),
-
-		errorStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")).
-			MarginTop(1),
+		deps:    deps,
+		bucket:  bucket,
+		loading: true,
+		spinner: components.NewSpinner(T("Scanning local files...")),
+		errors:  components.NewErrorDisplay(),
 	}
 }
 
-// Init initializes the upload view
+// Init starts the spinner and the first scan.
 func (v *UploadView) Init() tea.Cmd {
-	return tea.Batch(
-		v.spinner.Start(),
-		v.loadFiles(),
-	)
+	return tea.Batch(v.spinner.Start(), v.loadFiles())
 }
 
-// Update handles messages for the upload view
+// Update handles messages for the upload view.
 func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -88,98 +63,25 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.list != nil {
 			v.list, _ = v.list.Update(msg)
 		}
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
-		}
+		v.transfer.resize(msg)
 
 	case FilesLoadedMsg:
-		v.loading = false
-		v.spinner.Stop()
+		return v.onFilesLoaded(msg)
 
-		if msg.Error != nil {
-			// Enhanced error handling with user-friendly messages
-			errorMsg := "Failed to scan local files"
-			if strings.Contains(msg.Error.Error(), "permission") {
-				errorMsg = "❌ Permission denied. Please check file/directory permissions."
-			} else if strings.Contains(msg.Error.Error(), "no such file") {
-				errorMsg = "❌ Directory not found. Please ensure the current directory exists."
-			} else if strings.Contains(msg.Error.Error(), "too many open files") {
-				errorMsg = "❌ Too many files open. Please close other applications and try again."
-			} else {
-				errorMsg = fmt.Sprintf("❌ Error: %v\n💡 Try: check current directory permissions or file access", msg.Error)
-			}
-
-			// Create a simple error display
-			items := []components.ListItem{
-				{
-					Title:       errorMsg,
-					Description: "Press 'r' to retry, 'esc' to go back, or 'q' to quit",
-					Tag:         "Error",
-				},
-			}
-			v.list = components.NewList("⚠️ Error Scanning Files", items)
-			return v, nil
+	case transferProgressMsg:
+		if cmd := v.transfer.onProgress(msg.event, progressMessage(msg.event)); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
-		// Convert file info to list items
-		items := make([]components.ListItem, 0, len(msg.Files))
-		for _, file := range msg.Files {
-			if !file.IsDir { // Only show files, not directories
-				items = append(items, components.ListItem{
-					Title:       file.RelativePath,
-					Description: fmt.Sprintf("Size: %s | Modified: %s", formatBytes(file.Size), file.ModTime.Format("2006-01-02 15:04:05")),
-					Tag:         "File",
-					Data:        file,
-				})
-			}
+	case transferDoneMsg:
+		if cmd := v.transfer.finish(msg); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
-		v.list = components.NewList("⬆️ Select File to Upload", items)
-		return v, nil
+	case backToOperationMsg:
+		return NewOperationView(v.deps, v.bucket), nil
 
-	case tea.KeyMsg:
-		if v.loading || v.processing {
-			break
-		}
-
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return v, tea.Quit
-		case "esc":
-			// Go back to operation selection
-			return NewOperationView(v.region, v.bucket), nil
-		case "r":
-			// Retry scanning files
-			v.loading = true
-			v.spinner = components.NewSpinner("Retrying to scan local files...")
-			return v, tea.Batch(
-				v.spinner.Start(),
-				v.loadFiles(),
-			)
-		case "enter", " ":
-			if v.list != nil {
-				selectedItem := v.list.GetCurrentItem()
-				if selectedItem != nil {
-					// Check if it's an error item
-					if selectedItem.Tag == "Error" {
-						// On error item selection, retry
-						v.loading = true
-						v.spinner = components.NewSpinner("Retrying to scan local files...")
-						return v, tea.Batch(
-							v.spinner.Start(),
-							v.loadFiles(),
-						)
-					}
-
-					fileInfo := selectedItem.Data.(FileInfo)
-					return v.uploadFile(fileInfo)
-				}
-			}
-		}
-
-		if v.list != nil {
-			v.list, _ = v.list.Update(msg)
-		}
+	case brokerClosedMsg:
 
 	case components.SpinnerTickMsg:
 		if v.loading {
@@ -187,155 +89,181 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, v.spinner.Start())
 		}
 
-	case components.ProgressMsg:
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
-		}
-
-	case components.CompletedMsg:
-		if v.progress != nil {
-			v.progress, _ = v.progress.Update(msg)
-			v.processing = false
-			// Wait a moment to show completion, then go back
-			return v, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-				return tea.KeyMsg{Type: tea.KeyEsc}
-			})
-		}
+	case tea.KeyMsg:
+		return v.onKey(msg)
 	}
 
 	return v, tea.Batch(cmds...)
 }
 
-// View renders the upload view
-func (v *UploadView) View() string {
-	if v.processing && v.progress != nil {
-		return v.progress.View()
+func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
+	v.loading = false
+	v.spinner.Stop()
+
+	if msg.Err != nil {
+		v.errors.AddAWSError(msg.Err)
+		v.list = components.NewList(T("Error Scanning Files"), []components.ListItem{{
+			Title:       T("Failed to scan local files"),
+			Description: T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
+			Tag:         "Error",
+		}})
+		return v, nil
+	}
+
+	items := make([]components.ListItem, 0, len(msg.Files))
+	for _, file := range msg.Files {
+		items = append(items, components.ListItem{
+			Title: file.RelativePath,
+			Description: fmt.Sprintf("%s %s | %s %s",
+				T("Size:"), formatBytes(file.Size),
+				T("Modified:"), formatModified(file.ModTime)),
+			Tag:  "File",
+			Data: file,
+		})
+	}
+	v.list = components.NewList(T("Select File to Upload"), items)
+	return v, nil
+}
+
+func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	if v.transfer.active {
+		switch key {
+		case "ctrl+c", "q":
+			return v, tea.Quit
+		case "esc":
+			v.transfer.cancelTransfer()
+		}
+		return v, nil
 	}
 
 	if v.loading {
-		return v.headerStyle.Render("📁 Local Files") + "\n\n" + v.spinner.View()
+		if key == "ctrl+c" || key == "q" {
+			return v, tea.Quit
+		}
+		return v, nil
+	}
+
+	switch key {
+	case "ctrl+c", "q":
+		return v, tea.Quit
+	case "esc":
+		return NewOperationView(v.deps, v.bucket), nil
+	case "r":
+		v.loading = true
+		v.errors.ClearErrors()
+		v.spinner = components.NewSpinner(T("Retrying to scan local files..."))
+		return v, tea.Batch(v.spinner.Start(), v.loadFiles())
+	case "enter", " ":
+		item := v.currentItem()
+		if item == nil {
+			break
+		}
+		if item.Tag == "Error" {
+			v.loading = true
+			v.spinner = components.NewSpinner(T("Retrying to scan local files..."))
+			return v, tea.Batch(v.spinner.Start(), v.loadFiles())
+		}
+		file, ok := item.Data.(FileInfo)
+		if !ok {
+			break
+		}
+		return v.startUpload(file)
+	}
+
+	if v.list != nil {
+		v.list, _ = v.list.Update(msg)
+	}
+	return v, nil
+}
+
+// startUpload runs Session.Upload on a command goroutine. The S3 key is the
+// file's slash-separated path relative to the working directory.
+func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
+	ctx, wait := v.transfer.begin(T("Uploading %s", file.RelativePath), file.Size)
+	progressFn := v.transfer.callback()
+
+	session, bucket := v.deps.Session, v.bucket
+	key := filepath.ToSlash(file.RelativePath)
+	localPath := file.Path
+	return v, tea.Batch(
+		func() tea.Msg {
+			err := session.Upload(ctx, localPath, bucket, key, s3.UploadOptions{
+				Progress: progressFn,
+			})
+			return transferDoneMsg{
+				err:     err,
+				summary: T("Uploaded %s (%s)", file.RelativePath, formatBytes(file.Size)),
+			}
+		},
+		wait,
+	)
+}
+
+// View renders the upload view.
+func (v *UploadView) View() string {
+	if v.transfer.active && v.transfer.progress != nil {
+		return v.transfer.progress.View()
+	}
+
+	if v.loading {
+		return headerStyle.Render(T("Local Files")) + "\n\n" + v.spinner.View()
 	}
 
 	if v.list == nil {
-		return v.errorStyle.Render("Failed to load files")
+		return errorStyle.Render(T("Failed to scan local files"))
 	}
 
-	context := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888")).
-		Render("Region: " + v.region + " | Bucket: " + v.bucket)
+	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
+		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
+	footer := footerStyle.Render(T("↑↓: navigate • enter: select • r: refresh • esc: back • q: quit"))
 
-	footer := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#626262")).
-		Render("↑↓: navigate • enter: select • r: refresh • esc: back • q: quit")
-
-	return context + "\n\n" + v.list.View() + "\n\n" + footer
+	result := context + "\n\n" + v.list.View()
+	if v.errors.GetErrorCount() > 0 {
+		result += "\n\n" + v.errors.View()
+	}
+	return result + "\n\n" + footer
 }
 
-// loadFiles loads local files from current directory
+func (v *UploadView) currentItem() *components.ListItem {
+	if v.list == nil {
+		return nil
+	}
+	return v.list.GetCurrentItem()
+}
+
+// loadFiles walks the working directory and lists non-hidden regular files.
+// Hidden entries and symlinks are skipped; directories are not selectable.
 func (v *UploadView) loadFiles() tea.Cmd {
 	return func() tea.Msg {
 		var files []FileInfo
-
-		// Walk the current directory
-		err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		err := filepath.WalkDir(".", func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
 			}
-
-			// Skip hidden files and directories
-			if path != "." && filepath.Base(path)[0] == '.' {
-				if d.IsDir() {
+			base := filepath.Base(path)
+			if path != "." && strings.HasPrefix(base, ".") {
+				if entry.IsDir() {
 					return fs.SkipDir
 				}
 				return nil
 			}
-
-			info, err := d.Info()
+			if entry.IsDir() || !entry.Type().IsRegular() {
+				return nil
+			}
+			info, err := entry.Info()
 			if err != nil {
 				return err
 			}
-
 			files = append(files, FileInfo{
 				Path:         path,
 				RelativePath: path,
 				Size:         info.Size(),
 				ModTime:      info.ModTime(),
-				IsDir:        d.IsDir(),
 			})
-
 			return nil
 		})
-
-		if err != nil {
-			return FilesLoadedMsg{Error: err}
-		}
-
-		return FilesLoadedMsg{Files: files}
-	}
-}
-
-// uploadFile uploads the selected file using modern worker pool
-func (v *UploadView) uploadFile(file FileInfo) (tea.Model, tea.Cmd) {
-	v.processing = true
-	v.progress = components.NewProgress("⬆️ Uploading "+file.RelativePath, file.Size)
-
-	return v, func() tea.Msg {
-		// Try to use modern uploader first (if available)
-		if client, ok := v.s3Client.(*s3.Client); ok {
-			// Create modern uploader with enhanced configuration
-			config := s3.DefaultUploadConfig()
-			config.ConcurrentUploads = 3
-			config.OnProgress = func(uploaded, total int64) {
-				// Update progress in real-time
-				v.progress.SetProgress(uploaded, total,
-					fmt.Sprintf("Uploaded %s of %s", formatBytes(uploaded), formatBytes(total)))
-			}
-
-			uploader := s3.NewUploader(client, config)
-			defer uploader.Close()
-
-			request := s3.UploadRequest{
-				Bucket:   v.bucket,
-				Key:      file.RelativePath,
-				FilePath: file.Path,
-			}
-
-			ctx := context.Background()
-			err := uploader.Upload(ctx, request, config)
-			if err == nil {
-				return components.CompletedMsg{
-					Success: true,
-					Message: fmt.Sprintf("Uploaded %s (%s) with worker pool", file.RelativePath, formatBytes(file.Size)),
-				}
-			}
-
-			// If modern uploader fails, fall back to legacy
-		}
-
-		// Fallback to legacy uploader
-		f, err := os.Open(file.Path)
-		if err != nil {
-			return components.CompletedMsg{
-				Success: false,
-				Message: fmt.Sprintf("Failed to open file: %v", err),
-			}
-		}
-		defer f.Close()
-
-		// Use interface method for MVP
-		ctx := context.Background()
-		err = v.s3Client.UploadFile(ctx, file.Path, v.bucket, file.RelativePath)
-
-		if err != nil {
-			return components.CompletedMsg{
-				Success: false,
-				Message: fmt.Sprintf("Upload failed: %v", err),
-			}
-		}
-
-		return components.CompletedMsg{
-			Success: true,
-			Message: fmt.Sprintf("Uploaded %s (%s)", file.RelativePath, formatBytes(file.Size)),
-		}
+		return FilesLoadedMsg{Files: files, Err: err}
 	}
 }

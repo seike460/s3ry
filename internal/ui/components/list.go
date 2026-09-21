@@ -1,3 +1,5 @@
+// Package components provides the reusable Bubble Tea widgets used by the
+// views: lists, spinners, progress bars, previews, and error displays.
 package components
 
 import (
@@ -13,7 +15,7 @@ type ListItem struct {
 	Title       string
 	Description string
 	Tag         string
-	Data        interface{} // Additional data for the item
+	Data        any // Additional data for the item
 }
 
 // List represents a selectable list component with virtual scrolling
@@ -301,13 +303,12 @@ func (l *List) renderItem(i int) string {
 		}
 
 		return result
-	} else {
-		line := fmt.Sprintf("%s %s", cursor, item.Title)
-		if item.Tag != "" {
-			line += l.tagStyle.Render(fmt.Sprintf("[%s]", item.Tag))
-		}
-		return l.itemStyle.Render(line) + "\n"
 	}
+	line := fmt.Sprintf("%s %s", cursor, item.Title)
+	if item.Tag != "" {
+		line += l.tagStyle.Render(fmt.Sprintf("[%s]", item.Tag))
+	}
+	return l.itemStyle.Render(line) + "\n"
 }
 
 // renderScrollIndicators renders scrolling indicators

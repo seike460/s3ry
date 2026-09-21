@@ -150,7 +150,7 @@ func TestDownloadPrefixOverwriteSkip(t *testing.T) {
 
 	destDir := t.TempDir()
 	keepPath := filepath.Join(destDir, "keep.txt")
-	if err := os.WriteFile(keepPath, []byte("local keep"), 0o644); err != nil {
+	if err := os.WriteFile(keepPath, []byte("local keep"), 0o600); err != nil {
 		t.Fatalf("WriteFile existing destination: %v", err)
 	}
 
@@ -292,10 +292,10 @@ func TestUploadDirRoundTrip(t *testing.T) {
 	}
 	for relative, payload := range files {
 		path := filepath.Join(sourceDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 			t.Fatalf("MkdirAll %q: %v", path, err)
 		}
-		if err := os.WriteFile(path, payload, 0o644); err != nil {
+		if err := os.WriteFile(path, payload, 0o600); err != nil {
 			t.Fatalf("WriteFile %q: %v", path, err)
 		}
 	}
@@ -370,10 +370,10 @@ func TestUploadDirRootSymlink(t *testing.T) {
 	}
 	for relative, payload := range files {
 		path := filepath.Join(realDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 			t.Fatalf("MkdirAll %q: %v", path, err)
 		}
-		if err := os.WriteFile(path, payload, 0o644); err != nil {
+		if err := os.WriteFile(path, payload, 0o600); err != nil {
 			t.Fatalf("WriteFile %q: %v", path, err)
 		}
 	}
@@ -423,7 +423,7 @@ func TestUploadDirTransferContinueOnError(t *testing.T) {
 	if err := os.Chmod(deniedPath, 0); err != nil {
 		t.Fatalf("Chmod %q: %v", deniedPath, err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(deniedPath, 0o644) })
+	t.Cleanup(func() { _ = os.Chmod(deniedPath, 0o600) })
 
 	n, err := session.UploadDir(t.Context(), sourceDir, transferTestBucket, "uploaded", BulkOptions{
 		Parallel:        2,
@@ -532,7 +532,7 @@ func TestDownloadPrefixRequiresDirectory(t *testing.T) {
 		})
 	}, transferTestOptions)
 	destination := filepath.Join(t.TempDir(), "destination")
-	if err := os.WriteFile(destination, []byte("not a directory"), 0o644); err != nil {
+	if err := os.WriteFile(destination, []byte("not a directory"), 0o600); err != nil {
 		t.Fatalf("WriteFile destination: %v", err)
 	}
 
@@ -552,7 +552,7 @@ func TestDownloadPrefixRequiresDirectory(t *testing.T) {
 func TestUploadDirRequiresDirectory(t *testing.T) {
 	session := &Session{}
 	sourceFile := filepath.Join(t.TempDir(), "file.txt")
-	if err := os.WriteFile(sourceFile, []byte("not a directory"), 0o644); err != nil {
+	if err := os.WriteFile(sourceFile, []byte("not a directory"), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 

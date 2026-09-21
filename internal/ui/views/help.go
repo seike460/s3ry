@@ -3,150 +3,54 @@ package views
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/seike460/s3ry/internal/ui/components"
 )
 
-// HelpView represents the help view with comprehensive keyboard shortcuts
+// HelpView shows key bindings and usage information.
 type HelpView struct {
+	deps Deps
 	list *components.List
-
-	// Styles
-	headerStyle lipgloss.Style
-	keyStyle    lipgloss.Style
-	descStyle   lipgloss.Style
 }
 
-// NewHelpView creates a new help view
-func NewHelpView() *HelpView {
-	help := &HelpView{
-		headerStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			MarginBottom(2),
-
-		keyStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#04B575")),
-
-		descStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")),
-	}
-
-	// Create help items
+// NewHelpView creates a new help view.
+func NewHelpView(deps Deps) *HelpView {
 	items := []components.ListItem{
-		{
-			Title:       "🌍 Navigation",
-			Description: "Move around the application",
-			Tag:         "Category",
-		},
-		{
-			Title:       "↑/k - Move up",
-			Description: "Navigate to previous item in lists",
-			Tag:         "Key",
-		},
-		{
-			Title:       "↓/j - Move down",
-			Description: "Navigate to next item in lists",
-			Tag:         "Key",
-		},
-		{
-			Title:       "Enter/Space - Select",
-			Description: "Select current item or confirm action",
-			Tag:         "Key",
-		},
-		{
-			Title:       "Esc - Back",
-			Description: "Go back to previous view",
-			Tag:         "Key",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "📁 File Operations",
-			Description: "Work with S3 objects",
-			Tag:         "Category",
-		},
-		{
-			Title:       "d - Download",
-			Description: "Download selected object(s) from S3",
-			Tag:         "Key",
-		},
-		{
-			Title:       "u - Upload",
-			Description: "Upload file(s) to current bucket",
-			Tag:         "Key",
-		},
-		{
-			Title:       "Delete - Delete",
-			Description: "Delete selected object(s) from S3",
-			Tag:         "Key",
-		},
-		{
-			Title:       "r - Refresh",
-			Description: "Reload current list or retry failed operations",
-			Tag:         "Key",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "⚙️ Application",
-			Description: "General application controls",
-			Tag:         "Category",
-		},
-		{
-			Title:       "? - Help",
-			Description: "Show this help page",
-			Tag:         "Key",
-		},
-		{
-			Title:       "s - Settings",
-			Description: "Open application settings",
-			Tag:         "Key",
-		},
-		{
-			Title:       "Ctrl+C/q - Quit",
-			Description: "Exit the application",
-			Tag:         "Key",
-		},
-		{
-			Title:       "",
-			Description: "",
-			Tag:         "Separator",
-		},
-		{
-			Title:       "🚀 Pro Tips",
-			Description: "Advanced usage",
-			Tag:         "Category",
-		},
-		{
-			Title:       "Configuration",
-			Description: "Set AWS_REGION, AWS_PROFILE, or use ~/.s3ry.yaml",
-			Tag:         "Tip",
-		},
-		{
-			Title:       "Keyboard Navigation",
-			Description: "All operations can be performed via keyboard",
-			Tag:         "Tip",
-		},
+		{Title: T("Navigation"), Tag: "Category"},
+		{Title: "↑ / k", Description: T("Move cursor up"), Tag: "Key"},
+		{Title: "↓ / j", Description: T("Move cursor down"), Tag: "Key"},
+		{Title: "← / h", Description: T("Previous page"), Tag: "Key"},
+		{Title: "→ / l", Description: T("Next page"), Tag: "Key"},
+		{Title: "g", Description: T("Go to first item"), Tag: "Key"},
+		{Title: "G", Description: T("Go to last item"), Tag: "Key"},
+		{Title: T("Actions"), Tag: "Category"},
+		{Title: "enter / space", Description: T("Select item"), Tag: "Key"},
+		{Title: "esc", Description: T("Go back / cancel operation"), Tag: "Key"},
+		{Title: "r", Description: T("Refresh current view"), Tag: "Key"},
+		{Title: T("Application"), Tag: "Category"},
+		{Title: "?", Description: T("Show this help"), Tag: "Key"},
+		{Title: "s", Description: T("Show settings"), Tag: "Key"},
+		{Title: "q", Description: T("Quit application"), Tag: "Key"},
+		{Title: "ctrl+c", Description: T("Force quit"), Tag: "Key"},
+		{Title: T("Operations"), Tag: "Category"},
+		{Title: T("Download"), Description: T("Download selected S3 object to local file"), Tag: "Operation"},
+		{Title: T("Upload"), Description: T("Upload local file to S3 bucket"), Tag: "Operation"},
+		{Title: T("Delete"), Description: T("Delete selected S3 object"), Tag: "Operation"},
+		{Title: T("Generate List"), Description: T("Create a list of all objects in bucket"), Tag: "Operation"},
 	}
 
-	help.list = components.NewList("📖 S3ry Help - Keyboard Shortcuts & Usage", items)
-
-	return help
+	return &HelpView{
+		deps: deps,
+		list: components.NewList(T("Help - s3ry S3 Browser"), items),
+	}
 }
 
-// Init initializes the help view
+// Init initializes the help view.
 func (v *HelpView) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles messages for the help view
+// Update handles messages for the help view.
 func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -158,6 +62,8 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return v, tea.Quit
+		case "esc":
+			return NewBucketView(v.deps), nil
 		}
 
 		if v.list != nil {
@@ -168,16 +74,16 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return v, nil
 }
 
-// View renders the help view
+// View renders the help view.
 func (v *HelpView) View() string {
-	if v.list == nil {
-		return v.headerStyle.Render("Help not available")
-	}
+	header := headerStyle.Render(T("s3ry - Interactive S3 Terminal Client"))
 
-	footer := lipgloss.NewStyle().
+	description := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#626262")).
-		MarginTop(1).
-		Render("esc/q: back • Use keyboard shortcuts shown above for efficient navigation")
+		Margin(1, 0).
+		Render(T("Navigate your S3 buckets and objects with ease"))
 
-	return v.list.View() + "\n" + footer
+	footer := footerStyle.Render(T("↑↓: navigate • esc: back • q: quit"))
+
+	return header + "\n" + description + "\n\n" + v.list.View() + "\n" + footer
 }

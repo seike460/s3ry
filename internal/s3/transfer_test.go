@@ -63,7 +63,7 @@ func putTransferTestObject(t *testing.T, client *awss3.Client, bucket, key strin
 
 func writeTransferTestFile(t *testing.T, path string, payload []byte) {
 	t.Helper()
-	if err := os.WriteFile(path, payload, 0o644); err != nil {
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
 		t.Fatalf("WriteFile %q: %v", path, err)
 	}
 }
@@ -471,7 +471,7 @@ func testDownloadCreatedDuringTransfer(t *testing.T, mode OverwriteMode) {
 		if !event.Done {
 			createOnce.Do(func() {
 				created.Store(true)
-				createErr = os.WriteFile(destination, localOriginal, 0o644)
+				createErr = os.WriteFile(destination, localOriginal, 0o600)
 			})
 		}
 	}
@@ -688,7 +688,7 @@ func TestUploadLocalErrors(t *testing.T) {
 	}
 
 	directory := filepath.Join(t.TempDir(), "directory")
-	if err := os.Mkdir(directory, 0o755); err != nil {
+	if err := os.Mkdir(directory, 0o750); err != nil {
 		t.Fatalf("Mkdir: %v", err)
 	}
 	err = session.Upload(t.Context(), directory, transferTestBucket, "directory", UploadOptions{})
@@ -705,7 +705,7 @@ func TestUploadLocalErrors(t *testing.T) {
 		if err := os.Chmod(permissionDenied, 0); err != nil {
 			t.Fatalf("Chmod: %v", err)
 		}
-		t.Cleanup(func() { _ = os.Chmod(permissionDenied, 0o644) })
+		t.Cleanup(func() { _ = os.Chmod(permissionDenied, 0o600) })
 
 		err := session.Upload(t.Context(), permissionDenied, transferTestBucket, "permission-denied.bin", UploadOptions{})
 		if !errors.Is(err, ErrAccessDenied) {

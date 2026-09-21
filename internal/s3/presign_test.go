@@ -44,11 +44,12 @@ func TestPresignGetReturnsRoutableURL(t *testing.T) {
 	t.Cleanup(func() {
 		http.DefaultClient.Transport = defaultTransport
 	})
+	//nolint:gosec // G107: fetching the generated presigned URL is the test's purpose
 	response, err := http.Get(presigned)
 	if err != nil {
 		t.Fatalf("GET presigned URL: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("GET presigned URL status = %d, want %d", response.StatusCode, http.StatusOK)
 	}

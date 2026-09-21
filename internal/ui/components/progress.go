@@ -160,7 +160,7 @@ func (p *Progress) View() string {
 
 		// Show size information if available
 		if p.total > 0 {
-			s.WriteString(fmt.Sprintf(" (%s / %s)", formatBytes(p.current), formatBytes(p.total)))
+			fmt.Fprintf(&s, " (%s / %s)", formatBytes(p.current), formatBytes(p.total))
 		}
 
 		// Show enhanced speed and ETA information
@@ -179,7 +179,7 @@ func (p *Progress) View() string {
 			if p.speed > 0 && p.speed != displaySpeed {
 				instantDiff := (p.speed - displaySpeed) / displaySpeed
 				if instantDiff > 0.2 || instantDiff < -0.2 { // Show if >20% difference
-					s.WriteString(fmt.Sprintf(" (now: %s/s)", formatBytes(int64(p.speed))))
+					fmt.Fprintf(&s, " (now: %s/s)", formatBytes(int64(p.speed)))
 				}
 			}
 
@@ -190,19 +190,19 @@ func (p *Progress) View() string {
 
 				// Format ETA nicely
 				if eta > time.Hour {
-					s.WriteString(fmt.Sprintf(" | ETA: %dh%dm", int(eta.Hours()), int(eta.Minutes())%60))
+					fmt.Fprintf(&s, " | ETA: %dh%dm", int(eta.Hours()), int(eta.Minutes())%60)
 				} else if eta > time.Minute {
-					s.WriteString(fmt.Sprintf(" | ETA: %dm%ds", int(eta.Minutes()), int(eta.Seconds())%60))
+					fmt.Fprintf(&s, " | ETA: %dm%ds", int(eta.Minutes()), int(eta.Seconds())%60)
 				} else {
-					s.WriteString(fmt.Sprintf(" | ETA: %ds", int(eta.Seconds())))
+					fmt.Fprintf(&s, " | ETA: %ds", int(eta.Seconds()))
 				}
 			}
 
 			// Show elapsed time
 			if elapsed > time.Minute {
-				s.WriteString(fmt.Sprintf(" | Elapsed: %dm%ds", int(elapsed.Minutes()), int(elapsed.Seconds())%60))
+				fmt.Fprintf(&s, " | Elapsed: %dm%ds", int(elapsed.Minutes()), int(elapsed.Seconds())%60)
 			} else {
-				s.WriteString(fmt.Sprintf(" | Elapsed: %ds", int(elapsed.Seconds())))
+				fmt.Fprintf(&s, " | Elapsed: %ds", int(elapsed.Seconds()))
 			}
 		}
 	}
@@ -294,17 +294,6 @@ func (p *Progress) GetCurrentSpeed() float64 {
 // GetAverageSpeed returns the average speed over recent samples
 func (p *Progress) GetAverageSpeed() float64 {
 	return p.avgSpeed
-}
-
-// formatDuration formats a duration for display
-func (p *Progress) formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	} else if d < time.Hour {
-		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
-	} else {
-		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
-	}
 }
 
 // formatBytes formats byte count as human readable string
