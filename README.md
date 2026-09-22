@@ -177,6 +177,13 @@ transfer benchmarks for regression comparisons.
 - S3 keys are validated and mapped to local paths by `LocalPath`, which rejects absolute paths, `..` traversal, and prefix escapes.
 - The UI is a Bubble Tea model tree: `cli` parses flags, `app` owns the root model and global keys, `views` holds one screen per responsibility, and `components` holds the reusable widgets.
 
+### Extension points
+
+- **Operations**: add one entry to the `operations` table in `internal/ui/views/operation.go` (key, label, next view). No switch statements need editing.
+- **Languages**: add one catalog map to `internal/i18n/messages.go`; every view renders through its injected `Printer`.
+- **Views**: implement `tea.Model`, construct it from the operation table, and wire dependencies through `views.Deps`. The app handles transitions and transfer cleanup generically.
+- **Theme**: colors are named constants in `internal/ui/components/theme.go`, shared by all widgets and views.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

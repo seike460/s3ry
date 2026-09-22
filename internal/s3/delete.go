@@ -120,12 +120,12 @@ func (s *Session) DeleteKeys(ctx context.Context, bucket string, keys []string, 
 	return result, nil
 }
 
-// DeletePrefix walks prefix and streams complete delete batches to one
-// sequential batch consumer. prefix must be non-empty; an empty prefix is
-// rejected because deleting a whole bucket is not supported. A prefix without
-// a trailing slash is normalized to one, so "p" has directory semantics and
-// matches "p/x" but not "p2/x". If the listing is incomplete, its final
-// partial batch is not deleted.
+// DeletePrefix walks prefix and deletes each full batch before the listing
+// continues. prefix must be non-empty; an empty prefix is rejected because
+// deleting a whole bucket is not supported. A prefix without a trailing slash
+// is normalized to one, so "p" has directory semantics and matches "p/x" but
+// not "p2/x". If the listing is incomplete, its final partial batch is not
+// deleted.
 func (s *Session) DeletePrefix(ctx context.Context, bucket, prefix string, o DeleteOptions) (DeleteResult, error) {
 	if err := ValidateBucketName(bucket); err != nil {
 		return DeleteResult{}, err
@@ -136,15 +136,6 @@ func (s *Session) DeletePrefix(ctx context.Context, bucket, prefix string, o Del
 			Op:     "delete-prefix",
 			Bucket: bucket,
 			Err:    errors.New("prefix must not be empty; deleting a whole bucket is not supported"),
-		}
-	}
-	if err := ValidateKey(prefix); err != nil {
-		return DeleteResult{}, &Error{
-			Kind:   KindInvalid,
-			Op:     "delete-prefix",
-			Bucket: bucket,
-			Key:    prefix,
-			Err:    err,
 		}
 	}
 	if !strings.HasSuffix(prefix, "/") {
@@ -160,80 +151,47 @@ func (s *Session) DeletePrefix(ctx context.Context, bucket, prefix string, o Del
 		}
 	}
 
-	walkCtx, cancelWalk := context.WithCancel(ctx)
-	defer cancelWalk()
-
-	type prefixBatch struct {
-		keys []string
-		done chan struct{}
+	var (
+		mu        sync.Mutex
+		deleted   DeleteResult
+		deleteErr error
+		batch     = make([]string, 0, MaxDeleteBatch)
+	)
+	deleteBatch := func(keys []string) {
+		partial, err := s.DeleteKeys(ctx, bucket, keys, o)
+		mergeDeleteResult(&deleted, partial)
+		if err != nil && deleteErr == nil {
+			deleteErr = err
+		}
 	}
-	batches := make(chan prefixBatch)
-	var deleted DeleteResult
-	var deleteErr error
-	stopDeleting := false
-	var deleter sync.WaitGroup
-	deleter.Add(1)
-	go func() {
-		defer deleter.Done()
-		for item := range batches {
-			batch := item.keys
-			if stopDeleting {
-				close(item.done)
-				continue
-			}
 
-			partial, err := s.DeleteKeys(ctx, bucket, batch, o)
-			mergeDeleteResult(&deleted, partial)
-			if err != nil && deleteErr == nil {
-				deleteErr = err
-			}
-			if err != nil {
-				stopDeleting = true
-				cancelWalk()
-			}
-			close(item.done)
+	// The mutex serializes batch collection and deletion across concurrent
+	// walk callbacks. A delete error is returned to the walker, which cancels
+	// sibling crawls before later pages are requested.
+	walkErr := s.Walk(ctx, bucket, prefix, WalkOptions{Concurrency: s.Options().Concurrency}, func(object Object) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if deleteErr != nil {
+			return deleteErr
 		}
-	}()
-
-	batch := make([]string, 0, MaxDeleteBatch)
-	// Walk serializes callbacks. Each complete batch waits for the consumer to
-	// finish before listing can continue, so a hard delete error cancels the walk
-	// before later pages are requested.
-	walkErr := s.Walk(walkCtx, bucket, prefix, WalkOptions{Concurrency: s.Options().Concurrency}, func(object Object) error {
 		batch = append(batch, object.Key)
-		if len(batch) == MaxDeleteBatch {
-			item := prefixBatch{keys: batch, done: make(chan struct{})}
-			select {
-			case batches <- item:
-			case <-walkCtx.Done():
-				return Classify("list", bucket, prefix, walkCtx.Err())
-			}
-			batch = make([]string, 0, MaxDeleteBatch)
-			select {
-			case <-item.done:
-			case <-walkCtx.Done():
-				return Classify("list", bucket, prefix, walkCtx.Err())
-			}
+		if len(batch) < MaxDeleteBatch {
+			return nil
 		}
-		return nil
+		keys := batch
+		batch = make([]string, 0, MaxDeleteBatch)
+		if err := ctx.Err(); err != nil {
+			return Classify("list", bucket, prefix, err)
+		}
+		deleteBatch(keys)
+		return deleteErr
 	})
-	// An incomplete listing is never partially deleted: only hand off the
+
+	// An incomplete listing is never partially deleted: only flush the
 	// remaining batch after Walk has completed successfully.
 	if walkErr == nil && deleteErr == nil && len(batch) > 0 {
-		item := prefixBatch{keys: batch, done: make(chan struct{})}
-		select {
-		case batches <- item:
-			select {
-			case <-item.done:
-			case <-walkCtx.Done():
-				walkErr = Classify("list", bucket, prefix, walkCtx.Err())
-			}
-		case <-walkCtx.Done():
-			walkErr = Classify("list", bucket, prefix, walkCtx.Err())
-		}
+		deleteBatch(batch)
 	}
-	close(batches)
-	deleter.Wait()
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		canceled := Classify("list", bucket, prefix, ctxErr)
