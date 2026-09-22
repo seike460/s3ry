@@ -54,33 +54,39 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		v.state.resize(msg)
-		v.transfer.resize(msg)
+	case tea.WindowSizeMsg, transferProgressMsg, transferDoneMsg, components.SpinnerTickMsg:
+		if cmd := v.onEvent(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case FilesLoadedMsg:
 		return v.onFilesLoaded(msg)
 
-	case transferProgressMsg, transferDoneMsg:
-		if cmd := v.onTransfer(msg); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-	case backToOperationMsg:
-		if v.transfer.backToOperation(msg) {
+	case backToOperationMsg, brokerClosedMsg:
+		if msg, ok := msg.(backToOperationMsg); ok && v.transfer.backToOperation(msg) {
 			return NewOperationView(v.deps, v.bucket), nil
 		}
-
-	case brokerClosedMsg:
-
-	case components.SpinnerTickMsg:
-		cmds = append(cmds, v.state.onTick(msg))
 
 	case tea.KeyMsg:
 		return v.onKey(msg)
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onEvent routes resize, transfer events, and spinner ticks to their
+// sub-components.
+func (v *UploadView) onEvent(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		v.state.resize(msg)
+		v.transfer.resize(msg)
+		return nil
+	case components.SpinnerTickMsg:
+		return v.state.onTick(msg)
+	default:
+		return v.onTransfer(msg)
+	}
 }
 
 // onTransfer feeds progress and completion events into the transfer state.
@@ -136,10 +142,15 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, v.state.startLoading(v.deps.T("Retrying to scan local files..."), v.loadFiles())
 	}
 
-	if v.transfer.quitRequested(key) {
+	return v.onReadyKey(msg)
+}
+
+// onReadyKey handles input on the file list.
+func (v *UploadView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.transfer.quitRequested(msg.String()) {
 		return v, tea.Quit
 	}
-	switch key {
+	switch msg.String() {
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
 	case "enter", " ":

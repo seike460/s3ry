@@ -97,34 +97,39 @@ func (p *Preview) View() string {
 		)
 	}
 
-	var title string
+	return p.borderStyle.Render(
+		p.titleStyle.Render(p.title()) + "\n" +
+			p.contentStyle.Render(p.fitContent()),
+	)
+}
+
+// title returns the pane title for the detected preview type.
+func (p *Preview) title() string {
 	switch p.previewType {
 	case PreviewTypeText:
-		title = "📄 Text Preview"
+		return "📄 Text Preview"
 	case PreviewTypeImage:
-		title = "🖼️ Image Preview"
+		return "🖼️ Image Preview"
 	case PreviewTypePDF:
-		title = "📊 PDF Preview"
+		return "📊 PDF Preview"
 	case PreviewTypeBinary:
-		title = "🔍 Binary Preview"
+		return "🔍 Binary Preview"
 	default:
-		title = "❓ Preview"
+		return "❓ Preview"
 	}
+}
 
-	// Truncate content if too large
-	displayContent := p.content
+// fitContent truncates the preview body to the pane height.
+func (p *Preview) fitContent() string {
 	maxLines := p.height - 4 // Account for title and border
-	if maxLines > 0 {
-		lines := strings.Split(displayContent, "\n")
-		if len(lines) > maxLines {
-			lines = lines[:maxLines-1]
-			lines = append(lines, "... (content truncated)")
-			displayContent = strings.Join(lines, "\n")
-		}
+	if maxLines <= 0 {
+		return p.content
 	}
-
-	return p.borderStyle.Render(
-		p.titleStyle.Render(title) + "\n" +
-			p.contentStyle.Render(displayContent),
-	)
+	lines := strings.Split(p.content, "\n")
+	if len(lines) <= maxLines {
+		return p.content
+	}
+	lines = lines[:maxLines-1]
+	lines = append(lines, "... (content truncated)")
+	return strings.Join(lines, "\n")
 }

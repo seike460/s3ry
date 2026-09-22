@@ -32,54 +32,45 @@ const (
 	KindUnsupported
 )
 
+// kindNames maps each Kind to its stable machine name.
+var kindNames = map[Kind]string{
+	KindNotFound:      "not_found",
+	KindAccessDenied:  "access_denied",
+	KindNoCredentials: "no_credentials",
+	KindThrottled:     "throttled",
+	KindCanceled:      "canceled",
+	KindTimeout:       "timeout",
+	KindInvalid:       "invalid",
+	KindExists:        "exists",
+	KindUnsupported:   "unsupported",
+}
+
 func (k Kind) String() string {
-	switch k {
-	case KindNotFound:
-		return "not_found"
-	case KindAccessDenied:
-		return "access_denied"
-	case KindNoCredentials:
-		return "no_credentials"
-	case KindThrottled:
-		return "throttled"
-	case KindCanceled:
-		return "canceled"
-	case KindTimeout:
-		return "timeout"
-	case KindInvalid:
-		return "invalid"
-	case KindExists:
-		return "exists"
-	case KindUnsupported:
-		return "unsupported"
-	default:
-		return "unknown"
+	if name, ok := kindNames[k]; ok {
+		return name
 	}
+	return "unknown"
+}
+
+// kindSentences maps each Kind to its human-readable sentence.
+// #nosec G101 -- these are user-facing error messages, not credentials.
+var kindSentences = map[Kind]string{
+	KindNotFound:      "not found",
+	KindAccessDenied:  "access denied",
+	KindNoCredentials: "no AWS credentials found (configure a profile or run aws sso login)",
+	KindThrottled:     "throttled by S3",
+	KindCanceled:      "canceled",
+	KindTimeout:       "timed out",
+	KindInvalid:       "invalid input",
+	KindExists:        "already exists",
+	KindUnsupported:   "not supported by this endpoint",
 }
 
 func (k Kind) sentence() string {
-	switch k {
-	case KindNotFound:
-		return "not found"
-	case KindAccessDenied:
-		return "access denied"
-	case KindNoCredentials:
-		return "no AWS credentials found (configure a profile or run aws sso login)"
-	case KindThrottled:
-		return "throttled by S3"
-	case KindCanceled:
-		return "canceled"
-	case KindTimeout:
-		return "timed out"
-	case KindInvalid:
-		return "invalid input"
-	case KindExists:
-		return "already exists"
-	case KindUnsupported:
-		return "not supported by this endpoint"
-	default:
-		return "unknown error"
+	if sentence, ok := kindSentences[k]; ok {
+		return sentence
 	}
+	return "unknown error"
 }
 
 // Error is the package's classified error. Kind is the machine-readable
@@ -175,29 +166,33 @@ func (b *BulkError) Error() string {
 	if b == nil || len(b.Errors) == 0 {
 		return "0 errors"
 	}
-
-	limit := len(b.Errors)
-	if limit > 3 {
-		limit = 3
-	}
-	summary := make([]string, 0, limit+1)
-	for _, item := range b.Errors[:limit] {
-		if item.Err == nil {
-			summary = append(summary, item.Key)
-			continue
-		}
-		if item.Key == "" {
-			summary = append(summary, item.Err.Error())
-			continue
-		}
-		summary = append(summary, fmt.Sprintf("%s: %v", item.Key, item.Err))
-	}
-	if len(b.Errors) > limit {
-		summary = append(summary, fmt.Sprintf("... and %d more", len(b.Errors)-limit))
-	}
 	countName := "errors"
 	if len(b.Errors) == 1 {
 		countName = "error"
 	}
-	return fmt.Sprintf("%d %s: %s", len(b.Errors), countName, strings.Join(summary, "; "))
+	return fmt.Sprintf("%d %s: %s", len(b.Errors), countName, strings.Join(b.errorSummary(), "; "))
+}
+
+// errorSummary renders up to three item messages plus an overflow marker.
+func (b *BulkError) errorSummary() []string {
+	limit := min(len(b.Errors), 3)
+	summary := make([]string, 0, limit+1)
+	for _, item := range b.Errors[:limit] {
+		summary = append(summary, item.message())
+	}
+	if len(b.Errors) > limit {
+		summary = append(summary, fmt.Sprintf("... and %d more", len(b.Errors)-limit))
+	}
+	return summary
+}
+
+// message formats the item as "key: err", tolerating empty parts.
+func (item KeyError) message() string {
+	if item.Err == nil {
+		return item.Key
+	}
+	if item.Key == "" {
+		return item.Err.Error()
+	}
+	return fmt.Sprintf("%s: %v", item.Key, item.Err)
 }

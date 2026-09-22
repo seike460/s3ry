@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // ListBuckets lists all buckets visible to the caller. ListBuckets is a
@@ -26,33 +27,45 @@ func (s *Session) ListBuckets(ctx context.Context) ([]Bucket, error) {
 			return nil, Classify("list-buckets", "", "", err)
 		}
 
-		for _, item := range out.Buckets {
-			name := aws.ToString(item.Name)
-			bucket := Bucket{
-				Name: name,
-			}
-			if item.CreationDate != nil {
-				bucket.CreationDate = *item.CreationDate
-			}
-			bucket.Region = aws.ToString(item.BucketRegion)
-			if bucket.Region != "" {
-				s.cache.cacheRegion(name, bucket.Region)
-			}
-			buckets = append(buckets, bucket)
-		}
+		buckets = s.collectBuckets(buckets, out.Buckets)
 
-		nextToken := out.ContinuationToken
-		if token != nil && nextToken != nil && aws.ToString(token) == aws.ToString(nextToken) {
-			return nil, &Error{
-				Kind: KindUnsupported,
-				Op:   "list-buckets",
-				Err:  errors.New("endpoint returned the same continuation token repeatedly"),
-			}
+		token, err = nextListToken(token, out.ContinuationToken)
+		if err != nil {
+			return nil, err
 		}
-
-		token = nextToken
-		if token == nil || aws.ToString(token) == "" {
+		if aws.ToString(token) == "" {
 			return buckets, nil
 		}
 	}
+}
+
+// collectBuckets converts API bucket entries, caching each returned region.
+func (s *Session) collectBuckets(buckets []Bucket, items []s3types.Bucket) []Bucket {
+	for _, item := range items {
+		bucket := Bucket{
+			Name:   aws.ToString(item.Name),
+			Region: aws.ToString(item.BucketRegion),
+		}
+		if item.CreationDate != nil {
+			bucket.CreationDate = *item.CreationDate
+		}
+		if bucket.Region != "" {
+			s.cache.cacheRegion(bucket.Name, bucket.Region)
+		}
+		buckets = append(buckets, bucket)
+	}
+	return buckets
+}
+
+// nextListToken returns the next continuation token, detecting an endpoint
+// that repeats the same token forever.
+func nextListToken(prev, next *string) (*string, error) {
+	if prev != nil && next != nil && aws.ToString(prev) == aws.ToString(next) {
+		return nil, &Error{
+			Kind: KindUnsupported,
+			Op:   "list-buckets",
+			Err:  errors.New("endpoint returned the same continuation token repeatedly"),
+		}
+	}
+	return next, nil
 }

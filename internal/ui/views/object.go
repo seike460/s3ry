@@ -66,28 +66,19 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		v.onResize(msg)
+	case tea.WindowSizeMsg, transferProgressMsg, transferDoneMsg, components.SpinnerTickMsg, components.PreviewMsg:
+		if cmd := v.onEvent(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
 
-	case transferProgressMsg, transferDoneMsg:
-		if cmd := v.onTransfer(msg); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-	case backToOperationMsg:
-		if v.transfer.backToOperation(msg) {
+	case backToOperationMsg, brokerClosedMsg:
+		// brokerClosedMsg means the broker was closed while a read was in
+		// flight; nothing to do.
+		if msg, ok := msg.(backToOperationMsg); ok && v.transfer.backToOperation(msg) {
 			return NewOperationView(v.deps, v.bucket), nil
-		}
-
-	case brokerClosedMsg:
-		// The broker was closed while a read was in flight; nothing to do.
-
-	case components.SpinnerTickMsg, components.PreviewMsg:
-		if cmd := v.onPassive(msg); cmd != nil {
-			cmds = append(cmds, cmd)
 		}
 
 	case tea.KeyMsg:
@@ -95,6 +86,19 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onEvent routes resize, transfer, and passive events to their handlers.
+func (v *ObjectView) onEvent(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		v.onResize(msg)
+		return nil
+	case transferProgressMsg, transferDoneMsg:
+		return v.onTransfer(msg)
+	default:
+		return v.onPassive(msg)
+	}
 }
 
 // onResize propagates the new terminal width to the list, transfer, and
@@ -185,17 +189,15 @@ func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
 // onReadyKey handles input on the object list.
 func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	var cmds []tea.Cmd
 	if v.transfer.quitRequested(key) {
 		return v, tea.Quit
 	}
+	if next := v.navView(key); next != nil {
+		return next, nil
+	}
+
+	var cmds []tea.Cmd
 	switch key {
-	case "esc":
-		return NewOperationView(v.deps, v.bucket), nil
-	case "?":
-		return NewHelpView(v.deps), nil
-	case "s":
-		return NewSettingsView(v.deps), nil
 	case "p":
 		v.showPreview = !v.showPreview
 		v.refreshPreview(&cmds)
@@ -210,6 +212,20 @@ func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.refreshPreview(&cmds)
 	}
 	return v, tea.Batch(cmds...)
+}
+
+// navView returns the destination view for navigation keys, or nil when the
+// key is not a navigation key.
+func (v *ObjectView) navView(key string) tea.Model {
+	switch key {
+	case "esc":
+		return NewOperationView(v.deps, v.bucket)
+	case "?":
+		return NewHelpView(v.deps)
+	case "s":
+		return NewSettingsView(v.deps)
+	}
+	return nil
 }
 
 // selectedObject returns the s3.Object under the cursor, if any.

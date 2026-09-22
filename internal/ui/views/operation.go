@@ -127,19 +127,31 @@ func (v *OperationView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		return NewSettingsView(v.deps), nil
 	case "enter", " ":
-		if item := v.list.GetCurrentItem(); item != nil {
-			if op := findOperation(v.ops, func(o operation) bool { return o.tag == item.Tag }); op != nil {
-				return op.view(v.deps, v.bucket), nil
-			}
+		if op := v.selectedOperation(); op != nil {
+			return op.view(v.deps, v.bucket), nil
 		}
 	default:
-		if op := findOperation(v.ops, func(o operation) bool { return o.shortcut == key && key != "" }); op != nil {
+		if op := v.shortcutOperation(key); op != nil {
 			return op.view(v.deps, v.bucket), nil
 		}
 	}
 
 	v.list, _ = v.list.Update(msg)
 	return v, nil
+}
+
+// selectedOperation returns the operation under the cursor, if any.
+func (v *OperationView) selectedOperation() *operation {
+	item := v.list.GetCurrentItem()
+	if item == nil {
+		return nil
+	}
+	return findOperation(v.ops, func(o operation) bool { return o.tag == item.Tag })
+}
+
+// shortcutOperation resolves key to the operation with that shortcut.
+func (v *OperationView) shortcutOperation(key string) *operation {
+	return findOperation(v.ops, func(o operation) bool { return o.shortcut == key && key != "" })
 }
 
 // View renders the operation view.

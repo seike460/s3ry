@@ -74,36 +74,40 @@ func (v *ObjectView) View() string {
 		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket))
 
 	if v.confirm != nil {
-		var question string
-		if v.confirm.kind == confirmDelete {
-			question = v.deps.T("Delete %s? [y/N]", v.confirm.object.Key)
-		} else {
-			question = v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
-		}
-		return context + "\n\n" + errorStyle.Render(question)
+		return context + "\n\n" + errorStyle.Render(v.confirmQuestion())
 	}
 
 	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit"))
 
-	var body string
-	if v.showPreview && v.preview != nil {
-		listWidth := v.width / 2
-		if listWidth < minPreviewListWidth {
-			listWidth = minPreviewListWidth
-		}
-		body = lipgloss.JoinHorizontal(lipgloss.Top,
-			lipgloss.NewStyle().Width(listWidth).Render(v.state.list.View()),
-			lipgloss.NewStyle().Width(v.width-listWidth).Render(v.preview.View()),
-		)
-	} else {
-		body = v.state.list.View()
-	}
-
-	result := context + "\n\n" + body
+	result := context + "\n\n" + v.listBody()
 	if v.state.errors.GetErrorCount() > 0 {
 		result += "\n\n" + v.state.errors.View()
 	}
 	return result + "\n\n" + footer
+}
+
+// confirmQuestion renders the open confirmation prompt's question.
+func (v *ObjectView) confirmQuestion() string {
+	if v.confirm.kind == confirmDelete {
+		return v.deps.T("Delete %s? [y/N]", v.confirm.object.Key)
+	}
+	return v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
+}
+
+// listBody renders the object list, joined with the preview pane when the
+// preview is open.
+func (v *ObjectView) listBody() string {
+	if !v.showPreview || v.preview == nil {
+		return v.state.list.View()
+	}
+	listWidth := v.width / 2
+	if listWidth < minPreviewListWidth {
+		listWidth = minPreviewListWidth
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top,
+		lipgloss.NewStyle().Width(listWidth).Render(v.state.list.View()),
+		lipgloss.NewStyle().Width(v.width-listWidth).Render(v.preview.View()),
+	)
 }
 
 func (v *ObjectView) currentObject() *s3.Object {

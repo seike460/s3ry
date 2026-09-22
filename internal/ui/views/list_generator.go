@@ -51,23 +51,16 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.transfer.resize(msg)
 
-	case transferProgressMsg, transferDoneMsg:
-		if cmd := v.onTransfer(msg); cmd != nil {
+	case transferProgressMsg, transferDoneMsg, components.SpinnerTickMsg:
+		if cmd := v.onEvent(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
-	case backToOperationMsg:
-		if v.transfer.backToOperation(msg) {
+	case backToOperationMsg, brokerClosedMsg:
+		// brokerClosedMsg means the broker was closed while a read was in
+		// flight; nothing to do.
+		if msg, ok := msg.(backToOperationMsg); ok && v.transfer.backToOperation(msg) {
 			return NewOperationView(v.deps, v.bucket), nil
-		}
-
-	case brokerClosedMsg:
-		// The broker was closed while a read was in flight; nothing to do.
-
-	case components.SpinnerTickMsg:
-		if v.transfer.active && v.spinner.IsActive() {
-			v.spinner, _ = v.spinner.Update(msg)
-			cmds = append(cmds, v.spinner.Start())
 		}
 
 	case tea.KeyMsg:
@@ -75,6 +68,19 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onEvent routes transfer events to the transfer state and keeps the
+// spinner ticking while a generation is active.
+func (v *ListGeneratorView) onEvent(msg tea.Msg) tea.Cmd {
+	if _, ok := msg.(components.SpinnerTickMsg); ok {
+		if v.transfer.active && v.spinner.IsActive() {
+			v.spinner, _ = v.spinner.Update(msg)
+			return v.spinner.Start()
+		}
+		return nil
+	}
+	return v.onTransfer(msg)
 }
 
 // onTransfer feeds progress and completion events into the transfer state.

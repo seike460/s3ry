@@ -91,21 +91,26 @@ func isIPv4DottedQuad(name string) bool {
 		return false
 	}
 	for _, part := range parts {
-		if len(part) == 0 || len(part) > 3 {
-			return false
-		}
-		value := 0
-		for i := 0; i < len(part); i++ {
-			if part[i] < '0' || part[i] > '9' {
-				return false
-			}
-			value = value*10 + int(part[i]-'0')
-		}
-		if value > 255 {
+		if !isIPv4Octet(part) {
 			return false
 		}
 	}
 	return true
+}
+
+// isIPv4Octet reports whether part is a decimal octet in [0, 255].
+func isIPv4Octet(part string) bool {
+	if len(part) == 0 || len(part) > 3 {
+		return false
+	}
+	value := 0
+	for i := 0; i < len(part); i++ {
+		if part[i] < '0' || part[i] > '9' {
+			return false
+		}
+		value = value*10 + int(part[i]-'0')
+	}
+	return value <= 255
 }
 
 // ValidateKey checks that key is a non-empty, valid UTF-8 object key within

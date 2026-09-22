@@ -31,20 +31,8 @@ type BulkOptions struct {
 // in "/". Object keys are mapped with LocalPath, which rejects traversal
 // segments before any local directories or files are created.
 func (s *Session) DownloadPrefix(ctx context.Context, bucket, prefix, destDir string, o BulkOptions) (int, error) {
-	if info, err := os.Stat(destDir); err == nil {
-		if !info.IsDir() {
-			return 0, &Error{
-				Kind: KindInvalid,
-				Op:   "download-prefix",
-				Err:  fmt.Errorf("destination path %q is not a directory", destDir),
-			}
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return 0, &Error{
-			Kind: KindInvalid,
-			Op:   "download-prefix",
-			Err:  fmt.Errorf("destination path %q: %w", destDir, err),
-		}
+	if err := validateDestDir(destDir); err != nil {
+		return 0, err
 	}
 
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
@@ -52,41 +40,91 @@ func (s *Session) DownloadPrefix(ctx context.Context, bucket, prefix, destDir st
 	}
 	parallel := bulkParallel(s, o)
 	bulk := newBulkTransfers(ctx, parallel, o.ContinueOnError)
+	d := &prefixDownloader{
+		s:       s,
+		bulk:    bulk,
+		bucket:  bucket,
+		prefix:  prefix,
+		destDir: destDir,
+		o:       o,
+	}
 
-	walkErr := s.Walk(ctx, bucket, prefix, WalkOptions{Concurrency: parallel}, func(object Object) error {
-		if strings.HasSuffix(object.Key, "/") {
-			return nil
-		}
-		if err := bulk.ctx.Err(); err != nil {
-			return err
-		}
-
-		localPath, err := LocalPath(destDir, prefix, object.Key)
-		if err != nil {
-			return bulk.callbackError(object.Key, err)
-		}
-
-		bulk.goTransfer(object.Key, func(transferCtx context.Context) (bool, error) {
-			var skipped atomic.Bool
-			progress := func(event Progress) {
-				if event.Done && event.Skipped {
-					skipped.Store(true)
-				}
-				if o.Progress != nil {
-					o.Progress(event)
-				}
-			}
-			err := s.Download(transferCtx, bucket, object.Key, localPath, DownloadOptions{
-				Overwrite:        o.Overwrite,
-				Progress:         progress,
-				ProgressInterval: o.ProgressInterval,
-			})
-			return !skipped.Load(), err
-		})
-		return nil
-	})
+	walkErr := s.Walk(ctx, bucket, prefix, WalkOptions{Concurrency: parallel}, d.visit)
 	walkErr = classifyBulkWalkError("list", bucket, prefix, walkErr)
 	return bulk.finish(walkErr)
+}
+
+// validateDestDir requires destDir to be a directory or not yet exist.
+func validateDestDir(destDir string) error {
+	info, err := os.Stat(destDir)
+	if err == nil {
+		if !info.IsDir() {
+			return &Error{
+				Kind: KindInvalid,
+				Op:   "download-prefix",
+				Err:  fmt.Errorf("destination path %q is not a directory", destDir),
+			}
+		}
+		return nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return &Error{
+			Kind: KindInvalid,
+			Op:   "download-prefix",
+			Err:  fmt.Errorf("destination path %q: %w", destDir, err),
+		}
+	}
+	return nil
+}
+
+// prefixDownloader enqueues a download for each walked object under prefix.
+type prefixDownloader struct {
+	s       *Session
+	bulk    *bulkTransfers
+	bucket  string
+	prefix  string
+	destDir string
+	o       BulkOptions
+}
+
+// visit maps one walked object to its local path and enqueues the transfer.
+// Folder markers are skipped.
+func (d *prefixDownloader) visit(object Object) error {
+	if strings.HasSuffix(object.Key, "/") {
+		return nil
+	}
+	if err := d.bulk.ctx.Err(); err != nil {
+		return err
+	}
+
+	localPath, err := LocalPath(d.destDir, d.prefix, object.Key)
+	if err != nil {
+		return d.bulk.callbackError(object.Key, err)
+	}
+
+	d.bulk.goTransfer(object.Key, func(transferCtx context.Context) (bool, error) {
+		return d.download(transferCtx, object.Key, localPath)
+	})
+	return nil
+}
+
+// download runs one object transfer, reporting whether bytes were written.
+func (d *prefixDownloader) download(transferCtx context.Context, key, localPath string) (bool, error) {
+	var skipped atomic.Bool
+	progress := func(event Progress) {
+		if event.Done && event.Skipped {
+			skipped.Store(true)
+		}
+		if d.o.Progress != nil {
+			d.o.Progress(event)
+		}
+	}
+	err := d.s.Download(transferCtx, d.bucket, key, localPath, DownloadOptions{
+		Overwrite:        d.o.Overwrite,
+		Progress:         progress,
+		ProgressInterval: d.o.ProgressInterval,
+	})
+	return !skipped.Load(), err
 }
 
 // UploadDir uploads every non-directory, non-symlink entry below srcDir.

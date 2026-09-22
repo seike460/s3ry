@@ -19,23 +19,33 @@ func (l *List) updateViewport() {
 	if len(l.items) == 0 {
 		return
 	}
+	l.fitMaxVisible()
+	l.scrollToCursor()
+	l.clampViewport()
+}
 
-	// Update max visible items based on height
-	if l.height > 0 {
-		l.maxVisible = l.height - listChromeLines
-		if l.maxVisible < minVisibleItems {
-			l.maxVisible = minVisibleItems
-		}
+// fitMaxVisible derives the page size from the terminal height.
+func (l *List) fitMaxVisible() {
+	if l.height <= 0 {
+		return
 	}
+	l.maxVisible = l.height - listChromeLines
+	if l.maxVisible < minVisibleItems {
+		l.maxVisible = minVisibleItems
+	}
+}
 
-	// Adjust viewport to keep cursor visible
+// scrollToCursor keeps the cursor inside the visible window.
+func (l *List) scrollToCursor() {
 	if l.cursor < l.viewportTop {
 		l.viewportTop = l.cursor
 	} else if l.cursor >= l.viewportTop+l.maxVisible {
 		l.viewportTop = l.cursor - l.maxVisible + 1
 	}
+}
 
-	// Ensure viewport doesn't go beyond bounds
+// clampViewport keeps the viewport inside the item range.
+func (l *List) clampViewport() {
 	if l.viewportTop < 0 {
 		l.viewportTop = 0
 	}
