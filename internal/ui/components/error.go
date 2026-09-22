@@ -9,6 +9,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	// maxStoredErrors bounds the retained error history so a long session
+	// cannot grow the display unboundedly.
+	maxStoredErrors = 5
+	// errorAutoHideDelay keeps transient errors visible long enough to read
+	// without requiring a manual dismiss.
+	errorAutoHideDelay = 10 * time.Second
+)
+
 // ErrorLevel represents the severity of an error
 type ErrorLevel int
 
@@ -64,27 +73,27 @@ type ErrorDisplay struct {
 func NewErrorDisplay() *ErrorDisplay {
 	return &ErrorDisplay{
 		errors:        make([]ErrorMsg, 0),
-		maxErrors:     5, // Keep last 5 errors
+		maxErrors:     maxStoredErrors,
 		showTechnical: false,
 		autoHide:      true,
-		hideAfter:     time.Second * 10,
+		hideAfter:     errorAutoHideDelay,
 
 		infoStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")).
+			Foreground(lipgloss.Color(ColorSuccess)).
 			Bold(true),
 
 		warningStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFA500")).
+			Foreground(lipgloss.Color(ColorWarning)).
 			Bold(true),
 
 		errorStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF5555")).
+			Foreground(lipgloss.Color(ColorDanger)).
 			Bold(true),
 
 		criticalStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
+			Foreground(lipgloss.Color(ColorCritical)).
 			Bold(true).
-			Background(lipgloss.Color("#441111")).
+			Background(lipgloss.Color(ColorDangerBg)).
 			Padding(0, 1),
 
 		titleStyle: lipgloss.NewStyle().
@@ -96,19 +105,19 @@ func NewErrorDisplay() *ErrorDisplay {
 			MarginLeft(2),
 
 		suggestionStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			MarginTop(1).
 			MarginLeft(2).
 			Italic(true),
 
 		technicalStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")).
+			Foreground(lipgloss.Color(ColorMuted)).
 			MarginTop(1).
 			MarginLeft(2).
 			Faint(true),
 
 		timestampStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666")).
+			Foreground(lipgloss.Color(ColorFaint)).
 			Faint(true),
 	}
 }

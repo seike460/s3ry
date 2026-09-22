@@ -152,16 +152,3 @@ func (c *Config) Save(path string) error {
 
 	return os.WriteFile(path, data, 0o600)
 }
-
-// NormalizeLanguage converts language names to their standard code.
-// Unknown values pass through unchanged so the i18n layer can decide.
-func NormalizeLanguage(lang string) string {
-	switch lang {
-	case "japanese", "jp":
-		return "ja"
-	case "english":
-		return "en"
-	default:
-		return lang
-	}
-}

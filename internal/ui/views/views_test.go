@@ -444,7 +444,7 @@ func TestListGeneratorCancelOnEsc(t *testing.T) {
 
 func TestTransferFinishDropsStaleBroker(t *testing.T) {
 	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
-	view.transfer.begin("job", 1)
+	view.transfer.begin(testDeps(t, nil), "job", 1)
 	defer view.transfer.abort()
 
 	// A completion tagged with a foreign broker must be ignored.
@@ -468,7 +468,7 @@ func TestBackToOperationRejectsStaleTick(t *testing.T) {
 
 func TestBackToOperationAcceptsMatchingTick(t *testing.T) {
 	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
-	view.transfer.begin("job", 1)
+	view.transfer.begin(testDeps(t, nil), "job", 1)
 	finished := view.transfer.broker
 	cmd := view.transfer.finish(transferDoneMsg{broker: finished})
 	if cmd == nil {
@@ -485,7 +485,7 @@ func TestBackToOperationAcceptsMatchingTick(t *testing.T) {
 
 func TestTransferAbortReleasesBlockedDone(t *testing.T) {
 	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
-	view.transfer.begin("job", 1)
+	view.transfer.begin(testDeps(t, nil), "job", 1)
 	broker := view.transfer.broker
 
 	// Saturate the channel so the final Done send blocks, then prove abort
@@ -513,7 +513,7 @@ func TestTransferAbortReleasesBlockedDone(t *testing.T) {
 
 func TestObjectViewQuitAbortsTransfer(t *testing.T) {
 	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
-	view.transfer.begin("job", 1)
+	view.transfer.begin(testDeps(t, nil), "job", 1)
 	broker := view.transfer.broker
 
 	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
@@ -549,4 +549,68 @@ func TestSettingsViewNilConfig(t *testing.T) {
 	if view.View() == "" {
 		t.Fatal("settings view rendered nothing")
 	}
+}
+
+func TestObjectViewCurrentObject(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	if got := view.currentObject(); got != nil {
+		t.Fatalf("currentObject on empty list = %#v, want nil", got)
+	}
+
+	obj := s3.Object{Key: "a.txt", Size: 1, LastModified: time.Now()}
+	model, _ := view.Update(ObjectsLoadedMsg{Objects: []s3.Object{obj}})
+	view = model.(*ObjectView)
+
+	got := view.currentObject()
+	if got == nil || got.Key != "a.txt" {
+		t.Fatalf("currentObject = %#v, want a.txt", got)
+	}
+}
+
+func TestObjectViewAbortTransferIdle(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	view.AbortTransfer()
+	if view.transfer.active || view.transfer.broker != nil {
+		t.Fatal("AbortTransfer left transfer state marked active")
+	}
+}
+
+func TestObjectViewPreviewObject(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	msg := view.previewObject(s3.Object{
+		Key:          "a.txt",
+		Size:         3,
+		LastModified: time.Now(),
+		ETag:         "0123456789abcdef",
+	})()
+	preview, ok := msg.(components.PreviewMsg)
+	if !ok {
+		t.Fatalf("previewObject returned %T, want components.PreviewMsg", msg)
+	}
+	if !strings.Contains(preview.Content, "a.txt") {
+		t.Fatalf("preview content = %q, want object key included", preview.Content)
+	}
+}
+
+func TestListStateOnTick(t *testing.T) {
+	view := NewBucketView(testDeps(t, nil))
+	if !view.state.loading {
+		t.Fatal("new bucket view is not loading")
+	}
+	if cmd := view.state.onTick(components.SpinnerTickMsg{}); cmd == nil {
+		t.Fatal("onTick while loading returned nil, want next tick command")
+	}
+	view.state.loading = false
+	if cmd := view.state.onTick(components.SpinnerTickMsg{}); cmd != nil {
+		t.Fatal("onTick while idle returned a command")
+	}
+}
+
+func TestTransferStateResize(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	// Without a progress widget the resize is a no-op.
+	view.transfer.resize(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	_, _ = view.transfer.begin(view.deps, "job", 10)
+	view.transfer.resize(tea.WindowSizeMsg{Width: 40, Height: 10})
 }

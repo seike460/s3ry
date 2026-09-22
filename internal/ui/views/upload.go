@@ -40,7 +40,7 @@ func NewUploadView(deps Deps, bucket string) *UploadView {
 	return &UploadView{
 		deps:   deps,
 		bucket: bucket,
-		state:  newListState(T("Scanning local files...")),
+		state:  newListState(deps.T("Scanning local files...")),
 	}
 }
 
@@ -92,7 +92,7 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		v.state.fail(T("Error Scanning Files"), T("Failed to scan local files"), msg.Err)
+		v.state.fail(v.deps, v.deps.T("Error Scanning Files"), v.deps.T("Failed to scan local files"), msg.Err)
 		return v, nil
 	}
 
@@ -101,13 +101,13 @@ func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
 		items = append(items, components.ListItem{
 			Title: file.RelativePath,
 			Description: fmt.Sprintf("%s %s | %s %s",
-				T("Size:"), components.FormatBytes(file.Size),
-				T("Modified:"), formatModified(file.ModTime)),
+				v.deps.T("Size:"), components.FormatBytes(file.Size),
+				v.deps.T("Modified:"), formatModified(file.ModTime)),
 			Tag:  "File",
 			Data: file,
 		})
 	}
-	v.state.loaded(T("Select File to Upload"), items)
+	v.state.loaded(v.deps.T("Select File to Upload"), items)
 	return v, nil
 }
 
@@ -134,7 +134,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if v.state.retryRequested(key) {
-		return v, v.state.startLoading(T("Retrying to scan local files..."), v.loadFiles())
+		return v, v.state.startLoading(v.deps.T("Retrying to scan local files..."), v.loadFiles())
 	}
 
 	switch key {
@@ -164,7 +164,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // startUpload runs Session.Upload on a command goroutine. The S3 key is the
 // file's slash-separated path relative to the working directory.
 func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
-	ctx, wait := v.transfer.begin(T("Uploading %s", file.RelativePath), file.Size)
+	ctx, wait := v.transfer.begin(v.deps, v.deps.T("Uploading %s", file.RelativePath), file.Size)
 	broker := v.transfer.broker
 
 	session, bucket := v.deps.Session, v.bucket
@@ -177,7 +177,7 @@ func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
 			})
 			return transferDoneMsg{
 				err:     err,
-				summary: T("Uploaded %s (%s)", file.RelativePath, components.FormatBytes(file.Size)),
+				summary: v.deps.T("Uploaded %s (%s)", file.RelativePath, components.FormatBytes(file.Size)),
 				broker:  broker,
 			}
 		},
@@ -192,16 +192,16 @@ func (v *UploadView) View() string {
 	}
 
 	if v.state.loading {
-		return headerStyle.Render(T("Local Files")) + "\n\n" + v.state.spinner.View()
+		return headerStyle.Render(v.deps.T("Local Files")) + "\n\n" + v.state.spinner.View()
 	}
 
 	if v.state.list == nil {
-		return errorStyle.Render(T("Failed to scan local files"))
+		return errorStyle.Render(v.deps.T("Failed to scan local files"))
 	}
 
 	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
-		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
-	footer := footerStyle.Render(T("↑↓: navigate • enter: select • r: refresh • esc: back • q: quit"))
+		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket))
+	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • r: refresh • esc: back • q: quit"))
 
 	result := context + "\n\n" + v.state.list.View()
 	if v.state.errors.GetErrorCount() > 0 {

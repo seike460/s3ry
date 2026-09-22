@@ -1,42 +1,38 @@
 // Package i18n wraps golang.org/x/text/message with the small surface s3ry
-// needs: process-wide language selection and a printf-style lookup.
+// needs: an immutable printer per selected language.
 package i18n
 
 import (
 	"os"
 	"strings"
-	"sync"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
 
-var (
-	// printer is the global message printer. It is guarded because the TUI
-	// reads strings while startup code may still be selecting the language.
-	printerMu sync.RWMutex
-	printer   = message.NewPrinter(language.English)
-	current   = language.English
-)
-
-// Init selects the language from the environment.
-func Init() {
-	SetLanguage(detectLanguage().String())
+// Printer formats localized messages. It is immutable once created, so a
+// single printer can be shared by every view without synchronization.
+type Printer struct {
+	printer *message.Printer
+	lang    language.Tag
 }
 
-// InitWithLanguage selects a specific language. An empty or unsupported code
-// falls back to locale detection and then to English.
-func InitWithLanguage(languageCode string) {
-	SetLanguage(languageCode)
-}
-
-// SetLanguage changes the current language.
-func SetLanguage(languageCode string) {
+// NewPrinter selects the language for languageCode. An empty or unsupported
+// code falls back to locale detection and then to English.
+func NewPrinter(languageCode string) *Printer {
 	tag := parseLanguageCode(languageCode)
-	printerMu.Lock()
-	printer = message.NewPrinter(tag)
-	current = tag
-	printerMu.Unlock()
+	return &Printer{printer: message.NewPrinter(tag), lang: tag}
+}
+
+// Sprintf returns a localized string formatted with the given arguments.
+// Strings that have no catalog entry are returned unchanged.
+func (p *Printer) Sprintf(format string, args ...any) string {
+	return p.printer.Sprintf(format, args...)
+}
+
+// Language returns the tag of the printer.
+func (p *Printer) Language() language.Tag {
+	return p.lang
 }
 
 // detectLanguage returns the system language, defaulting to English.
@@ -63,22 +59,6 @@ func parseLanguageCode(languageCode string) language.Tag {
 		return language.Japanese
 	}
 	return language.English
-}
-
-// Sprintf returns a localized string formatted with the given arguments.
-// Strings that have no catalog entry are returned unchanged.
-func Sprintf(format string, args ...any) string {
-	printerMu.RLock()
-	p := printer
-	printerMu.RUnlock()
-	return p.Sprintf(format, args...)
-}
-
-// CurrentLanguage returns the tag of the active printer.
-func CurrentLanguage() language.Tag {
-	printerMu.RLock()
-	defer printerMu.RUnlock()
-	return current
 }
 
 // SupportedLanguages lists the languages with a registered catalog.

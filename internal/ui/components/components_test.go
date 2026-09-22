@@ -125,26 +125,20 @@ func TestSpinnerLifecycle(t *testing.T) {
 		t.Fatal("Start did not reactivate")
 	}
 
-	s.SetMessage("working")
-	if !strings.Contains(s.View(), "working") {
-		t.Fatal("SetMessage not reflected in View")
-	}
-
 	updated, cmd := s.Update(SpinnerTickMsg(time.Now()))
 	if updated != s || cmd == nil {
 		t.Fatal("active spinner tick did not reschedule")
 	}
 }
 
-func TestSpinnerDotVariantAndSettings(t *testing.T) {
-	s := NewDotSpinner("dots")
-	s.SetFrameRate(30)
-	if s.GetFrameRate() != 30 {
-		t.Fatalf("frame rate = %d, want 30", s.GetFrameRate())
+func TestSpinnerStopsRendering(t *testing.T) {
+	s := NewSpinner("loading")
+	if !s.IsActive() {
+		t.Fatal("new spinner is not active")
 	}
-	info := s.GetPerformanceInfo()
-	if info["target_fps"] != 30 || info["active"] != true {
-		t.Fatalf("performance info = %v", info)
+	s.Stop()
+	if s.IsActive() || s.View() != "" {
+		t.Fatal("stopped spinner still renders")
 	}
 }
 

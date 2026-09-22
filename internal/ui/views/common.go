@@ -27,6 +27,8 @@ type Deps struct {
 	// Timeout bounds each blocking S3 request made by a view. Zero applies
 	// no extra deadline.
 	Timeout time.Duration
+	// Messages formats localized UI text. Nil falls back to English.
+	Messages *i18n.Printer
 }
 
 // errNoSession is reported when a view is created without an AWS session.
@@ -56,25 +58,31 @@ func (d Deps) listContext(parent context.Context) (context.Context, context.Canc
 	return context.WithCancel(parent)
 }
 
+// english is the fallback printer used when Deps carries no printer.
+var english = i18n.NewPrinter("en")
+
 // T localizes a message key. Keys are written in English and the catalog
 // returns the translation for the active language.
-func T(format string, args ...any) string {
-	return i18n.Sprintf(format, args...)
+func (d Deps) T(format string, args ...any) string {
+	if d.Messages == nil {
+		return english.Sprintf(format, args...)
+	}
+	return d.Messages.Sprintf(format, args...)
 }
 
 var (
-	headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4")).MarginBottom(1)
-	contextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888"))
-	footerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555"))
+	headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(components.ColorAccent)).MarginBottom(1)
+	contextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorMuted))
+	footerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorDisabled))
+	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(components.ColorDanger))
 )
 
 // errorList builds the single-item list shown when a load fails. The
 // "Error" tag marks the item so pressing enter retries the load.
-func errorList(title, message string) *components.List {
+func errorList(d Deps, title, message string) *components.List {
 	return components.NewList(title, []components.ListItem{{
 		Title:       message,
-		Description: T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
+		Description: d.T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
 		Tag:         "Error",
 	}})
 }
@@ -108,11 +116,11 @@ func (s *listState) startLoading(retryMessage string, load tea.Cmd) tea.Cmd {
 }
 
 // fail stops loading, records the error, and shows the retryable error list.
-func (s *listState) fail(title, message string, err error) {
+func (s *listState) fail(d Deps, title, message string, err error) {
 	s.loading = false
 	s.spinner.Stop()
 	s.errors.AddAWSError(err)
-	s.list = errorList(title, message)
+	s.list = errorList(d, title, message)
 }
 
 // loaded stops loading and installs the freshly built item list.

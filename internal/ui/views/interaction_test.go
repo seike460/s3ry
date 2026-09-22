@@ -232,7 +232,7 @@ func TestListGeneratorAbortAndKeys(t *testing.T) {
 
 func TestTransferProgressUpdatesWidget(t *testing.T) {
 	view := NewUploadView(testDeps(t, nil), "test-bucket")
-	_, _ = view.transfer.begin("upload", 100)
+	_, _ = view.transfer.begin(testDeps(t, nil), "upload", 100)
 	broker := view.transfer.broker
 
 	model, cmd := view.Update(transferProgressMsg{

@@ -23,5 +23,5 @@ func main() {
 		Version: version,
 		Commit:  commit,
 		Date:    date,
-	}))
+	}, cli.RunDeps{}))
 }

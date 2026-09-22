@@ -301,12 +301,3 @@ func BenchmarkLoadFromEnv(b *testing.B) {
 		cfg.loadFromEnv()
 	}
 }
-
-func BenchmarkNormalizeLanguage(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		NormalizeLanguage("japanese")
-		NormalizeLanguage("english")
-		NormalizeLanguage("en")
-	}
-}

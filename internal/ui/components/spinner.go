@@ -7,29 +7,28 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// spinnerFrameRate is the tick cadence. The visible glyph advances every
+// fourth tick so the animation stays readable at this rate.
+const spinnerFrameRate = 16 * time.Millisecond
+
 // SpinnerTickMsg represents a spinner tick message
 type SpinnerTickMsg time.Time
 
-// Spinner represents a loading spinner component with 60fps optimization
+// Spinner represents a loading spinner component
 type Spinner struct {
 	frames  []string
 	current int
 	message string
 	active  bool
 
-	// Performance optimization for 60fps
-	frameRate    time.Duration
-	lastUpdate   time.Time
-	skipFrames   int
 	frameCounter int
-	targetFPS    int
 
 	// Styles
 	spinnerStyle lipgloss.Style
 	messageStyle lipgloss.Style
 }
 
-// NewSpinner creates a new Spinner component optimized for 60fps
+// NewSpinner creates a new Spinner component
 func NewSpinner(message string) *Spinner {
 	return &Spinner{
 		frames: []string{
@@ -38,66 +37,24 @@ func NewSpinner(message string) *Spinner {
 		message: message,
 		active:  true,
 
-		// 60fps optimization settings
-		targetFPS:    60,
-		frameRate:    time.Millisecond * 16, // ~60fps (16.67ms per frame)
-		lastUpdate:   time.Now(),
-		skipFrames:   0,
-		frameCounter: 0,
-
 		spinnerStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")),
+			Foreground(lipgloss.Color(ColorAccent)),
 
 		messageStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFF")).
+			Foreground(lipgloss.Color(ColorBright)).
 			MarginLeft(1),
 	}
 }
 
-// NewDotSpinner creates a spinner with dot animation optimized for 60fps
-func NewDotSpinner(message string) *Spinner {
-	return &Spinner{
-		frames: []string{
-			"   ", ".  ", ".. ", "...", " ..", "  .", "   ",
-		},
-		message: message,
-		active:  true,
-
-		// 60fps optimization settings
-		targetFPS:    60,
-		frameRate:    time.Millisecond * 16, // ~60fps
-		lastUpdate:   time.Now(),
-		skipFrames:   0,
-		frameCounter: 0,
-
-		spinnerStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")),
-
-		messageStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFF")),
-	}
-}
-
-// Update handles messages for the spinner component with 60fps optimization
+// Update handles messages for the spinner component
 func (s *Spinner) Update(msg tea.Msg) (*Spinner, tea.Cmd) {
 	switch msg.(type) {
 	case SpinnerTickMsg:
 		if s.active {
-			now := time.Now()
-
-			// Frame rate control to maintain smooth 60fps
-			if now.Sub(s.lastUpdate) >= s.frameRate {
-				// Update frame only when enough time has passed
-				s.frameCounter++
-
-				// Update spinner frame (slower animation for visual appeal)
-				if s.frameCounter%4 == 0 { // Update spinner every 4 frames
-					s.current = (s.current + 1) % len(s.frames)
-				}
-
-				s.lastUpdate = now
+			s.frameCounter++
+			if s.frameCounter%4 == 0 {
+				s.current = (s.current + 1) % len(s.frames)
 			}
-
 			return s, s.tick()
 		}
 	}
@@ -128,42 +85,14 @@ func (s *Spinner) Stop() {
 	s.active = false
 }
 
-// SetMessage updates the spinner message
-func (s *Spinner) SetMessage(message string) {
-	s.message = message
-}
-
 // IsActive returns whether the spinner is active
 func (s *Spinner) IsActive() bool {
 	return s.active
 }
 
-// tick returns a command that will send a SpinnerTickMsg optimized for 60fps
+// tick returns a command that will send a SpinnerTickMsg
 func (s *Spinner) tick() tea.Cmd {
-	return tea.Tick(s.frameRate, func(t time.Time) tea.Msg {
+	return tea.Tick(spinnerFrameRate, func(t time.Time) tea.Msg {
 		return SpinnerTickMsg(t)
 	})
-}
-
-// SetFrameRate adjusts the target frame rate for performance tuning
-func (s *Spinner) SetFrameRate(fps int) {
-	s.targetFPS = fps
-	s.frameRate = time.Duration(1000/fps) * time.Millisecond
-}
-
-// GetFrameRate returns the current target frame rate
-func (s *Spinner) GetFrameRate() int {
-	return s.targetFPS
-}
-
-// GetPerformanceInfo returns performance statistics
-func (s *Spinner) GetPerformanceInfo() map[string]any {
-	return map[string]any{
-		"target_fps":    s.targetFPS,
-		"frame_rate_ms": s.frameRate.Milliseconds(),
-		"frame_counter": s.frameCounter,
-		"active":        s.active,
-		"current_frame": s.current,
-		"total_frames":  len(s.frames),
-	}
 }

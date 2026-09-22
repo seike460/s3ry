@@ -10,19 +10,21 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 )
 
-// Tests that change progressInterval must not call t.Parallel.
-var progressInterval = 100 * time.Millisecond
+// defaultProgressInterval throttles intermediate progress reports when a
+// transfer does not request its own cadence.
+const defaultProgressInterval = 100 * time.Millisecond
 
 // meter throttles progress callbacks from concurrent transfer workers. It
-// tracks the highest transferred offset, enforces progressInterval between
+// tracks the highest transferred offset, enforces interval between
 // intermediate reports, and guarantees exactly one terminal report via done.
 type meter struct {
-	mu   sync.Mutex
-	fn   ProgressFunc
-	base Progress
-	n    atomic.Int64
-	last atomic.Int64
-	done atomic.Bool
+	mu       sync.Mutex
+	fn       ProgressFunc
+	base     Progress
+	interval time.Duration
+	n        atomic.Int64
+	last     atomic.Int64
+	done     atomic.Bool
 }
 
 func (m *meter) add(delta int64) {
@@ -76,9 +78,13 @@ func (m *meter) reportLocked() {
 		return
 	}
 
+	interval := m.interval
+	if interval <= 0 {
+		interval = defaultProgressInterval
+	}
 	now := time.Now().UnixNano()
 	last := m.last.Load()
-	if now-last < progressInterval.Nanoseconds() {
+	if now-last < interval.Nanoseconds() {
 		return
 	}
 	m.last.Store(now)

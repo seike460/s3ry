@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/seike460/s3ry/internal/config"
+	"github.com/seike460/s3ry/internal/i18n"
 	"github.com/seike460/s3ry/internal/s3"
 	"github.com/seike460/s3ry/internal/ui/views"
 )
@@ -109,9 +110,10 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	}
 
 	deps := views.Deps{
-		Session: session,
-		Config:  cfg,
-		Timeout: time.Duration(cfg.Performance.Timeout) * time.Second,
+		Session:  session,
+		Config:   cfg,
+		Timeout:  time.Duration(cfg.Performance.Timeout) * time.Second,
+		Messages: i18n.NewPrinter(cfg.UI.Language),
 	}
 
 	options := []tea.ProgramOption{

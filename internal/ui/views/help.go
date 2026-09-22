@@ -16,32 +16,32 @@ type HelpView struct {
 // NewHelpView creates a new help view.
 func NewHelpView(deps Deps) *HelpView {
 	items := []components.ListItem{
-		{Title: T("Navigation"), Tag: "Category"},
-		{Title: "↑ / k", Description: T("Move cursor up"), Tag: "Key"},
-		{Title: "↓ / j", Description: T("Move cursor down"), Tag: "Key"},
-		{Title: "← / h", Description: T("Previous page"), Tag: "Key"},
-		{Title: "→ / l", Description: T("Next page"), Tag: "Key"},
-		{Title: "g", Description: T("Go to first item"), Tag: "Key"},
-		{Title: "G", Description: T("Go to last item"), Tag: "Key"},
-		{Title: T("Actions"), Tag: "Category"},
-		{Title: "enter / space", Description: T("Select item"), Tag: "Key"},
-		{Title: "esc", Description: T("Go back / cancel operation"), Tag: "Key"},
-		{Title: "r", Description: T("Refresh current view"), Tag: "Key"},
-		{Title: T("Application"), Tag: "Category"},
-		{Title: "?", Description: T("Show this help"), Tag: "Key"},
-		{Title: "s", Description: T("Show settings"), Tag: "Key"},
-		{Title: "q", Description: T("Quit application"), Tag: "Key"},
-		{Title: "ctrl+c", Description: T("Force quit"), Tag: "Key"},
-		{Title: T("Operations"), Tag: "Category"},
-		{Title: T("Download"), Description: T("Download selected S3 object to local file"), Tag: "Operation"},
-		{Title: T("Upload"), Description: T("Upload local file to S3 bucket"), Tag: "Operation"},
-		{Title: T("Delete"), Description: T("Delete selected S3 object"), Tag: "Operation"},
-		{Title: T("Generate List"), Description: T("Create a list of all objects in bucket"), Tag: "Operation"},
+		{Title: deps.T("Navigation"), Tag: "Category"},
+		{Title: "↑ / k", Description: deps.T("Move cursor up"), Tag: "Key"},
+		{Title: "↓ / j", Description: deps.T("Move cursor down"), Tag: "Key"},
+		{Title: "← / h", Description: deps.T("Previous page"), Tag: "Key"},
+		{Title: "→ / l", Description: deps.T("Next page"), Tag: "Key"},
+		{Title: "g", Description: deps.T("Go to first item"), Tag: "Key"},
+		{Title: "G", Description: deps.T("Go to last item"), Tag: "Key"},
+		{Title: deps.T("Actions"), Tag: "Category"},
+		{Title: "enter / space", Description: deps.T("Select item"), Tag: "Key"},
+		{Title: "esc", Description: deps.T("Go back / cancel operation"), Tag: "Key"},
+		{Title: "r", Description: deps.T("Refresh current view"), Tag: "Key"},
+		{Title: deps.T("Application"), Tag: "Category"},
+		{Title: "?", Description: deps.T("Show this help"), Tag: "Key"},
+		{Title: "s", Description: deps.T("Show settings"), Tag: "Key"},
+		{Title: "q", Description: deps.T("Quit application"), Tag: "Key"},
+		{Title: "ctrl+c", Description: deps.T("Force quit"), Tag: "Key"},
+		{Title: deps.T("Operations"), Tag: "Category"},
+		{Title: deps.T("Download"), Description: deps.T("Download selected S3 object to local file"), Tag: "Operation"},
+		{Title: deps.T("Upload"), Description: deps.T("Upload local file to S3 bucket"), Tag: "Operation"},
+		{Title: deps.T("Delete"), Description: deps.T("Delete selected S3 object"), Tag: "Operation"},
+		{Title: deps.T("Generate List"), Description: deps.T("Create a list of all objects in bucket"), Tag: "Operation"},
 	}
 
 	return &HelpView{
 		deps: deps,
-		list: components.NewList(T("Help - s3ry S3 Browser"), items),
+		list: components.NewList(deps.T("Help - s3ry S3 Browser"), items),
 	}
 }
 
@@ -76,14 +76,14 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the help view.
 func (v *HelpView) View() string {
-	header := headerStyle.Render(T("s3ry - Interactive S3 Terminal Client"))
+	header := headerStyle.Render(v.deps.T("s3ry - Interactive S3 Terminal Client"))
 
 	description := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#626262")).
+		Foreground(lipgloss.Color(components.ColorDisabled)).
 		Margin(1, 0).
-		Render(T("Navigate your S3 buckets and objects with ease"))
+		Render(v.deps.T("Navigate your S3 buckets and objects with ease"))
 
-	footer := footerStyle.Render(T("↑↓: navigate • esc: back • q: quit"))
+	footer := footerStyle.Render(v.deps.T("↑↓: navigate • esc: back • q: quit"))
 
 	return header + "\n" + description + "\n\n" + v.list.View() + "\n" + footer
 }

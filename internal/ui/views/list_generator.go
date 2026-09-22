@@ -21,13 +21,17 @@ type ListGeneratorView struct {
 	transfer transferState
 }
 
+// generationDoneDelay leaves the generated list visible a little longer than
+// a normal transfer outcome, since the path text is the result itself.
+const generationDoneDelay = 3 * time.Second
+
 // NewListGeneratorView creates a new list generator view.
 func NewListGeneratorView(deps Deps, bucket string) *ListGeneratorView {
 	return &ListGeneratorView{
 		deps:     deps,
 		bucket:   bucket,
-		spinner:  components.NewSpinner(T("Generating object list...")),
-		transfer: transferState{active: true, doneDelay: 3 * time.Second},
+		spinner:  components.NewSpinner(deps.T("Generating object list...")),
+		transfer: transferState{active: true, doneDelay: generationDoneDelay},
 	}
 }
 
@@ -45,7 +49,7 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.transfer.resize(msg)
 
 	case transferProgressMsg:
-		message := fmt.Sprintf(T("%d objects written"), msg.event.Transferred)
+		message := fmt.Sprintf(v.deps.T("%d objects written"), msg.event.Transferred)
 		if cmd := v.transfer.onProgress(msg, message); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -90,18 +94,18 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the list generator view.
 func (v *ListGeneratorView) View() string {
 	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
-		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
+		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket))
 
 	var content string
 	if v.transfer.progress != nil {
 		content = v.transfer.progress.View()
 	} else {
-		content = headerStyle.Render(T("Generating Object List")) + "\n\n" + v.spinner.View()
+		content = headerStyle.Render(v.deps.T("Generating Object List")) + "\n\n" + v.spinner.View()
 	}
 
 	help := ""
 	if !v.transfer.active {
-		help = "\n\n" + footerStyle.Render(T("esc: back • q: quit"))
+		help = "\n\n" + footerStyle.Render(v.deps.T("esc: back • q: quit"))
 	}
 	return context + "\n\n" + content + help
 }
@@ -113,7 +117,7 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 		return func() tea.Msg { return transferDoneMsg{err: err} }
 	}
 
-	ctx, wait := v.transfer.begin(T("Generating object list"), -1)
+	ctx, wait := v.transfer.begin(v.deps, v.deps.T("Generating object list"), -1)
 	broker := v.transfer.broker
 
 	session, bucket := v.deps.Session, v.bucket
@@ -146,7 +150,7 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 			broker.callback(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: count, Done: true, Err: walkErr})
 			return transferDoneMsg{
 				err:     walkErr,
-				summary: T("Object list created: %s (%d objects)", filename, count),
+				summary: v.deps.T("Object list created: %s (%d objects)", filename, count),
 				broker:  broker,
 			}
 		},

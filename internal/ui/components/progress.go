@@ -66,26 +66,26 @@ func NewProgress(title string, total int64) *Progress {
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			MarginBottom(1),
 
 		progressStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")),
+			Foreground(lipgloss.Color(ColorSuccess)),
 
 		completeStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#04B575")),
+			Foreground(lipgloss.Color(ColorSuccess)),
 
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")),
+			Foreground(lipgloss.Color(ColorDanger)),
 
 		messageStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")).
+			Foreground(lipgloss.Color(ColorMuted)).
 			MarginTop(1),
 
 		speedStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFA500")).
+			Foreground(lipgloss.Color(ColorWarning)).
 			Bold(true),
 	}
 }

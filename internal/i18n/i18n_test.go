@@ -7,10 +7,9 @@ import (
 	"golang.org/x/text/language"
 )
 
-func TestInit(t *testing.T) {
-	Init()
-
-	assert.NotEqual(t, language.Und, CurrentLanguage())
+func TestNewPrinter(t *testing.T) {
+	p := NewPrinter("en")
+	assert.Equal(t, language.English, p.Language())
 }
 
 func TestDetectLanguage_English(t *testing.T) {
@@ -43,9 +42,9 @@ func TestDetectLanguage_Japanese_LANGUAGE(t *testing.T) {
 }
 
 func TestSprintf(t *testing.T) {
-	SetLanguage("en")
+	p := NewPrinter("en")
 
-	result := Sprintf("Hello %s", "World")
+	result := p.Sprintf("Hello %s", "World")
 
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "Hello")
@@ -53,60 +52,55 @@ func TestSprintf(t *testing.T) {
 }
 
 func TestSprintf_Japanese(t *testing.T) {
-	SetLanguage("ja")
-	t.Cleanup(func() { SetLanguage("en") })
+	p := NewPrinter("ja")
 
-	result := Sprintf("Hello %s", "World")
+	result := p.Sprintf("Hello %s", "World")
 
 	assert.NotEmpty(t, result)
 }
 
 func TestJapaneseCatalog(t *testing.T) {
-	SetLanguage("ja")
-	t.Cleanup(func() { SetLanguage("en") })
+	p := NewPrinter("ja")
 
-	if got := Sprintf("Canceled"); got != "キャンセルしました" {
+	if got := p.Sprintf("Canceled"); got != "キャンセルしました" {
 		t.Fatalf("ja catalog = %q, want キャンセルしました", got)
 	}
-	if got := Sprintf("Delete %s? [y/N]", "a.txt"); got != "a.txt を削除しますか？ [y/N]" {
+	if got := p.Sprintf("Delete %s? [y/N]", "a.txt"); got != "a.txt を削除しますか？ [y/N]" {
 		t.Fatalf("ja formatted catalog = %q", got)
 	}
-	if got := Sprintf("key without a translation"); got != "key without a translation" {
+	if got := p.Sprintf("key without a translation"); got != "key without a translation" {
 		t.Fatalf("untranslated key = %q, want the key itself", got)
 	}
 }
 
-func TestMultipleInitCalls(t *testing.T) {
-	Init()
-	first := CurrentLanguage()
+func TestPrintersAreIndependent(t *testing.T) {
+	en := NewPrinter("en")
+	ja := NewPrinter("ja")
 
-	Init()
-	second := CurrentLanguage()
-
-	assert.Equal(t, first, second)
+	if got := ja.Sprintf("Canceled"); got != "キャンセルしました" {
+		t.Fatalf("ja printer = %q, want キャンセルしました", got)
+	}
+	if got := en.Sprintf("Canceled"); got != "Canceled" {
+		t.Fatalf("en printer = %q, want the untranslated key", got)
+	}
 }
 
 func BenchmarkSprintf(b *testing.B) {
-	SetLanguage("en")
+	p := NewPrinter("en")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result := Sprintf("Benchmark test %d", i)
+		result := p.Sprintf("Benchmark test %d", i)
 		if result == "" {
 			b.Fatal("Sprintf returned empty string")
 		}
 	}
 }
 
-func TestInitWithLanguage(t *testing.T) {
-	InitWithLanguage("ja")
-	assert.Equal(t, language.Japanese, CurrentLanguage())
-
-	InitWithLanguage("invalid")
-	assert.Equal(t, language.English, CurrentLanguage())
-
-	InitWithLanguage("")
-	assert.NotEqual(t, language.Und, CurrentLanguage())
+func TestNewPrinterFallbacks(t *testing.T) {
+	assert.Equal(t, language.Japanese, NewPrinter("ja").Language())
+	assert.Equal(t, language.English, NewPrinter("invalid").Language())
+	assert.NotEqual(t, language.Und, NewPrinter("").Language())
 }
 
 func TestParseLanguageCode(t *testing.T) {
@@ -130,19 +124,6 @@ func TestParseLanguageCode(t *testing.T) {
 		result := parseLanguageCode(test.input)
 		assert.Equal(t, test.expected, result, "Failed for input: %s", test.input)
 	}
-}
-
-func TestSetLanguage(t *testing.T) {
-	SetLanguage("ja")
-	assert.Equal(t, language.Japanese, CurrentLanguage())
-
-	SetLanguage("en")
-	assert.Equal(t, language.English, CurrentLanguage())
-}
-
-func TestCurrentLanguage(t *testing.T) {
-	lang := CurrentLanguage()
-	assert.NotEqual(t, language.Und, lang)
 }
 
 func TestSupportedLanguages(t *testing.T) {

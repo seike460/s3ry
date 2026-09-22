@@ -446,7 +446,6 @@ func testIntegrationBucketRegion(t *testing.T, f *integrationFixture) {
 }
 
 func testIntegrationUploadCancellation(t *testing.T, f *integrationFixture) {
-	setTransferProgressInterval(t, 0)
 	payload := integrationPayload(integrationTransferSize)
 	source := filepath.Join(t.TempDir(), "canceled-upload.bin")
 	if err := os.WriteFile(source, payload, 0o600); err != nil {
@@ -460,6 +459,7 @@ func testIntegrationUploadCancellation(t *testing.T, f *integrationFixture) {
 	progress := &integrationProgressRecorder{}
 	var first sync.Once
 	err := f.session.Upload(ctx, source, f.bucket, key, UploadOptions{
+		ProgressInterval: time.Nanosecond,
 		Progress: func(event Progress) {
 			progress.callback(event)
 			first.Do(cancel)

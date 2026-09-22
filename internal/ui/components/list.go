@@ -10,6 +10,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// borderPadding reserves cells for the border and its padding inside the
+// configured list width.
+const borderPadding = 4
+
 // ListItem represents a selectable item in a list
 type ListItem struct {
 	Title       string
@@ -57,43 +61,43 @@ func NewList(title string, items []ListItem) *List {
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			MarginLeft(1).
 			MarginBottom(1),
 
 		itemStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFF")).
+			Foreground(lipgloss.Color(ColorBright)).
 			PaddingLeft(2),
 
 		selectedStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorText)).
+			Background(lipgloss.Color(ColorAccent)).
 			PaddingLeft(1).
 			PaddingRight(1).
 			Border(lipgloss.RoundedBorder(), false, false, false, true).
-			BorderForeground(lipgloss.Color("#04B575")),
+			BorderForeground(lipgloss.Color(ColorSuccess)),
 
 		descStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")).
+			Foreground(lipgloss.Color(ColorMuted)).
 			PaddingLeft(4),
 
 		tagStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#00FF87")).
-			Background(lipgloss.Color("#1A1A1A")).
+			Foreground(lipgloss.Color(ColorHighlight)).
+			Background(lipgloss.Color(ColorOverlay)).
 			PaddingLeft(1).
 			PaddingRight(1).
 			MarginLeft(2),
 
 		helpStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262")).
+			Foreground(lipgloss.Color(ColorDisabled)).
 			MarginTop(1).
 			PaddingLeft(1),
 
 		borderStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#874BFD")).
+			BorderForeground(lipgloss.Color(ColorBorder)).
 			Padding(1),
 	}
 
@@ -197,7 +201,7 @@ func (l *List) View() string {
 
 	// Apply border if width is set
 	if l.width > 0 {
-		result = l.borderStyle.Width(l.width - 4).Render(result)
+		result = l.borderStyle.Width(l.width - borderPadding).Render(result)
 	}
 
 	return result

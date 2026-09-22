@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
@@ -21,6 +22,9 @@ type UploadOptions struct {
 	StorageClass string
 	// Progress receives transfer progress events.
 	Progress ProgressFunc
+	// ProgressInterval throttles intermediate progress events; zero or
+	// negative uses the default cadence.
+	ProgressInterval time.Duration
 }
 
 // Upload streams localPath to s3://bucket/key using the region-aware
@@ -28,7 +32,8 @@ type UploadOptions struct {
 // in parallel parts.
 func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o UploadOptions) (err error) {
 	m := &meter{
-		fn: o.Progress,
+		fn:       o.Progress,
+		interval: o.ProgressInterval,
 		base: Progress{
 			Op:     OpUpload,
 			Bucket: bucket,
@@ -100,6 +105,9 @@ type DownloadOptions struct {
 	Overwrite OverwriteMode
 	// Progress receives transfer progress events.
 	Progress ProgressFunc
+	// ProgressInterval throttles intermediate progress events; zero or
+	// negative uses the default cadence.
+	ProgressInterval time.Duration
 }
 
 // Download streams s3://bucket/key to localPath through the region-aware
@@ -107,7 +115,8 @@ type DownloadOptions struct {
 // size allows it.
 func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o DownloadOptions) (err error) {
 	m := &meter{
-		fn: o.Progress,
+		fn:       o.Progress,
+		interval: o.ProgressInterval,
 		base: Progress{
 			Op:     OpDownload,
 			Bucket: bucket,

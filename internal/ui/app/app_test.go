@@ -102,3 +102,9 @@ func TestRunRejectsBadConfig(t *testing.T) {
 		t.Fatal("Run accepted an invalid part size")
 	}
 }
+
+func TestIsTTYAvailableDoesNotPanic(_ *testing.T) {
+	// The result depends on the host terminal; the test only exercises the
+	// probe so both branches stay compilable and safe.
+	_ = isTTYAvailable()
+}

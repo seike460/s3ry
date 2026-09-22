@@ -16,7 +16,7 @@ func catalog(tag language.Tag, key, value string) {
 }
 
 // The catalog keys are the English source strings used at call sites via
-// views.T / i18n.Sprintf. English needs no entries: a missing key falls
+// Deps.T / Printer.Sprintf. English needs no entries: a missing key falls
 // back to the key itself.
 func init() {
 	ja := language.Japanese

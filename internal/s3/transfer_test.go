@@ -86,15 +86,6 @@ func assertTransferTempsMissing(t *testing.T, localPath string) {
 	}
 }
 
-func setTransferProgressInterval(t *testing.T, interval time.Duration) {
-	t.Helper()
-	previous := progressInterval
-	progressInterval = interval
-	t.Cleanup(func() {
-		progressInterval = previous
-	})
-}
-
 func TestUploadMultipartStatAndETag(t *testing.T) {
 	var (
 		requestMu    sync.Mutex
@@ -161,7 +152,6 @@ func (w *transferCaptureResponseWriter) Write(p []byte) (int, error) {
 }
 
 func TestUploadProgress(t *testing.T) {
-	setTransferProgressInterval(t, 0)
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
 
@@ -178,7 +168,7 @@ func TestUploadProgress(t *testing.T) {
 		mu.Unlock()
 	}
 
-	if err := session.Upload(t.Context(), source, transferTestBucket, transferTestObjectKey, UploadOptions{Progress: progress}); err != nil {
+	if err := session.Upload(t.Context(), source, transferTestBucket, transferTestObjectKey, UploadOptions{Progress: progress, ProgressInterval: time.Nanosecond}); err != nil {
 		t.Fatalf("Upload: %v", err)
 	}
 
@@ -449,7 +439,6 @@ func TestDownloadOverwriteSkipCreatedDuringTransfer(t *testing.T) {
 }
 
 func testDownloadCreatedDuringTransfer(t *testing.T, mode OverwriteMode) {
-	setTransferProgressInterval(t, 0)
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
 	const key = "created-during-transfer.bin"
@@ -477,8 +466,9 @@ func testDownloadCreatedDuringTransfer(t *testing.T, mode OverwriteMode) {
 	}
 
 	err := session.Download(t.Context(), transferTestBucket, key, destination, DownloadOptions{
-		Overwrite: mode,
-		Progress:  progress,
+		Overwrite:        mode,
+		Progress:         progress,
+		ProgressInterval: time.Nanosecond,
 	})
 	if !created.Load() {
 		t.Fatal("progress callback did not create the destination")
@@ -515,7 +505,6 @@ func testDownloadCreatedDuringTransfer(t *testing.T, mode OverwriteMode) {
 }
 
 func TestDownloadProgressAfterRangeRetry(t *testing.T) {
-	setTransferProgressInterval(t, 0)
 	var (
 		firstRangeFailure atomic.Bool
 		rangeRequests     atomic.Int64
@@ -541,6 +530,7 @@ func TestDownloadProgressAfterRangeRetry(t *testing.T) {
 	)
 	destination := filepath.Join(t.TempDir(), "retry.bin")
 	err := session.Download(t.Context(), transferTestBucket, transferTestObjectKey, destination, DownloadOptions{
+		ProgressInterval: time.Nanosecond,
 		Progress: func(event Progress) {
 			mu.Lock()
 			events = append(events, event)
@@ -648,7 +638,6 @@ func TestUploadCancellationAbortsMultipartUpload(t *testing.T) {
 }
 
 func TestDownloadCancellationRemovesDestinationAndTemp(t *testing.T) {
-	setTransferProgressInterval(t, 0)
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
 	putTransferTestObject(t, client, transferTestBucket, transferTestObjectKey, transferTestPayload)
@@ -659,6 +648,7 @@ func TestDownloadCancellationRemovesDestinationAndTemp(t *testing.T) {
 	var cancelOnce sync.Once
 
 	err := session.Download(ctx, transferTestBucket, transferTestObjectKey, destination, DownloadOptions{
+		ProgressInterval: time.Nanosecond,
 		Progress: func(event Progress) {
 			if !event.Done {
 				cancelOnce.Do(cancel)
@@ -725,7 +715,6 @@ func TestDownloadDirectoryIsInvalid(t *testing.T) {
 }
 
 func TestDownloadProgress(t *testing.T) {
-	setTransferProgressInterval(t, 0)
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
 	putTransferTestObject(t, client, transferTestBucket, transferTestObjectKey, transferTestPayload)
@@ -736,6 +725,7 @@ func TestDownloadProgress(t *testing.T) {
 	)
 	destination := filepath.Join(t.TempDir(), "progress.bin")
 	err := session.Download(t.Context(), transferTestBucket, transferTestObjectKey, destination, DownloadOptions{
+		ProgressInterval: time.Nanosecond,
 		Progress: func(event Progress) {
 			mu.Lock()
 			events = append(events, event)
@@ -825,5 +815,16 @@ func TestTransferValidationProgressDone(t *testing.T) {
 	var eventErr *Error
 	if !errors.As(events[0].Err, &eventErr) || eventErr != typed {
 		t.Fatalf("validation progress Err = %#v, want returned *Error %#v", events[0].Err, typed)
+	}
+}
+
+func TestPanicError(t *testing.T) {
+	err := panicError(errors.New("boom"))
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("panicError(error) = %v, want wrapped error", err)
+	}
+	err = panicError("plain value")
+	if err == nil || !strings.Contains(err.Error(), "plain value") {
+		t.Fatalf("panicError(value) = %v, want formatted value", err)
 	}
 }

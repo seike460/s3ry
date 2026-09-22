@@ -46,22 +46,22 @@ func NewPreview() *Preview {
 	return &Preview{
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			PaddingLeft(1).
 			PaddingRight(1),
 
 		contentStyle: lipgloss.NewStyle().
 			Padding(1).
-			Foreground(lipgloss.Color("#FAFAFA")),
+			Foreground(lipgloss.Color(ColorText)),
 
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")).
+			Foreground(lipgloss.Color(ColorDanger)).
 			Padding(1),
 
 		borderStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#7D56F4")),
+			BorderForeground(lipgloss.Color(ColorAccent)),
 	}
 }
 

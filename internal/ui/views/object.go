@@ -46,9 +46,9 @@ type ObjectView struct {
 func NewObjectView(deps Deps, bucket string, mode ObjectMode) *ObjectView {
 	var spinnerMessage string
 	if mode == ModeDelete {
-		spinnerMessage = T("Loading S3 objects for delete...")
+		spinnerMessage = deps.T("Loading S3 objects for delete...")
 	} else {
-		spinnerMessage = T("Loading S3 objects for download...")
+		spinnerMessage = deps.T("Loading S3 objects for download...")
 	}
 
 	return &ObjectView{
@@ -119,7 +119,7 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // onObjectsLoaded renders the freshly fetched listing or its error.
 func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
-		v.state.fail(T("Error Loading Objects"), T("Failed to load S3 objects"), msg.Err)
+		v.state.fail(v.deps, v.deps.T("Error Loading Objects"), v.deps.T("Failed to load S3 objects"), msg.Err)
 		return v, nil
 	}
 
@@ -127,11 +127,11 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 	for _, obj := range msg.Objects {
 		tag := "Object"
 		description := fmt.Sprintf("%s %s | %s %s",
-			T("Size:"), components.FormatBytes(obj.Size),
-			T("Modified:"), formatModified(obj.LastModified))
+			v.deps.T("Size:"), components.FormatBytes(obj.Size),
+			v.deps.T("Modified:"), formatModified(obj.LastModified))
 		if strings.HasSuffix(obj.Key, "/") {
 			tag = "Folder"
-			description = T("Folder marker")
+			description = v.deps.T("Folder marker")
 		}
 		items = append(items, components.ListItem{
 			Title:       obj.Key,
@@ -141,12 +141,12 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 		})
 	}
 
-	title := T("Select Object")
+	title := v.deps.T("Select Object")
 	switch v.mode {
 	case ModeDownload:
-		title = T("Select Object to Download")
+		title = v.deps.T("Select Object to Download")
 	case ModeDelete:
-		title = T("Select Object to Delete")
+		title = v.deps.T("Select Object to Delete")
 	}
 	v.state.loaded(title, items)
 	return v, nil
@@ -196,7 +196,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if v.state.retryRequested(key) {
-		return v, v.state.startLoading(T("Retrying to load S3 objects..."), v.loadObjects())
+		return v, v.state.startLoading(v.deps.T("Retrying to load S3 objects..."), v.loadObjects())
 	}
 
 	var cmds []tea.Cmd
@@ -214,7 +214,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.showPreview = !v.showPreview
 		if v.showPreview {
 			if obj := v.currentObject(); obj != nil {
-				cmds = append(cmds, previewObject(*obj))
+				cmds = append(cmds, v.previewObject(*obj))
 			}
 		}
 	case "enter", " ":
@@ -233,7 +233,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.state.list, _ = v.state.list.Update(msg)
 		if v.showPreview {
 			if obj := v.currentObject(); obj != nil {
-				cmds = append(cmds, previewObject(*obj))
+				cmds = append(cmds, v.previewObject(*obj))
 			}
 		}
 	}
@@ -247,27 +247,27 @@ func (v *ObjectView) View() string {
 	}
 
 	if v.state.loading {
-		return headerStyle.Render(T("S3 Objects")) + "\n\n" + v.state.spinner.View()
+		return headerStyle.Render(v.deps.T("S3 Objects")) + "\n\n" + v.state.spinner.View()
 	}
 
 	if v.state.list == nil {
-		return errorStyle.Render(T("Failed to load S3 objects"))
+		return errorStyle.Render(v.deps.T("Failed to load S3 objects"))
 	}
 
 	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
-		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
+		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket))
 
 	if v.confirm != nil {
 		var question string
 		if v.confirm.kind == confirmDelete {
-			question = T("Delete %s? [y/N]", v.confirm.object.Key)
+			question = v.deps.T("Delete %s? [y/N]", v.confirm.object.Key)
 		} else {
-			question = T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
+			question = v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
 		}
 		return context + "\n\n" + errorStyle.Render(question)
 	}
 
-	footer := footerStyle.Render(T("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit"))
+	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit"))
 
 	var body string
 	if v.showPreview && v.preview != nil {
@@ -327,15 +327,15 @@ func (v *ObjectView) loadObjects() tea.Cmd {
 }
 
 // previewObject renders the object's metadata into the preview pane.
-func previewObject(obj s3.Object) tea.Cmd {
+func (v *ObjectView) previewObject(obj s3.Object) tea.Cmd {
 	return func() tea.Msg {
 		modified := formatModified(obj.LastModified)
 		content := fmt.Sprintf("%s\n\n%s %s\n%s %s\n%s %s\n%s %s",
-			T("S3 Object Information"),
-			T("Key:"), obj.Key,
-			T("Size:"), components.FormatBytes(obj.Size),
-			T("Modified:"), modified,
-			T("ETag:"), truncateShort(obj.ETag, 40),
+			v.deps.T("S3 Object Information"),
+			v.deps.T("Key:"), obj.Key,
+			v.deps.T("Size:"), components.FormatBytes(obj.Size),
+			v.deps.T("Modified:"), modified,
+			v.deps.T("ETag:"), truncateShort(obj.ETag, 40),
 		)
 		return components.PreviewMsg{Content: content, PreviewType: components.PreviewTypeText}
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -23,6 +24,9 @@ type BulkOptions struct {
 	// goroutine-safe.
 	Progress        ProgressFunc
 	ContinueOnError bool
+	// ProgressInterval throttles intermediate progress events for every
+	// transfer in the batch; zero or negative uses the default cadence.
+	ProgressInterval time.Duration
 }
 
 type bulkTransfers struct {
@@ -211,8 +215,9 @@ func (s *Session) DownloadPrefix(ctx context.Context, bucket, prefix, destDir st
 				}
 			}
 			err := s.Download(transferCtx, bucket, object.Key, localPath, DownloadOptions{
-				Overwrite: o.Overwrite,
-				Progress:  progress,
+				Overwrite:        o.Overwrite,
+				Progress:         progress,
+				ProgressInterval: o.ProgressInterval,
 			})
 			return !skipped.Load(), err
 		})
@@ -299,7 +304,8 @@ func (s *Session) UploadDir(ctx context.Context, srcDir, bucket, prefix string, 
 
 		bulk.goTransfer(key, func(transferCtx context.Context) (bool, error) {
 			return true, s.Upload(transferCtx, path, bucket, key, UploadOptions{
-				Progress: o.Progress,
+				Progress:         o.Progress,
+				ProgressInterval: o.ProgressInterval,
 			})
 		})
 		return nil

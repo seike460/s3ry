@@ -36,6 +36,10 @@ type brokerClosedMsg struct{}
 // a view that has already moved on.
 type backToOperationMsg struct{ broker *progressBroker }
 
+// defaultDoneDelay keeps a completed transfer's outcome visible before the
+// view returns to the operation menu.
+const defaultDoneDelay = 2 * time.Second
+
 // progressBroker adapts concurrent s3.ProgressFunc callbacks to the
 // Bubble Tea message loop. Intermediate events may be dropped when the UI
 // falls behind; the final Done event is always queued.
@@ -101,16 +105,20 @@ type transferState struct {
 	// doneDelay customizes how long the outcome stays visible before the
 	// view returns to the operation menu. Zero uses two seconds.
 	doneDelay time.Duration
+	// localize formats status strings in the view's language; nil uses
+	// English.
+	localize func(string, ...any) string
 }
 
 // begin starts a transfer: it creates the cancelable context, the broker,
 // and the progress widget. The returned context must be passed to the S3
 // call, and the returned command starts progress delivery.
-func (t *transferState) begin(title string, total int64) (context.Context, tea.Cmd) {
+func (t *transferState) begin(d Deps, title string, total int64) (context.Context, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 	t.broker = newProgressBroker()
 	t.active = true
+	t.localize = d.T
 	t.progress = components.NewProgress(title, total)
 	return ctx, t.broker.wait()
 }
@@ -145,15 +153,19 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	t.cancel = nil
 	t.active = false
 
+	localize := t.localize
+	if localize == nil {
+		localize = english.Sprintf
+	}
 	text := msg.summary
 	success := msg.err == nil
 	if msg.err != nil {
 		text = msg.err.Error()
 		switch {
 		case errors.Is(msg.err, s3.ErrCanceled):
-			text = T("Canceled")
+			text = localize("Canceled")
 		case errors.Is(msg.err, s3.ErrTimeout):
-			text = T("Timed out")
+			text = localize("Timed out")
 		}
 	}
 	if t.progress == nil {
@@ -162,7 +174,7 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	t.progress, _ = t.progress.Update(components.CompletedMsg{Success: success, Message: text})
 	delay := t.doneDelay
 	if delay <= 0 {
-		delay = 2 * time.Second
+		delay = defaultDoneDelay
 	}
 	finishedBroker := t.lastBroker
 	return tea.Tick(delay, func(time.Time) tea.Msg {

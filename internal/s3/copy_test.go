@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -249,7 +250,6 @@ func TestDownloadPrefixTransferContinueOnError(t *testing.T) {
 }
 
 func TestDownloadPrefixCancellation(t *testing.T) {
-	setTransferProgressInterval(t, 0)
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
 
@@ -264,7 +264,8 @@ func TestDownloadPrefixCancellation(t *testing.T) {
 	defer cancel()
 	var cancelOnce sync.Once
 	n, err := session.DownloadPrefix(ctx, transferTestBucket, "src/", t.TempDir(), BulkOptions{
-		Parallel: 4,
+		Parallel:         4,
+		ProgressInterval: time.Nanosecond,
 		Progress: func(event Progress) {
 			if event.Done {
 				cancelOnce.Do(cancel)

@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/seike460/s3ry/internal/config"
-	"github.com/seike460/s3ry/internal/ui/app"
+	"github.com/seike460/s3ry/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
@@ -23,13 +23,18 @@ type rootFlags struct {
 	LogLevel   string
 }
 
-// runTUI is replaceable so command behavior can be tested without starting Bubble Tea.
-var runTUI = func(ctx context.Context, cfg *config.Config) error {
-	return app.Run(ctx, cfg)
+// RunDeps carries the replaceable runtime dependencies of a command run.
+// Nil fields fall back to the production implementations.
+type RunDeps struct {
+	// RunTUI starts the interactive client; nil uses app.Run.
+	RunTUI func(ctx context.Context, cfg *config.Config) error
+	// IsTerminal reports whether a file descriptor is a terminal; nil uses
+	// term.IsTerminal.
+	IsTerminal func(fd uintptr) bool
 }
 
 // NewRootCommand builds a fresh command tree for one invocation.
-func NewRootCommand(info BuildInfo) *cobra.Command {
+func NewRootCommand(info BuildInfo, deps RunDeps) *cobra.Command {
 	info = info.normalized()
 	flags := &rootFlags{}
 
@@ -45,7 +50,7 @@ func NewRootCommand(info BuildInfo) *cobra.Command {
 			"date":   info.Date,
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runRoot(cmd, flags)
+			return runRoot(cmd, flags, deps)
 		},
 	}
 
@@ -66,12 +71,12 @@ func NewRootCommand(info BuildInfo) *cobra.Command {
 }
 
 // Run executes the CLI and returns its process exit code.
-func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, info BuildInfo) int {
+func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, info BuildInfo, deps RunDeps) int {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	cmd := NewRootCommand(info)
+	cmd := NewRootCommand(info, deps)
 	if args == nil {
 		args = []string{}
 	}
@@ -88,7 +93,7 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	return ExitCode(err)
 }
 
-func runRoot(cmd *cobra.Command, flags *rootFlags) error {
+func runRoot(cmd *cobra.Command, flags *rootFlags, deps RunDeps) error {
 	if err := cmd.Context().Err(); err != nil {
 		return err
 	}
@@ -98,7 +103,7 @@ func runRoot(cmd *cobra.Command, flags *rootFlags) error {
 		return err
 	}
 
-	cfg.InitializeI18n()
+	printer := i18n.NewPrinter(cfg.UI.Language)
 	if flags.Verbose {
 		cfg.Logging.Level = "debug"
 	}
@@ -107,10 +112,10 @@ func runRoot(cmd *cobra.Command, flags *rootFlags) error {
 	if err := cmd.Context().Err(); err != nil {
 		return err
 	}
-	if err := ensureInteractiveTerminal(cmd.InOrStdin(), cmd.OutOrStdout()); err != nil {
+	if err := ensureInteractiveTerminal(cmd.InOrStdin(), cmd.OutOrStdout(), printer, deps.terminalProbe()); err != nil {
 		return err
 	}
-	return runTUI(cmd.Context(), cfg)
+	return deps.tuiRunner()(cmd.Context(), cfg)
 }
 
 func loadConfig(flags *rootFlags) (*config.Config, error) {

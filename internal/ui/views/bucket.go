@@ -27,7 +27,7 @@ type BucketView struct {
 func NewBucketView(deps Deps) *BucketView {
 	return &BucketView{
 		deps:  deps,
-		state: newListState(T("Loading S3 buckets...")),
+		state: newListState(deps.T("Loading S3 buckets...")),
 	}
 }
 
@@ -48,7 +48,7 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case BucketsLoadedMsg:
 		if msg.Err != nil {
-			v.state.fail(T("Error Loading Buckets"), T("Failed to load S3 buckets"), msg.Err)
+			v.state.fail(v.deps, v.deps.T("Error Loading Buckets"), v.deps.T("Failed to load S3 buckets"), msg.Err)
 			return v, nil
 		}
 
@@ -61,12 +61,12 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			items[i] = components.ListItem{
 				Title:       bucket.Name,
-				Description: fmt.Sprintf("%s %s", T("Region:"), region),
+				Description: fmt.Sprintf("%s %s", v.deps.T("Region:"), region),
 				Tag:         "Bucket",
 				Data:        bucket,
 			}
 		}
-		v.state.loaded(T("Select S3 Bucket"), items)
+		v.state.loaded(v.deps.T("Select S3 Bucket"), items)
 		return v, nil
 
 	case tea.KeyMsg:
@@ -75,7 +75,7 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if v.state.retryRequested(msg.String()) {
-			return v, v.state.startLoading(T("Retrying to load S3 buckets..."), v.loadBuckets())
+			return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
 		}
 
 		switch msg.String() {
@@ -111,15 +111,15 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the bucket view.
 func (v *BucketView) View() string {
 	if v.state.loading {
-		return headerStyle.Render(T("s3ry - S3 file manager")) + "\n\n" + v.state.spinner.View()
+		return headerStyle.Render(v.deps.T("s3ry - S3 file manager")) + "\n\n" + v.state.spinner.View()
 	}
 	if v.state.list == nil {
-		return errorStyle.Render(T("Failed to load S3 buckets"))
+		return errorStyle.Render(v.deps.T("Failed to load S3 buckets"))
 	}
 
 	var result strings.Builder
 	result.WriteString(contextStyle.Render(
-		fmt.Sprintf("%s %s", T("Region:"), v.deps.region())))
+		fmt.Sprintf("%s %s", v.deps.T("Region:"), v.deps.region())))
 	result.WriteString("\n\n")
 	result.WriteString(v.state.list.View())
 
@@ -129,7 +129,7 @@ func (v *BucketView) View() string {
 	}
 
 	result.WriteString("\n\n")
-	result.WriteString(footerStyle.Render(T("↑↓: navigate • enter: select • r: retry • ?: help • s: settings • q: quit")))
+	result.WriteString(footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • r: retry • ?: help • s: settings • q: quit")))
 	return result.String()
 }
 

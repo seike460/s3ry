@@ -15,10 +15,10 @@ func TestVersionFlagMatchesVersionCommand(t *testing.T) {
 	info := BuildInfo{Version: "1.2.3", Commit: "abc123", Date: "2026-09-04"}
 
 	var flagOutput, flagError bytes.Buffer
-	flagCode := Run(context.Background(), []string{"--version"}, strings.NewReader(""), &flagOutput, &flagError, info)
+	flagCode := Run(context.Background(), []string{"--version"}, strings.NewReader(""), &flagOutput, &flagError, info, RunDeps{})
 
 	var commandOutput, commandError bytes.Buffer
-	commandCode := Run(context.Background(), []string{"version"}, strings.NewReader(""), &commandOutput, &commandError, info)
+	commandCode := Run(context.Background(), []string{"version"}, strings.NewReader(""), &commandOutput, &commandError, info, RunDeps{})
 
 	if flagCode != 0 || commandCode != 0 {
 		t.Fatalf("version commands returned codes %d and %d", flagCode, commandCode)
@@ -34,7 +34,7 @@ func TestVersionFlagMatchesVersionCommand(t *testing.T) {
 func TestRunUnknownFlagReturnsUsageCode(t *testing.T) {
 	var output, errorOutput bytes.Buffer
 
-	code := Run(context.Background(), []string{"--bogus"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{})
+	code := Run(context.Background(), []string{"--bogus"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, RunDeps{})
 
 	if code != 2 {
 		t.Fatalf("Run returned code %d, want 2", code)
@@ -50,7 +50,7 @@ func TestRunUnknownFlagReturnsUsageCode(t *testing.T) {
 func TestRunPositionalArgReturnsUsageCode(t *testing.T) {
 	var output, errorOutput bytes.Buffer
 
-	code := Run(context.Background(), []string{"extra-arg"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{})
+	code := Run(context.Background(), []string{"extra-arg"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, RunDeps{})
 
 	if code != 2 {
 		t.Fatalf("Run returned code %d, want 2", code)
@@ -63,7 +63,7 @@ func TestRunPositionalArgReturnsUsageCode(t *testing.T) {
 func TestRunCompletionZsh(t *testing.T) {
 	var output, errorOutput bytes.Buffer
 
-	code := Run(context.Background(), []string{"completion", "zsh"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{})
+	code := Run(context.Background(), []string{"completion", "zsh"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, RunDeps{})
 
 	if code != 0 {
 		t.Fatalf("Run returned code %d, want 0", code)
@@ -77,32 +77,32 @@ func TestRunCompletionZsh(t *testing.T) {
 }
 
 func TestRunTTYGuard(t *testing.T) {
-	withCLIOverrides(t, func() {
-		isTerminal = func(uintptr) bool { return false }
-		runTUI = func(context.Context, *config.Config) error {
+	deps := RunDeps{
+		IsTerminal: func(uintptr) bool { return false },
+		RunTUI: func(context.Context, *config.Config) error {
 			t.Fatal("runTUI was called for a non-terminal")
 			return nil
-		}
+		},
+	}
 
-		configPath := writeCLIConfig(t)
-		var output, errorOutput bytes.Buffer
-		code := Run(context.Background(), []string{"--config", configPath, "--lang", "en"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{})
+	configPath := writeCLIConfig(t)
+	var output, errorOutput bytes.Buffer
+	code := Run(context.Background(), []string{"--config", configPath, "--lang", "en"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, deps)
 
-		if code != 1 {
-			t.Fatalf("Run returned code %d, want 1", code)
-		}
-		want := "s3ry: " + interactiveTerminalMessage + "\n"
-		if got := errorOutput.String(); got != want {
-			t.Fatalf("error output = %q, want %q", got, want)
-		}
-	})
+	if code != 1 {
+		t.Fatalf("Run returned code %d, want 1", code)
+	}
+	want := "s3ry: " + interactiveTerminalMessage + "\n"
+	if got := errorOutput.String(); got != want {
+		t.Fatalf("error output = %q, want %q", got, want)
+	}
 }
 
 func TestRunReachesTUIWhenTerminalIsAvailable(t *testing.T) {
-	withCLIOverrides(t, func() {
-		isTerminal = func(uintptr) bool { return true }
-		called := false
-		runTUI = func(_ context.Context, cfg *config.Config) error {
+	called := false
+	deps := RunDeps{
+		IsTerminal: func(uintptr) bool { return true },
+		RunTUI: func(_ context.Context, cfg *config.Config) error {
 			called = true
 			if cfg.AWS.Region != "us-west-2" {
 				t.Errorf("region = %q, want us-west-2", cfg.AWS.Region)
@@ -111,34 +111,23 @@ func TestRunReachesTUIWhenTerminalIsAvailable(t *testing.T) {
 				t.Errorf("language = %q, want en", cfg.UI.Language)
 			}
 			return nil
-		}
+		},
+	}
 
-		configPath := writeCLIConfig(t)
-		var output, errorOutput bytes.Buffer
-		code := Run(context.Background(), []string{
-			"--config", configPath,
-			"--region", "us-west-2",
-			"--lang", "en",
-		}, strings.NewReader(""), &output, &errorOutput, BuildInfo{})
+	configPath := writeCLIConfig(t)
+	var output, errorOutput bytes.Buffer
+	code := Run(context.Background(), []string{
+		"--config", configPath,
+		"--region", "us-west-2",
+		"--lang", "en",
+	}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, deps)
 
-		if code != 0 {
-			t.Fatalf("Run returned code %d, want 0; stderr: %q", code, errorOutput.String())
-		}
-		if !called {
-			t.Fatal("runTUI was not called")
-		}
-	})
-}
-
-func withCLIOverrides(t *testing.T, fn func()) {
-	t.Helper()
-	oldTerminal := isTerminal
-	oldRunTUI := runTUI
-	t.Cleanup(func() {
-		isTerminal = oldTerminal
-		runTUI = oldRunTUI
-	})
-	fn()
+	if code != 0 {
+		t.Fatalf("Run returned code %d, want 0; stderr: %q", code, errorOutput.String())
+	}
+	if !called {
+		t.Fatal("runTUI was not called")
+	}
 }
 
 func writeCLIConfig(t *testing.T) string {

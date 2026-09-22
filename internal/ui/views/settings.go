@@ -62,84 +62,84 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the settings view.
 func (v *SettingsView) View() string {
 	if v.list == nil {
-		return errorStyle.Render(T("Settings not available"))
+		return errorStyle.Render(v.deps.T("Settings not available"))
 	}
-	footer := footerStyle.Render(T("esc: back • q: quit"))
+	footer := footerStyle.Render(v.deps.T("esc: back • q: quit"))
 	return v.list.View() + "\n" + footer
 }
 
 // buildSettingsList renders the current configuration into list items.
 func (v *SettingsView) buildSettingsList() {
 	items := []components.ListItem{
-		{Title: T("AWS Configuration"), Tag: "Category"},
+		{Title: v.deps.T("AWS Configuration"), Tag: "Category"},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Region:"), v.value(v.config.AWS.Region)),
-			Description: T("Empty follows the AWS SDK default chain"),
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Region:"), v.value(v.config.AWS.Region)),
+			Description: v.deps.T("Empty follows the AWS SDK default chain"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Profile:"), v.value(v.config.AWS.Profile)),
-			Description: T("AWS shared config profile"),
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Profile:"), v.value(v.config.AWS.Profile)),
+			Description: v.deps.T("AWS shared config profile"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Endpoint:"), v.value(v.config.AWS.Endpoint)),
-			Description: T("Custom S3 endpoint URL, for example LocalStack"),
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Endpoint:"), v.value(v.config.AWS.Endpoint)),
+			Description: v.deps.T("Custom S3 endpoint URL, for example LocalStack"),
 			Tag:         "Setting",
 		},
-		{Title: T("UI Configuration"), Tag: "Category"},
+		{Title: v.deps.T("UI Configuration"), Tag: "Category"},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Language:"), v.value(v.config.UI.Language)),
-			Description: T("Interface language (en/ja)"),
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Language:"), v.value(v.config.UI.Language)),
+			Description: v.deps.T("Interface language (en/ja)"),
 			Tag:         "Setting",
 		},
-		{Title: T("Performance"), Tag: "Category"},
+		{Title: v.deps.T("Performance"), Tag: "Category"},
 		{
-			Title:       fmt.Sprintf("%s %d", T("Concurrency:"), v.config.Performance.Concurrency),
-			Description: T("Parallel S3 workers for transfers and listing"),
-			Tag:         "Setting",
-		},
-		{
-			Title:       fmt.Sprintf("%s %s", T("Part size:"), components.FormatBytes(v.config.Performance.PartSize)),
-			Description: T("Multipart chunk size in bytes"),
+			Title:       fmt.Sprintf("%s %d", v.deps.T("Concurrency:"), v.config.Performance.Concurrency),
+			Description: v.deps.T("Parallel S3 workers for transfers and listing"),
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Timeout:"), fmt.Sprintf("%ds", v.config.Performance.Timeout)),
-			Description: T("Timeout for each blocking S3 request"),
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Part size:"), components.FormatBytes(v.config.Performance.PartSize)),
+			Description: v.deps.T("Multipart chunk size in bytes"),
 			Tag:         "Setting",
 		},
-		{Title: T("Environment"), Tag: "Category"},
+		{
+			Title:       fmt.Sprintf("%s %s", v.deps.T("Timeout:"), fmt.Sprintf("%ds", v.config.Performance.Timeout)),
+			Description: v.deps.T("Timeout for each blocking S3 request"),
+			Tag:         "Setting",
+		},
+		{Title: v.deps.T("Environment"), Tag: "Category"},
 		{
 			Title:       fmt.Sprintf("AWS_REGION: %s", v.envValue("AWS_REGION")),
-			Description: T("Region override from the environment"),
+			Description: v.deps.T("Region override from the environment"),
 			Tag:         "EnvVar",
 		},
 		{
 			Title:       fmt.Sprintf("AWS_PROFILE: %s", v.envValue("AWS_PROFILE")),
-			Description: T("Profile override from the environment"),
+			Description: v.deps.T("Profile override from the environment"),
 			Tag:         "EnvVar",
 		},
 		{
 			Title:       fmt.Sprintf("AWS_ACCESS_KEY_ID: %s", v.maskedEnv("AWS_ACCESS_KEY_ID")),
-			Description: T("Access key from the environment (masked)"),
+			Description: v.deps.T("Access key from the environment (masked)"),
 			Tag:         "EnvVar",
 		},
 		{
 			Title:       fmt.Sprintf("AWS_SECRET_ACCESS_KEY: %s", v.maskedEnv("AWS_SECRET_ACCESS_KEY")),
-			Description: T("Secret key from the environment (masked)"),
+			Description: v.deps.T("Secret key from the environment (masked)"),
 			Tag:         "EnvVar",
 		},
 	}
 
-	v.list = components.NewList(T("Settings"), items)
+	v.list = components.NewList(v.deps.T("Settings"), items)
 }
 
-var valueStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#04B575"))
+var valueStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(components.ColorSuccess))
 
 func (v *SettingsView) value(s string) string {
 	if s == "" {
-		return errorStyle.Render(T("(not set)"))
+		return errorStyle.Render(v.deps.T("(not set)"))
 	}
 	return valueStyle.Render(s)
 }
@@ -151,7 +151,7 @@ func (v *SettingsView) envValue(key string) string {
 func (v *SettingsView) maskedEnv(key string) string {
 	value := os.Getenv(key)
 	if value == "" {
-		return errorStyle.Render(T("(not set)"))
+		return errorStyle.Render(v.deps.T("(not set)"))
 	}
 	if len(value) > 8 {
 		return valueStyle.Render(value[:4] + strings.Repeat("*", len(value)-8) + value[len(value)-4:])
