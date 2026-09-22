@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -91,6 +92,19 @@ func (e walkPanic) Error() string {
 // maxWalkConcurrency bounds the prefix crawler's goroutine pool.
 const maxWalkConcurrency = 64
 
+// prefixCrawler carries the shared state of a parallel delimiter crawl.
+type prefixCrawler struct {
+	client  *awss3.Client
+	bucket  string
+	maxKeys int32
+	fn      func(Object) error
+	fnMu    sync.Mutex
+	sem     chan struct{}
+	seen    map[string]struct{}
+	seenMu  sync.Mutex
+	g       *errgroup.Group
+}
+
 // walkParallel crawls delimiter prefixes with a bounded goroutine pool. Each
 // discovered child prefix either acquires a semaphore slot and runs in the
 // errgroup or, when the pool is full, is crawled inline by the current
@@ -103,85 +117,22 @@ func (s *Session) walkParallel(ctx context.Context, client *awss3.Client, bucket
 	}
 
 	g, walkCtx := errgroup.WithContext(ctx)
-	sem := make(chan struct{}, o.Concurrency)
-	var fnMu sync.Mutex
-	var seenMu sync.Mutex
-	seen := map[string]struct{}{prefix: {}}
-
-	var crawl func(context.Context, string) error
-	crawl = func(callCtx context.Context, current string) (err error) {
-		defer func() {
-			if value := recover(); value != nil {
-				err = walkPanic{value: value}
-			}
-		}()
-
-		token := ""
-		for {
-			if err := callCtx.Err(); err != nil {
-				return Classify("list", bucket, current, err)
-			}
-
-			out, err := client.ListObjectsV2(callCtx, listObjectsInput(bucket, current, token, o.MaxKeys, aws.String("/")))
-			if err != nil {
-				return Classify("list", bucket, current, err)
-			}
-
-			for _, item := range out.Contents {
-				fnMu.Lock()
-				if callCtx.Err() != nil {
-					fnMu.Unlock()
-					return Classify("list", bucket, current, callCtx.Err())
-				}
-				callbackErr := fn(objectFromListObject(item))
-				fnMu.Unlock()
-				if callbackErr != nil {
-					return callbackErr
-				}
-			}
-
-			for _, item := range out.CommonPrefixes {
-				p := aws.ToString(item.Prefix)
-				if p == "" || !strings.HasPrefix(p, current) || len(p) <= len(current) {
-					continue
-				}
-
-				seenMu.Lock()
-				if _, duplicate := seen[p]; duplicate {
-					seenMu.Unlock()
-					continue
-				}
-				seen[p] = struct{}{}
-				seenMu.Unlock()
-
-				select {
-				case sem <- struct{}{}:
-					g.Go(func() error {
-						defer func() { <-sem }()
-						return crawl(callCtx, p)
-					})
-				default:
-					// Pool is full: crawl inline so a full semaphore cannot
-					// deadlock the tree walk.
-					if err := crawl(callCtx, p); err != nil {
-						return err
-					}
-				}
-			}
-
-			token = aws.ToString(out.NextContinuationToken)
-			if token == "" {
-				return nil
-			}
-		}
+	c := &prefixCrawler{
+		client:  client,
+		bucket:  bucket,
+		maxKeys: o.MaxKeys,
+		fn:      fn,
+		sem:     make(chan struct{}, o.Concurrency),
+		seen:    map[string]struct{}{prefix: {}},
+		g:       g,
 	}
 
 	// The root prefix also occupies a pool slot; Concurrency > 1 here, so the
 	// send never blocks and at most Concurrency listings run in parallel.
-	sem <- struct{}{}
+	c.sem <- struct{}{}
 	g.Go(func() error {
-		defer func() { <-sem }()
-		return crawl(walkCtx, prefix)
+		defer func() { <-c.sem }()
+		return c.crawl(walkCtx, prefix)
 	})
 	err := g.Wait()
 
@@ -190,4 +141,89 @@ func (s *Session) walkParallel(ctx context.Context, client *awss3.Client, bucket
 		panic(recovered.value)
 	}
 	return err
+}
+
+// crawl lists every page of current, delivering objects to fn and crawling
+// each discovered child prefix.
+func (c *prefixCrawler) crawl(ctx context.Context, current string) (err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			err = walkPanic{value: value}
+		}
+	}()
+
+	token := ""
+	for {
+		if err := ctx.Err(); err != nil {
+			return Classify("list", c.bucket, current, err)
+		}
+
+		out, err := c.client.ListObjectsV2(ctx, listObjectsInput(c.bucket, current, token, c.maxKeys, aws.String("/")))
+		if err != nil {
+			return Classify("list", c.bucket, current, err)
+		}
+		if err := c.deliver(ctx, current, out.Contents); err != nil {
+			return err
+		}
+		if err := c.visitPrefixes(ctx, current, out.CommonPrefixes); err != nil {
+			return err
+		}
+
+		token = aws.ToString(out.NextContinuationToken)
+		if token == "" {
+			return nil
+		}
+	}
+}
+
+// deliver serializes fn calls for one page of objects.
+func (c *prefixCrawler) deliver(ctx context.Context, current string, items []s3types.Object) error {
+	for _, item := range items {
+		c.fnMu.Lock()
+		if ctx.Err() != nil {
+			c.fnMu.Unlock()
+			return Classify("list", c.bucket, current, ctx.Err())
+		}
+		callbackErr := c.fn(objectFromListObject(item))
+		c.fnMu.Unlock()
+		if callbackErr != nil {
+			return callbackErr
+		}
+	}
+	return nil
+}
+
+// visitPrefixes crawls each unseen child prefix, in the pool when a slot is
+// free and inline when the pool is full so a full semaphore cannot deadlock
+// the tree walk.
+func (c *prefixCrawler) visitPrefixes(ctx context.Context, current string, prefixes []s3types.CommonPrefix) error {
+	for _, item := range prefixes {
+		p := aws.ToString(item.Prefix)
+		if p == "" || !strings.HasPrefix(p, current) || len(p) <= len(current) || !c.markSeen(p) {
+			continue
+		}
+		select {
+		case c.sem <- struct{}{}:
+			c.g.Go(func() error {
+				defer func() { <-c.sem }()
+				return c.crawl(ctx, p)
+			})
+		default:
+			if err := c.crawl(ctx, p); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// markSeen records p and reports whether it was new.
+func (c *prefixCrawler) markSeen(p string) bool {
+	c.seenMu.Lock()
+	defer c.seenMu.Unlock()
+	if _, duplicate := c.seen[p]; duplicate {
+		return false
+	}
+	c.seen[p] = struct{}{}
+	return true
 }

@@ -22,32 +22,60 @@ const (
 // detection, matching the amount http.DetectContentType uses.
 const sniffLength = 512
 
+// bucketNameRules are the S3 naming rules checked in order; the first
+// violation wins.
+var bucketNameRules = []struct {
+	reason   string
+	violates func(string) bool
+}{
+	{
+		"bucket name must be between 3 and 63 characters",
+		func(n string) bool { return len(n) < minBucketNameLength || len(n) > maxBucketNameLength },
+	},
+	{
+		"bucket name cannot start with xn--",
+		func(n string) bool { return strings.HasPrefix(n, "xn--") },
+	},
+	{
+		"bucket name cannot end with -s3alias",
+		func(n string) bool { return strings.HasSuffix(n, "-s3alias") },
+	},
+	{
+		"bucket name cannot end with --ol-s3",
+		func(n string) bool { return strings.HasSuffix(n, "--ol-s3") },
+	},
+	{
+		"bucket name cannot contain consecutive dots",
+		func(n string) bool { return strings.Contains(n, "..") },
+	},
+	{
+		"bucket name cannot be an IPv4 address",
+		isIPv4DottedQuad,
+	},
+	{
+		"bucket name must start and end with a lowercase letter or digit",
+		func(n string) bool {
+			return !isLowerAlphaNumeric(n[0]) || !isLowerAlphaNumeric(n[len(n)-1])
+		},
+	},
+	{
+		"bucket name contains an invalid character",
+		func(n string) bool {
+			for i := 0; i < len(n); i++ {
+				if !isLowerAlphaNumeric(n[i]) && n[i] != '.' && n[i] != '-' {
+					return true
+				}
+			}
+			return false
+		},
+	},
+}
+
 // ValidateBucketName checks name against the S3 bucket naming rules.
 func ValidateBucketName(name string) error {
-	if len(name) < minBucketNameLength || len(name) > maxBucketNameLength {
-		return newInvalidError("validate", name, "", "bucket name must be between 3 and 63 characters")
-	}
-	if strings.HasPrefix(name, "xn--") {
-		return newInvalidError("validate", name, "", "bucket name cannot start with xn--")
-	}
-	if strings.HasSuffix(name, "-s3alias") {
-		return newInvalidError("validate", name, "", "bucket name cannot end with -s3alias")
-	}
-	if strings.HasSuffix(name, "--ol-s3") {
-		return newInvalidError("validate", name, "", "bucket name cannot end with --ol-s3")
-	}
-	if strings.Contains(name, "..") {
-		return newInvalidError("validate", name, "", "bucket name cannot contain consecutive dots")
-	}
-	if isIPv4DottedQuad(name) {
-		return newInvalidError("validate", name, "", "bucket name cannot be an IPv4 address")
-	}
-	if !isLowerAlphaNumeric(name[0]) || !isLowerAlphaNumeric(name[len(name)-1]) {
-		return newInvalidError("validate", name, "", "bucket name must start and end with a lowercase letter or digit")
-	}
-	for i := 0; i < len(name); i++ {
-		if !isLowerAlphaNumeric(name[i]) && name[i] != '.' && name[i] != '-' {
-			return newInvalidError("validate", name, "", "bucket name contains an invalid character")
+	for _, rule := range bucketNameRules {
+		if rule.violates(name) {
+			return newInvalidError("validate", name, "", rule.reason)
 		}
 	}
 	return nil
@@ -109,32 +137,54 @@ func localPath(destDir, prefix, key string, windows bool) (string, error) {
 		return "", err
 	}
 
+	rel, err := relativeKey(prefix, key)
+	if err != nil {
+		return "", err
+	}
+	segments, err := safeSegments(rel, key, windows)
+	if err != nil {
+		return "", err
+	}
+	return joinUnderDest(destDir, segments, key)
+}
+
+// relativeKey returns key with its directory prefix removed, rejecting keys
+// outside the prefix and bare folder markers.
+func relativeKey(prefix, key string) (string, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
 	if !strings.HasPrefix(key, prefix) {
 		return "", newInvalidError("local_path", "", key, "object key is outside the requested prefix")
 	}
-
 	rel := strings.TrimPrefix(key, prefix)
 	if rel == "" {
 		return "", newInvalidError("local_path", "", key, "object key is a folder marker")
 	}
+	return rel, nil
+}
 
+// safeSegments splits rel into path segments, rejecting traversal and, on
+// Windows, separators and volume markers.
+func safeSegments(rel, key string, windows bool) ([]string, error) {
 	segments := make([]string, 0, strings.Count(rel, "/")+1)
 	for _, segment := range strings.Split(rel, "/") {
-		if segment == "" {
+		switch {
+		case segment == "":
 			continue
-		}
-		if segment == "." || segment == ".." {
-			return "", newInvalidError("local_path", "", key, "object key contains a path traversal segment")
-		}
-		if windows && (strings.IndexByte(segment, '\\') >= 0 || strings.IndexByte(segment, ':') >= 0) {
-			return "", newInvalidError("local_path", "", key, "object key contains a Windows path separator or volume marker")
+		case segment == "." || segment == "..":
+			return nil, newInvalidError("local_path", "", key, "object key contains a path traversal segment")
+		case windows && (strings.IndexByte(segment, '\\') >= 0 || strings.IndexByte(segment, ':') >= 0):
+			return nil, newInvalidError("local_path", "", key, "object key contains a Windows path separator or volume marker")
 		}
 		segments = append(segments, segment)
 	}
+	return segments, nil
+}
 
+// joinUnderDest joins segments below destDir and verifies the resolved path
+// stays inside it.
+func joinUnderDest(destDir string, segments []string, key string) (string, error) {
 	pathParts := make([]string, 1, len(segments)+1)
 	pathParts[0] = destDir
 	pathParts = append(pathParts, segments...)

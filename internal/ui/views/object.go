@@ -116,22 +116,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if v.confirm != nil {
-		switch key {
-		case "y", "Y":
-			pending := *v.confirm
-			v.confirm = nil
-			if pending.kind == confirmDelete {
-				return v.startDelete(pending.object)
-			}
-			return v.startDownload(pending.object, s3.OverwriteAlways)
-		case "n", "N", "esc":
-			v.confirm = nil
-			return v, nil
-		}
-		if v.transfer.quitRequested(key) {
-			return v, tea.Quit
-		}
-		return v, nil
+		return v.onConfirmKey(key)
 	}
 
 	if v.transfer.active {
@@ -152,6 +137,32 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, v.state.startLoading(v.deps.T("Retrying to load S3 objects..."), v.loadObjects())
 	}
 
+	return v.onReadyKey(msg)
+}
+
+// onConfirmKey handles input while a confirmation prompt is open.
+func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "y", "Y":
+		pending := *v.confirm
+		v.confirm = nil
+		if pending.kind == confirmDelete {
+			return v.startDelete(pending.object)
+		}
+		return v.startDownload(pending.object, s3.OverwriteAlways)
+	case "n", "N", "esc":
+		v.confirm = nil
+		return v, nil
+	}
+	if v.transfer.quitRequested(key) {
+		return v, tea.Quit
+	}
+	return v, nil
+}
+
+// onReadyKey handles input on the object list.
+func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
 	var cmds []tea.Cmd
 	if v.transfer.quitRequested(key) {
 		return v, tea.Quit
@@ -165,32 +176,41 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return NewSettingsView(v.deps), nil
 	case "p":
 		v.showPreview = !v.showPreview
-		if v.showPreview {
-			if obj := v.currentObject(); obj != nil {
-				cmds = append(cmds, v.previewObject(*obj))
-			}
-		}
+		v.refreshPreview(&cmds)
 	case "enter", " ":
-		item := v.state.currentItem()
-		if item == nil {
-			break
+		if obj := v.selectedObject(); obj != nil {
+			return v.selectObject(*obj)
 		}
-		obj, ok := item.Data.(s3.Object)
-		if !ok {
-			break
-		}
-		return v.selectObject(obj)
 	}
 
 	if v.state.list != nil {
 		v.state.list, _ = v.state.list.Update(msg)
-		if v.showPreview {
-			if obj := v.currentObject(); obj != nil {
-				cmds = append(cmds, v.previewObject(*obj))
-			}
-		}
+		v.refreshPreview(&cmds)
 	}
 	return v, tea.Batch(cmds...)
+}
+
+// selectedObject returns the s3.Object under the cursor, if any.
+func (v *ObjectView) selectedObject() *s3.Object {
+	item := v.state.currentItem()
+	if item == nil {
+		return nil
+	}
+	obj, ok := item.Data.(s3.Object)
+	if !ok {
+		return nil
+	}
+	return &obj
+}
+
+// refreshPreview reloads the preview pane for the object under the cursor.
+func (v *ObjectView) refreshPreview(cmds *[]tea.Cmd) {
+	if !v.showPreview {
+		return
+	}
+	if obj := v.currentObject(); obj != nil {
+		*cmds = append(*cmds, v.previewObject(*obj))
+	}
 }
 
 // AbortTransfer cancels any in-flight transfer and releases the progress

@@ -78,20 +78,25 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		if v.transfer.quitRequested(msg.String()) {
-			return v, tea.Quit
-		}
-		switch msg.String() {
-		case "esc":
-			if v.transfer.active {
-				v.transfer.cancelTransfer()
-				return v, nil
-			}
-			return NewOperationView(v.deps, v.bucket), nil
-		}
+		return v.onKey(msg)
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onKey handles keyboard input while the list is being generated.
+func (v *ListGeneratorView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.transfer.quitRequested(msg.String()) {
+		return v, tea.Quit
+	}
+	if msg.String() != "esc" {
+		return v, nil
+	}
+	if v.transfer.active {
+		v.transfer.cancelTransfer()
+		return v, nil
+	}
+	return NewOperationView(v.deps, v.bucket), nil
 }
 
 // View renders the list generator view.
