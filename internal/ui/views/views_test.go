@@ -614,3 +614,60 @@ func TestTransferStateResize(t *testing.T) {
 	_, _ = view.transfer.begin(view.deps, "job", 10)
 	view.transfer.resize(tea.WindowSizeMsg{Width: 40, Height: 10})
 }
+
+func TestObjectViewFolderDeleteUsesPrefix(t *testing.T) {
+	objects := []s3.Object{
+		{Key: "dir/"},
+		{Key: "dir/a.txt", Size: 1, LastModified: time.Now()},
+		{Key: "dir/b.txt", Size: 1, LastModified: time.Now()},
+	}
+	view := NewObjectView(testDeps(t, objects), "test-bucket", ModeDelete)
+
+	// Selecting a folder marker opens the prefix prompt and starts the
+	// dry-run count instead of deleting the marker alone.
+	model, cmd := view.selectObject(s3.Object{Key: "dir/"})
+	view = model.(*ObjectView)
+	if view.confirm == nil || view.confirm.kind != confirmDeletePrefix {
+		t.Fatalf("confirm = %+v, want a prefix-delete prompt", view.confirm)
+	}
+	if cmd == nil {
+		t.Fatal("dry-run count command was not issued")
+	}
+
+	count, ok := cmd().(prefixCountMsg)
+	if !ok {
+		t.Fatalf("count command returned %T, want prefixCountMsg", cmd())
+	}
+	if count.err != nil {
+		t.Fatalf("dry-run count failed: %v", count.err)
+	}
+	if count.count != 3 {
+		t.Fatalf("count = %d, want 3", count.count)
+	}
+
+	model, _ = view.Update(count)
+	view = model.(*ObjectView)
+	if view.confirm.count != 3 {
+		t.Fatalf("prompt count = %d, want 3", view.confirm.count)
+	}
+
+	// "y" starts the real prefix delete through the transfer pipeline.
+	model, deleteCmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	view = model.(*ObjectView)
+	defer view.AbortTransfer()
+	if !view.transfer.active || deleteCmd == nil {
+		t.Fatal("prefix delete did not start")
+	}
+}
+
+func TestObjectViewFolderDeleteCancelKeepsMarker(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDelete)
+	model, _ := view.selectObject(s3.Object{Key: "dir/"})
+	view = model.(*ObjectView)
+
+	model, _ = view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	view = model.(*ObjectView)
+	if view.confirm != nil || view.transfer.active {
+		t.Fatal("n did not cancel the prefix delete")
+	}
+}

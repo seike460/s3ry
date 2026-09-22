@@ -82,6 +82,9 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
 
+	case prefixCountMsg:
+		v.onPrefixCount(msg)
+
 	case backToOperationMsg, brokerClosedMsg:
 		// brokerClosedMsg means the broker was closed while a read was in
 		// flight; nothing to do.
@@ -180,10 +183,14 @@ func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
 	case "y", "Y":
 		pending := *v.confirm
 		v.confirm = nil
-		if pending.kind == confirmDelete {
+		switch pending.kind {
+		case confirmDelete:
 			return v.startDelete(pending.object)
+		case confirmDeletePrefix:
+			return v.startDeletePrefix(pending.object, max(int64(pending.count), 0))
+		default:
+			return v.startDownload(pending.object, s3.OverwriteAlways)
 		}
-		return v.startDownload(pending.object, s3.OverwriteAlways)
 	case "n", "N", "esc":
 		v.confirm = nil
 		return v, nil

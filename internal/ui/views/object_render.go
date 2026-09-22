@@ -99,10 +99,28 @@ func (v *ObjectView) contextLine() string {
 
 // confirmQuestion renders the open confirmation prompt's question.
 func (v *ObjectView) confirmQuestion() string {
-	if v.confirm.kind == confirmDelete {
+	switch v.confirm.kind {
+	case confirmDelete:
 		return v.deps.T("Delete %s? [y/N]", v.confirm.object.Key)
+	case confirmDeletePrefix:
+		return v.prefixDeleteQuestion()
+	default:
+		return v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
 	}
-	return v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
+}
+
+// prefixDeleteQuestion renders the folder-delete prompt. The dry-run count
+// arrives asynchronously; until then the question notes that counting is in
+// progress, and a count error falls back to a plain prompt.
+func (v *ObjectView) prefixDeleteQuestion() string {
+	key := v.confirm.object.Key
+	if v.confirm.countErr != nil {
+		return v.deps.T("Delete all objects under %s? [y/N]", key)
+	}
+	if v.confirm.count < 0 {
+		return v.deps.T("Delete all objects under %s? (counting...) [y/N]", key)
+	}
+	return v.deps.T("Delete %d objects under %s? [y/N]", v.confirm.count, key)
 }
 
 // listBody renders the object list, joined with the preview pane when the
