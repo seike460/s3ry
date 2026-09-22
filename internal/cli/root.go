@@ -72,17 +72,26 @@ func NewRootCommand(info BuildInfo, deps RunDeps) *cobra.Command {
 		return &usageError{err: err}
 	})
 
-	root.Flags().StringVar(&flags.Region, "region", "", "AWS region to use")
-	root.Flags().StringVar(&flags.Profile, "profile", "", "AWS profile to use")
-	root.Flags().StringVar(&flags.ConfigFile, "config", "", "Path to config file")
-	root.Flags().StringVar(&flags.Endpoint, "endpoint", "", "S3 endpoint URL for S3-compatible services")
-	root.Flags().BoolVar(&flags.PathStyle, "path-style", false, "Force path-style S3 addressing (MinIO, LocalStack)")
-	root.Flags().BoolVar(&flags.NoSignRequest, "no-sign-request", false, "Send unsigned requests for public endpoints")
-	root.Flags().BoolVarP(&flags.Verbose, "verbose", "v", false, "Enable verbose logging")
-	root.Flags().StringVar(&flags.LogLevel, "log-level", "", "Log level (debug, info, warn, error)")
-	root.PersistentFlags().StringVar(&flags.Language, "lang", "", "Language (en, ja)")
+	// AWS connection flags are persistent so non-interactive subcommands
+	// (ls, cat, rm, presign) accept them as well.
+	pf := root.PersistentFlags()
+	pf.StringVar(&flags.Region, "region", "", "AWS region to use")
+	pf.StringVar(&flags.Profile, "profile", "", "AWS profile to use")
+	pf.StringVar(&flags.ConfigFile, "config", "", "Path to config file")
+	pf.StringVar(&flags.Endpoint, "endpoint", "", "S3 endpoint URL for S3-compatible services")
+	pf.BoolVar(&flags.PathStyle, "path-style", false, "Force path-style S3 addressing (MinIO, LocalStack)")
+	pf.BoolVar(&flags.NoSignRequest, "no-sign-request", false, "Send unsigned requests for public endpoints")
+	pf.BoolVarP(&flags.Verbose, "verbose", "v", false, "Enable verbose logging")
+	pf.StringVar(&flags.LogLevel, "log-level", "", "Log level (debug, info, warn, error)")
+	pf.StringVar(&flags.Language, "lang", "", "Language (en, ja)")
 
-	root.AddCommand(newVersionCommand(info))
+	root.AddCommand(
+		newVersionCommand(info),
+		newLsCommand(flags),
+		newCatCommand(flags),
+		newRmCommand(flags),
+		newPresignCommand(flags),
+	)
 	return root
 }
 
