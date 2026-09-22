@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-09-22
+
 ### Added
 
 - Non-interactive subcommands: `ls` (buckets or objects, `-o json`), `cat`, `rm` (object or prefix, `--dry-run`), and `presign` (`--expires`).
@@ -86,7 +88,8 @@ Release notes were corrected on 2026-09-03; the unsupported claims were retracte
 
 ## [0.1] - 2018-04-29
 
-[Unreleased]: https://github.com/seike460/s3ry/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/seike460/s3ry/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/seike460/s3ry/releases/tag/v3.1.0
 [3.0.0]: https://github.com/seike460/s3ry/releases/tag/v3.0.0
 [2.0.0]: https://github.com/seike460/s3ry/releases/tag/v2.0.0
 [0.2]: https://github.com/seike460/s3ry/releases/tag/0.2
