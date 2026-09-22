@@ -15,16 +15,16 @@ func TestUploadLoadFilesSkipsHiddenEntries(t *testing.T) {
 		".hidden":         "hidden",
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o600); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
 	}
 
 	subdir := filepath.Join(dir, "subdir")
-	if err := os.Mkdir(subdir, 0755); err != nil {
+	if err := os.Mkdir(subdir, 0o750); err != nil {
 		t.Fatalf("make subdirectory: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(subdir, "nested.txt"), []byte("nested"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(subdir, "nested.txt"), []byte("nested"), 0o600); err != nil {
 		t.Fatalf("write nested file: %v", err)
 	}
 
@@ -34,15 +34,13 @@ func TestUploadLoadFilesSkipsHiddenEntries(t *testing.T) {
 	if !ok {
 		t.Fatal("loadFiles returned an unexpected message type")
 	}
-	if msg.Error != nil {
-		t.Fatalf("loadFiles returned an error: %v", msg.Error)
+	if msg.Err != nil {
+		t.Fatalf("loadFiles returned an error: %v", msg.Err)
 	}
 
 	candidates := make(map[string]bool)
 	for _, file := range msg.Files {
-		if !file.IsDir {
-			candidates[file.RelativePath] = true
-		}
+		candidates[file.RelativePath] = true
 	}
 
 	want := []string{

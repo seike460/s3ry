@@ -6,16 +6,23 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-22
+
 ### Added
 
-- A CI workflow covering build, vet, race tests, vulnerability checks with govulncheck, and cross-compilation.
+- A CI workflow covering build, vet, race tests, golangci-lint, integration tests against MinIO, vulnerability checks with govulncheck, and cross-compilation.
 - CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, issue and pull request templates, and Dependabot configuration.
+- `version` and `completion` subcommands; typed exit codes (1 general, 2 usage, 3 not found, 4 access denied or no credentials, 130 canceled).
+- Confirmation prompts before object deletion and local file overwrite.
+- `make build` stamps version, commit, and build date into the binary via `-ldflags` and builds with `-trimpath`.
+- `internal/s3` on AWS SDK for Go v2: a shared session with per-region client and transfer-manager caches, multipart upload/download with progress callbacks, recursive `DownloadPrefix`/`UploadDir`, batch delete with single-delete fallback, presigned GET, and concurrent prefix walking.
 
 ### Removed
 
-- The release workflow; release automation is unavailable until it is rebuilt for v3.0.0.
+- The GitHub Actions release workflow; releases run through GoReleaser locally.
 - The `cmd/s3ry-tui` command.
 - The legacy promptui UI and the public Go package `github.com/seike460/s3ry`.
+- The AWS SDK for Go v1 backend (`internal/legacy`), the worker package, and the obsolete `pkg/interfaces` and `pkg/types` packages.
 - The former flags `--legacy-ui`, `--new-ui`, `--bubbles`, and `--modern-backend`.
 - The `ui.mode` and `S3RY_UI_MODE` settings.
 - The desktop, web, and vscode commands and extensions.
@@ -26,9 +33,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Changed
 
 - A non-TTY invocation no longer starts the interactive UI and exits with an error.
-- The Japanese UI is temporarily hidden until it is rebuilt.
+- The CLI is built on cobra; `--help` output changed.
+- The TUI runs on AWS SDK for Go v2; region, profile, endpoint, concurrency, and part-size settings are honored end to end.
 - `--config` now reads the specified configuration file.
-- The Go directive is 1.25.
+- Timeouts are reported as "timed out" and exit with code 1 instead of being reported as cancellations.
+- The Go directive is 1.27.
 
 ### Fixed
 
@@ -36,6 +45,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `.gitignore` no longer hides new files under `cmd/s3ry`.
 - List key input that was dropped within the 50ms window and the three failing tests were fixed.
 - The upload file picker was always empty.
+- Object listings paginate through every page instead of stopping at 1000 keys.
+- Quitting or switching views during a transfer now cancels the worker and releases the progress broker instead of leaking goroutines.
+- The progress bar no longer panics on very narrow terminals or when a transfer overshoots its announced total.
 
 ### Security
 
@@ -58,7 +70,8 @@ Release notes were corrected on 2026-09-03; the unsupported claims were retracte
 
 ## [0.1] - 2018-04-29
 
-[Unreleased]: https://github.com/seike460/s3ry/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/seike460/s3ry/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/seike460/s3ry/releases/tag/v3.0.0
 [2.0.0]: https://github.com/seike460/s3ry/releases/tag/v2.0.0
 [0.2]: https://github.com/seike460/s3ry/releases/tag/0.2
 [0.1.4]: https://github.com/seike460/s3ry/releases/tag/0.1.4

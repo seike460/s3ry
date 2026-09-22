@@ -1,0 +1,26 @@
+version: "2"
+
+run:
+  go: "1.27"
+
+linters:
+  default: standard
+  enable:
+    - gosec
+    - revive
+  settings:
+    gosec:
+      excludes:
+        # G304 flags os.Open/os.ReadFile/os.Create on variable paths. s3ry is
+        # a file manager: it reads the local file the user selected, writes
+        # downloads to paths derived from S3 keys (validated against
+        # traversal by LocalPath), and reads the user-specified config file.
+        - G304
+
+formatters:
+  enable:
+    - gofumpt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

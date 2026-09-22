@@ -1,172 +1,119 @@
 package s3
 
 import (
+	"errors"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestObject(t *testing.T) {
-	now := time.Now()
-	obj := Object{
-		Key:          "test/file.txt",
-		Size:         1024,
-		LastModified: now,
-		ETag:         `"d41d8cd98f00b204e9800998ecf8427e"`,
-		StorageClass: "STANDARD",
+func TestParseURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		want       URL
+		wantErr    bool
+		wantOp     string
+		wantPrefix bool
+	}{
+		{name: "bucket", input: "s3://bucket", want: URL{Bucket: "bucket"}, wantPrefix: true},
+		{name: "bucket slash", input: "s3://bucket/", want: URL{Bucket: "bucket"}, wantPrefix: true},
+		{name: "object", input: "s3://bucket/a/b", want: URL{Bucket: "bucket", Key: "a/b"}},
+		{name: "escaped key", input: "s3://bucket/a%20b", want: URL{Bucket: "bucket", Key: "a%20b"}},
+		{name: "query in key", input: "s3://bucket/report?v=1", want: URL{Bucket: "bucket", Key: "report?v=1"}},
+		{name: "fragment in key", input: "s3://bucket/notes#1", want: URL{Bucket: "bucket", Key: "notes#1"}},
+		{name: "percent in key", input: "s3://bucket/50%off", want: URL{Bucket: "bucket", Key: "50%off"}},
+		{name: "trailing prefix", input: "s3://bucket/a/b/", want: URL{Bucket: "bucket", Key: "a/b/"}, wantPrefix: true},
+		{name: "missing scheme", input: "bucket/key", wantErr: true, wantOp: "parse"},
+		{name: "empty URL", input: "", wantErr: true, wantOp: "parse"},
+		{name: "empty bucket", input: "s3:///key", wantErr: true, wantOp: "parse"},
+		{name: "short bucket", input: "s3://ab/key", wantErr: true, wantOp: "parse"},
+		{name: "uppercase bucket", input: "s3://Bucket/key", wantErr: true, wantOp: "parse"},
+		{name: "wrong scheme", input: "http://bucket/key", wantErr: true, wantOp: "parse"},
 	}
 
-	assert.Equal(t, "test/file.txt", obj.Key)
-	assert.Equal(t, int64(1024), obj.Size)
-	assert.Equal(t, now, obj.LastModified)
-	assert.Equal(t, `"d41d8cd98f00b204e9800998ecf8427e"`, obj.ETag)
-	assert.Equal(t, "STANDARD", obj.StorageClass)
-}
-
-func TestBucket(t *testing.T) {
-	now := time.Now()
-	bucket := Bucket{
-		Name:         "test-bucket",
-		CreationDate: now,
-		Region:       "us-east-1",
-	}
-
-	assert.Equal(t, "test-bucket", bucket.Name)
-	assert.Equal(t, now, bucket.CreationDate)
-	assert.Equal(t, "us-east-1", bucket.Region)
-}
-
-func TestUploadRequest(t *testing.T) {
-	metadata := map[string]*string{
-		"author": stringPtr("test-user"),
-		"type":   stringPtr("document"),
-	}
-
-	req := UploadRequest{
-		Bucket:      "test-bucket",
-		Key:         "uploads/test.txt",
-		FilePath:    "/local/path/test.txt",
-		ContentType: "text/plain",
-		Metadata:    metadata,
-	}
-
-	assert.Equal(t, "test-bucket", req.Bucket)
-	assert.Equal(t, "uploads/test.txt", req.Key)
-	assert.Equal(t, "/local/path/test.txt", req.FilePath)
-	assert.Equal(t, "text/plain", req.ContentType)
-	assert.Equal(t, metadata, req.Metadata)
-	assert.Equal(t, "test-user", *req.Metadata["author"])
-}
-
-func TestDownloadRequest(t *testing.T) {
-	req := DownloadRequest{
-		Bucket:   "test-bucket",
-		Key:      "downloads/test.txt",
-		FilePath: "/local/path/downloaded.txt",
-	}
-
-	assert.Equal(t, "test-bucket", req.Bucket)
-	assert.Equal(t, "downloads/test.txt", req.Key)
-	assert.Equal(t, "/local/path/downloaded.txt", req.FilePath)
-}
-
-func TestListRequest(t *testing.T) {
-	req := ListRequest{
-		Bucket:     "test-bucket",
-		Prefix:     "documents/",
-		Delimiter:  "/",
-		MaxKeys:    100,
-		StartAfter: "documents/file1.txt",
-	}
-
-	assert.Equal(t, "test-bucket", req.Bucket)
-	assert.Equal(t, "documents/", req.Prefix)
-	assert.Equal(t, "/", req.Delimiter)
-	assert.Equal(t, int64(100), req.MaxKeys)
-	assert.Equal(t, "documents/file1.txt", req.StartAfter)
-}
-
-func TestProgressCallback(t *testing.T) {
-	var capturedTransferred, capturedTotal int64
-
-	callback := func(bytesTransferred, totalBytes int64) {
-		capturedTransferred = bytesTransferred
-		capturedTotal = totalBytes
-	}
-
-	// Test the callback
-	callback(512, 1024)
-
-	assert.Equal(t, int64(512), capturedTransferred)
-	assert.Equal(t, int64(1024), capturedTotal)
-}
-
-func TestProgressCallback_Multiple(t *testing.T) {
-	var calls []struct {
-		transferred int64
-		total       int64
-	}
-
-	callback := func(bytesTransferred, totalBytes int64) {
-		calls = append(calls, struct {
-			transferred int64
-			total       int64
-		}{bytesTransferred, totalBytes})
-	}
-
-	// Test multiple calls
-	callback(256, 1024)
-	callback(512, 1024)
-	callback(1024, 1024)
-
-	assert.Len(t, calls, 3)
-	assert.Equal(t, int64(256), calls[0].transferred)
-	assert.Equal(t, int64(512), calls[1].transferred)
-	assert.Equal(t, int64(1024), calls[2].transferred)
-
-	for _, call := range calls {
-		assert.Equal(t, int64(1024), call.total)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseURL(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("ParseURL(%q) error = nil, want error", tt.input)
+				}
+				var typed *Error
+				if !errors.As(err, &typed) {
+					t.Fatalf("ParseURL(%q) error type = %T, want *Error", tt.input, err)
+				}
+				if typed.Kind != KindInvalid || typed.Op != tt.wantOp {
+					t.Fatalf("ParseURL(%q) error = %#v, want invalid parse error", tt.input, typed)
+				}
+				if !errors.Is(err, ErrInvalid) {
+					t.Fatalf("ParseURL(%q) error is not ErrInvalid", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseURL(%q) error = %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Fatalf("ParseURL(%q) = %#v, want %#v", tt.input, got, tt.want)
+			}
+			if got.IsPrefix() != tt.wantPrefix {
+				t.Fatalf("ParseURL(%q).IsPrefix() = %v, want %v", tt.input, got.IsPrefix(), tt.wantPrefix)
+			}
+		})
 	}
 }
 
-// Helper function to create string pointers
-func stringPtr(s string) *string {
-	return &s
-}
+func TestURLStringAndIsPrefix(t *testing.T) {
+	tests := []struct {
+		name       string
+		url        URL
+		wantString string
+		wantPrefix bool
+	}{
+		{name: "bucket", url: URL{Bucket: "bucket"}, wantString: "s3://bucket", wantPrefix: true},
+		{name: "object", url: URL{Bucket: "bucket", Key: "a/b"}, wantString: "s3://bucket/a/b"},
+		{name: "trailing prefix", url: URL{Bucket: "bucket", Key: "a/"}, wantString: "s3://bucket/a/", wantPrefix: true},
+	}
 
-// Benchmark tests
-func BenchmarkObjectCreation(b *testing.B) {
-	now := time.Now()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		obj := Object{
-			Key:          "test/file.txt",
-			Size:         1024,
-			LastModified: now,
-			ETag:         `"d41d8cd98f00b204e9800998ecf8427e"`,
-			StorageClass: "STANDARD",
-		}
-		_ = obj
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.url.String(); got != tt.wantString {
+				t.Fatalf("URL.String() = %q, want %q", got, tt.wantString)
+			}
+			if got := tt.url.IsPrefix(); got != tt.wantPrefix {
+				t.Fatalf("URL.IsPrefix() = %v, want %v", got, tt.wantPrefix)
+			}
+		})
 	}
 }
 
-func BenchmarkUploadRequestCreation(b *testing.B) {
-	metadata := map[string]*string{
-		"author": stringPtr("test-user"),
-		"type":   stringPtr("document"),
+func TestTypesAndConstants(t *testing.T) {
+	if MaxDeleteBatch != 1000 {
+		t.Fatalf("MaxDeleteBatch = %d, want 1000", MaxDeleteBatch)
 	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req := UploadRequest{
-			Bucket:      "test-bucket",
-			Key:         "uploads/test.txt",
-			FilePath:    "/local/path/test.txt",
-			ContentType: "text/plain",
-			Metadata:    metadata,
-		}
-		_ = req
+	if OpUpload != 1 || OpDownload != 2 || OpDelete != 3 {
+		t.Fatalf("unexpected operation values: %d, %d, %d", OpUpload, OpDownload, OpDelete)
+	}
+	if OverwriteFail != 0 || OverwriteSkip != 1 || OverwriteAlways != 2 {
+		t.Fatalf("unexpected overwrite values: %d, %d, %d", OverwriteFail, OverwriteSkip, OverwriteAlways)
+	}
+	if got := (Object{Key: "key", Size: 1}).Key; got != "key" {
+		t.Fatalf("Object field access = %q, want key", got)
+	}
+	if got := (Bucket{Name: "bucket", Region: ""}).Region; got != "" {
+		t.Fatalf("unknown bucket region = %q, want empty", got)
+	}
+	progress := Progress{Op: OpUpload, Total: -1, Done: true}
+	if progress.Total != -1 || !progress.Done {
+		t.Fatalf("unexpected progress value: %#v", progress)
+	}
+	var callback ProgressFunc = func(Progress) {}
+	callback(progress)
+	info := ObjectInfo{Object: Object{Key: "key"}, Metadata: map[string]string{"x": "y"}}
+	if info.Key != "key" || info.Metadata["x"] != "y" {
+		t.Fatalf("unexpected object info: %#v", info)
+	}
+	page := Page{Bucket: "bucket", Prefix: "p/", Prefixes: []string{"p/a/"}, Objects: []Object{info.Object}, NextToken: "next", IsTruncated: true}
+	if page.Bucket != "bucket" || !page.IsTruncated || len(page.Objects) != 1 {
+		t.Fatalf("unexpected page: %#v", page)
 	}
 }

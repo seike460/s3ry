@@ -1,150 +1,146 @@
+// Package app hosts the root Bubble Tea model and program startup.
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+
 	"github.com/seike460/s3ry/internal/config"
+	"github.com/seike460/s3ry/internal/i18n"
+	"github.com/seike460/s3ry/internal/s3"
 	"github.com/seike460/s3ry/internal/ui/views"
 )
 
-// AppState represents the current state of the application
-type AppState int
-
-const (
-	StateInit AppState = iota
-	StateRegionSelection
-	StateBucketSelection
-	StateOperationSelection
-	StateObjectSelection
-	StateUploading
-	StateDownloading
-	StateDeleting
-	StateCreatingList
-	StateError
-	StateExit
-)
-
-// App represents the main application
+// App is the root Bubble Tea model. It owns the view stack and the shared
+// dependencies every view receives.
 type App struct {
-	config *config.Config
-	view   tea.Model
-
-	// Styles
-	titleStyle lipgloss.Style
-	errorStyle lipgloss.Style
+	deps views.Deps
+	view tea.Model
 }
 
-// New creates a new App instance with the given configuration
-func New(cfg *config.Config) *App {
-	app := &App{
-		config: cfg,
-
-		// Initialize styles
-		titleStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			MarginLeft(2).
-			MarginTop(1),
-
-		errorStyle: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")).
-			MarginLeft(2),
+// New creates the application model with the shared dependencies.
+func New(deps views.Deps) *App {
+	return &App{
+		deps: deps,
+		view: views.NewBucketView(deps),
 	}
-
-	// Initialize with bucket view, using the configured region if available
-	app.view = views.NewBucketView(cfg.AWS.Region)
-
-	return app
 }
 
-// Init initializes the application
+// Init initializes the application.
 func (a *App) Init() tea.Cmd {
 	return a.view.Init()
 }
 
-// Update handles messages and updates the model
-func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// abortableView is implemented by views that own a background transfer.
+// The app aborts the transfer before replacing or quitting the view so the
+// worker goroutine and its progress broker are released.
+type abortableView interface {
+	AbortTransfer()
+}
 
-	// Handle global keyboard shortcuts
+// abortView cancels any in-flight transfer owned by view.
+func abortView(view tea.Model) {
+	if v, ok := view.(abortableView); ok {
+		v.AbortTransfer()
+	}
+}
+
+// Update handles global shortcuts and delegates to the current view.
+func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "ctrl+c":
+			abortView(a.view)
 			return a, tea.Quit
 		case "ctrl+h", "f1":
-			// Global help shortcut
-			a.view = views.NewHelpView()
+			abortView(a.view)
+			a.view = views.NewHelpView(a.deps)
 			return a, a.view.Init()
 		case "ctrl+s":
-			// Global settings shortcut
-			a.view = views.NewSettingsView()
+			abortView(a.view)
+			a.view = views.NewSettingsView(a.deps)
 			return a, a.view.Init()
 		}
 	}
 
-	// Delegate to current view
 	var cmd tea.Cmd
+	oldView := a.view
 	oldViewType := fmt.Sprintf("%T", a.view)
 	a.view, cmd = a.view.Update(msg)
 	newViewType := fmt.Sprintf("%T", a.view)
 
 	if oldViewType != newViewType {
-		if cmd != nil {
-			initCmd := a.view.Init()
-			if initCmd != nil {
-				cmd = tea.Batch(cmd, initCmd)
-			}
-		} else {
-			cmd = a.view.Init()
+		abortView(oldView)
+		if initCmd := a.view.Init(); initCmd != nil {
+			cmd = tea.Batch(cmd, initCmd)
 		}
 	}
 
 	return a, cmd
 }
 
-// View renders the current state of the application
+// View renders the current view.
 func (a *App) View() string {
 	return a.view.View()
 }
 
-// Run starts the Bubble Tea application with the given configuration
-func Run(cfg *config.Config) error {
+// Run creates the AWS session from the resolved configuration and starts the
+// Bubble Tea program.
+func Run(ctx context.Context, cfg *config.Config) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if cfg == nil {
+		cfg = config.Default()
+	}
 
-	app := New(cfg)
+	session, err := s3.NewSession(ctx, s3.Options{
+		Profile:     cfg.AWS.Profile,
+		Region:      cfg.AWS.Region,
+		EndpointURL: cfg.AWS.Endpoint,
+		Concurrency: cfg.Performance.Concurrency,
+		PartSize:    cfg.Performance.PartSize,
+	})
+	if err != nil {
+		return err
+	}
 
-	// Configure tea program options for better TTY compatibility
+	deps := views.Deps{
+		Session:  session,
+		Config:   cfg,
+		Timeout:  time.Duration(cfg.Performance.Timeout) * time.Second,
+		Messages: i18n.NewPrinter(cfg.UI.Language),
+	}
+
 	options := []tea.ProgramOption{
 		tea.WithInput(os.Stdin),
 		tea.WithOutput(os.Stdout),
 	}
-
-	// Only enable TTY-dependent features if we're in a proper TTY environment
-	ttyAvailable := isTTYAvailable()
-	if ttyAvailable {
-		options = append(options, tea.WithAltScreen())
-		options = append(options, tea.WithMouseCellMotion())
-	} else {
+	if isTTYAvailable() {
+		options = append(options,
+			tea.WithAltScreen(),
+			tea.WithMouseCellMotion(),
+		)
 	}
 
-	p := tea.NewProgram(app, options...)
-
-	_, err := p.Run()
+	p := tea.NewProgram(New(deps), options...)
+	_, err = p.Run()
 	return err
 }
 
-// isTTYAvailable checks if TTY features can be safely used
+// isTTYAvailable reports whether alternate-screen and mouse support are safe
+// to enable.
 func isTTYAvailable() bool {
-	// Test if we can actually open and use /dev/tty
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
 		return false
 	}
-	tty.Close()
+	_ = tty.Close()
 
-	// Check if stdin is a TTY
 	fileInfo, err := os.Stdin.Stat()
 	if err != nil {
 		return false

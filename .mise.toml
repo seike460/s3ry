@@ -1,6 +1,6 @@
 [tools]
 go = "1.27.1"
-golangci-lint = "2.11.4"
+golangci-lint = "2.13.2"
 gofumpt = "0.7.0"
 goreleaser = "2.5.0"
 

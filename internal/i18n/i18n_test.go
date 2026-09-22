@@ -1,187 +1,106 @@
 package i18n
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 )
 
-func TestInit(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	Init()
-
-	assert.NotNil(t, Printer)
+func TestNewPrinter(t *testing.T) {
+	p := NewPrinter("en")
+	assert.Equal(t, language.English, p.Language())
 }
 
 func TestDetectLanguage_English(t *testing.T) {
-	// Save original env vars
-	originalLang := os.Getenv("LANG")
-	originalLanguage := os.Getenv("LANGUAGE")
-
-	// Clean environment
-	os.Unsetenv("LANG")
-	os.Unsetenv("LANGUAGE")
-
-	defer func() {
-		// Restore original env vars
-		if originalLang != "" {
-			os.Setenv("LANG", originalLang)
-		}
-		if originalLanguage != "" {
-			os.Setenv("LANGUAGE", originalLanguage)
-		}
-	}()
+	for _, key := range []string{"S3RY_LANGUAGE", "LANG", "LANGUAGE", "LC_ALL"} {
+		t.Setenv(key, "")
+	}
 
 	lang := detectLanguage()
 	assert.Equal(t, language.English, lang)
 }
 
 func TestDetectLanguage_Japanese_LANG(t *testing.T) {
-	// Save original env vars
-	originalLang := os.Getenv("LANG")
-	originalLanguage := os.Getenv("LANGUAGE")
-
-	// Set Japanese language via LANG
-	os.Setenv("LANG", "ja_JP.UTF-8")
-	os.Unsetenv("LANGUAGE")
-
-	defer func() {
-		// Restore original env vars
-		if originalLang != "" {
-			os.Setenv("LANG", originalLang)
-		} else {
-			os.Unsetenv("LANG")
-		}
-		if originalLanguage != "" {
-			os.Setenv("LANGUAGE", originalLanguage)
-		}
-	}()
+	for _, key := range []string{"S3RY_LANGUAGE", "LANGUAGE", "LC_ALL"} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("LANG", "ja_JP.UTF-8")
 
 	lang := detectLanguage()
 	assert.Equal(t, language.Japanese, lang)
 }
 
 func TestDetectLanguage_Japanese_LANGUAGE(t *testing.T) {
-	// Save original env vars
-	originalLang := os.Getenv("LANG")
-	originalLanguage := os.Getenv("LANGUAGE")
-
-	// Set Japanese language via LANGUAGE
-	os.Unsetenv("LANG")
-	os.Setenv("LANGUAGE", "ja")
-
-	defer func() {
-		// Restore original env vars
-		if originalLang != "" {
-			os.Setenv("LANG", originalLang)
-		}
-		if originalLanguage != "" {
-			os.Setenv("LANGUAGE", originalLanguage)
-		} else {
-			os.Unsetenv("LANGUAGE")
-		}
-	}()
+	for _, key := range []string{"S3RY_LANGUAGE", "LANG", "LC_ALL"} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("LANGUAGE", "ja")
 
 	lang := detectLanguage()
 	assert.Equal(t, language.Japanese, lang)
 }
 
 func TestSprintf(t *testing.T) {
-	// Reset global state
-	Printer = nil
+	p := NewPrinter("en")
 
-	result := Sprintf("Hello %s", "World")
+	result := p.Sprintf("Hello %s", "World")
 
 	assert.NotEmpty(t, result)
 	assert.Contains(t, result, "Hello")
 	assert.Contains(t, result, "World")
-	assert.NotNil(t, Printer) // Should be initialized
 }
 
-func TestSprintf_WithInitializedPrinter(t *testing.T) {
-	// Initialize printer first
-	Init()
+func TestSprintf_Japanese(t *testing.T) {
+	p := NewPrinter("ja")
 
-	result := Sprintf("Test %d", 123)
+	result := p.Sprintf("Hello %s", "World")
 
 	assert.NotEmpty(t, result)
-	assert.Contains(t, result, "Test")
-	assert.Contains(t, result, "123")
 }
 
-func TestPrintf(t *testing.T) {
-	// Reset global state
-	Printer = nil
+func TestJapaneseCatalog(t *testing.T) {
+	p := NewPrinter("ja")
 
-	// Printf should not panic and should initialize Printer
-	Printf("Test printf %s", "message")
-
-	assert.NotNil(t, Printer)
+	if got := p.Sprintf("Canceled"); got != "キャンセルしました" {
+		t.Fatalf("ja catalog = %q, want キャンセルしました", got)
+	}
+	if got := p.Sprintf("Delete %s? [y/N]", "a.txt"); got != "a.txt を削除しますか？ [y/N]" {
+		t.Fatalf("ja formatted catalog = %q", got)
+	}
+	if got := p.Sprintf("key without a translation"); got != "key without a translation" {
+		t.Fatalf("untranslated key = %q, want the key itself", got)
+	}
 }
 
-func TestPrint(t *testing.T) {
-	// Reset global state
-	Printer = nil
+func TestPrintersAreIndependent(t *testing.T) {
+	en := NewPrinter("en")
+	ja := NewPrinter("ja")
 
-	// Print should not panic and should initialize Printer
-	Print("Test print message")
-
-	assert.NotNil(t, Printer)
-}
-
-func TestPrintln(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	// Println should not panic and should initialize Printer
-	Println("Test println message")
-
-	assert.NotNil(t, Printer)
-}
-
-func TestMultipleInitCalls(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	// Multiple calls to Init should be safe
-	Init()
-	firstPrinter := Printer
-
-	Init()
-	secondPrinter := Printer
-
-	assert.NotNil(t, firstPrinter)
-	assert.NotNil(t, secondPrinter)
-	// Note: They might be different instances, but both should be valid
+	if got := ja.Sprintf("Canceled"); got != "キャンセルしました" {
+		t.Fatalf("ja printer = %q, want キャンセルしました", got)
+	}
+	if got := en.Sprintf("Canceled"); got != "Canceled" {
+		t.Fatalf("en printer = %q, want the untranslated key", got)
+	}
 }
 
 func BenchmarkSprintf(b *testing.B) {
-	Init() // Initialize once
+	p := NewPrinter("en")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result := Sprintf("Benchmark test %d", i)
+		result := p.Sprintf("Benchmark test %d", i)
 		if result == "" {
 			b.Fatal("Sprintf returned empty string")
 		}
 	}
 }
 
-func TestInitWithLanguage(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	InitWithLanguage("ja")
-
-	assert.NotNil(t, Printer)
-
-	// Test with invalid language
-	InitWithLanguage("invalid")
-	assert.NotNil(t, Printer)
+func TestNewPrinterFallbacks(t *testing.T) {
+	assert.Equal(t, language.Japanese, NewPrinter("ja").Language())
+	assert.Equal(t, language.English, NewPrinter("invalid").Language())
+	assert.NotEqual(t, language.Und, NewPrinter("").Language())
 }
 
 func TestParseLanguageCode(t *testing.T) {
@@ -207,28 +126,8 @@ func TestParseLanguageCode(t *testing.T) {
 	}
 }
 
-func TestSetLanguage(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	SetLanguage("ja")
-	assert.NotNil(t, Printer)
-
-	SetLanguage("en")
-	assert.NotNil(t, Printer)
-}
-
-func TestGetCurrentLanguage(t *testing.T) {
-	// Reset global state
-	Printer = nil
-
-	lang := GetCurrentLanguage()
-	assert.NotEqual(t, language.Und, lang)
-	assert.NotNil(t, Printer) // Should initialize
-}
-
-func TestGetSupportedLanguages(t *testing.T) {
-	langs := GetSupportedLanguages()
+func TestSupportedLanguages(t *testing.T) {
+	langs := SupportedLanguages()
 
 	assert.NotEmpty(t, langs)
 	assert.Contains(t, langs, "en")

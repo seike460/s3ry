@@ -1,13 +1,14 @@
 package components
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+// speedSampleWindow is how many recent samples feed the average speed.
+const speedSampleWindow = 10
 
 // ProgressMsg represents a progress update message
 type ProgressMsg struct {
@@ -47,12 +48,6 @@ type Progress struct {
 	speedStyle    lipgloss.Style
 }
 
-// speedSample represents a speed measurement sample
-type speedSample struct {
-	timestamp time.Time
-	bytes     int64
-}
-
 // NewProgress creates a new Progress component with enhanced real-time tracking
 func NewProgress(title string, total int64) *Progress {
 	now := time.Now()
@@ -61,31 +56,31 @@ func NewProgress(title string, total int64) *Progress {
 		total:      total,
 		startTime:  now,
 		lastUpdate: now,
-		maxSamples: 10, // Keep last 10 samples for average speed calculation
-		samples:    make([]speedSample, 0, 10),
+		maxSamples: speedSampleWindow,
+		samples:    make([]speedSample, 0, speedSampleWindow),
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			MarginBottom(1),
 
 		progressStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")),
+			Foreground(lipgloss.Color(ColorSuccess)),
 
 		completeStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#04B575")),
+			Foreground(lipgloss.Color(ColorSuccess)),
 
 		errorStyle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FF5555")),
+			Foreground(lipgloss.Color(ColorDanger)),
 
 		messageStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")).
+			Foreground(lipgloss.Color(ColorMuted)).
 			MarginTop(1),
 
 		speedStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFA500")).
+			Foreground(lipgloss.Color(ColorWarning)).
 			Bold(true),
 	}
 }
@@ -126,96 +121,6 @@ func (p *Progress) Update(msg tea.Msg) (*Progress, tea.Cmd) {
 	return p, nil
 }
 
-// View renders the progress component
-func (p *Progress) View() string {
-	var s strings.Builder
-
-	// Title
-	s.WriteString(p.titleStyle.Render(p.title))
-	s.WriteString("\n\n")
-
-	if p.completed {
-		// Show completion status
-		if p.success {
-			s.WriteString(p.completeStyle.Render("✓ " + p.message))
-		} else {
-			s.WriteString(p.errorStyle.Render("✗ " + p.message))
-		}
-	} else {
-		// Show progress bar
-		barWidth := 40
-		if p.width > 0 && p.width < 60 {
-			barWidth = p.width - 20
-		}
-
-		var percentage float64
-		if p.total > 0 {
-			percentage = float64(p.current) / float64(p.total)
-		}
-
-		filled := int(percentage * float64(barWidth))
-		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-
-		s.WriteString(p.progressStyle.Render(fmt.Sprintf("[%s] %.1f%%", bar, percentage*100)))
-
-		// Show size information if available
-		if p.total > 0 {
-			s.WriteString(fmt.Sprintf(" (%s / %s)", formatBytes(p.current), formatBytes(p.total)))
-		}
-
-		// Show enhanced speed and ETA information
-		elapsed := time.Since(p.startTime)
-		if elapsed > time.Second && p.current > 0 {
-			// Use average speed for more stable display
-			displaySpeed := p.avgSpeed
-			if displaySpeed == 0 {
-				displaySpeed = float64(p.current) / elapsed.Seconds()
-			}
-
-			s.WriteString(" | ")
-			s.WriteString(p.speedStyle.Render(fmt.Sprintf("%s/s", formatBytes(int64(displaySpeed)))))
-
-			// Show instantaneous speed if significantly different
-			if p.speed > 0 && p.speed != displaySpeed {
-				instantDiff := (p.speed - displaySpeed) / displaySpeed
-				if instantDiff > 0.2 || instantDiff < -0.2 { // Show if >20% difference
-					s.WriteString(fmt.Sprintf(" (now: %s/s)", formatBytes(int64(p.speed))))
-				}
-			}
-
-			// Enhanced ETA calculation
-			if p.total > 0 && displaySpeed > 0 {
-				remaining := float64(p.total-p.current) / displaySpeed
-				eta := time.Duration(remaining) * time.Second
-
-				// Format ETA nicely
-				if eta > time.Hour {
-					s.WriteString(fmt.Sprintf(" | ETA: %dh%dm", int(eta.Hours()), int(eta.Minutes())%60))
-				} else if eta > time.Minute {
-					s.WriteString(fmt.Sprintf(" | ETA: %dm%ds", int(eta.Minutes()), int(eta.Seconds())%60))
-				} else {
-					s.WriteString(fmt.Sprintf(" | ETA: %ds", int(eta.Seconds())))
-				}
-			}
-
-			// Show elapsed time
-			if elapsed > time.Minute {
-				s.WriteString(fmt.Sprintf(" | Elapsed: %dm%ds", int(elapsed.Minutes()), int(elapsed.Seconds())%60))
-			} else {
-				s.WriteString(fmt.Sprintf(" | Elapsed: %ds", int(elapsed.Seconds())))
-			}
-		}
-	}
-
-	// Show message if available
-	if p.message != "" && !p.completed {
-		s.WriteString("\n")
-		s.WriteString(p.messageStyle.Render(p.message))
-	}
-
-	return s.String()
-}
-
 // SetProgress updates the progress with real-time speed calculation
 func (p *Progress) SetProgress(current, total int64, message string) {
 	now := time.Now()
@@ -252,71 +157,4 @@ func (p *Progress) IsCompleted() bool {
 // IsSuccess returns whether the completed operation was successful
 func (p *Progress) IsSuccess() bool {
 	return p.success
-}
-
-// addSpeedSample adds a new speed measurement sample
-func (p *Progress) addSpeedSample(timestamp time.Time, bytes int64) {
-	sample := speedSample{
-		timestamp: timestamp,
-		bytes:     bytes,
-	}
-
-	// Add sample and maintain max size
-	p.samples = append(p.samples, sample)
-	if len(p.samples) > p.maxSamples {
-		p.samples = p.samples[1:]
-	}
-}
-
-// calculateAverageSpeed calculates the average speed from recent samples
-func (p *Progress) calculateAverageSpeed() {
-	if len(p.samples) < 2 {
-		return
-	}
-
-	// Calculate average speed over the sample period
-	first := p.samples[0]
-	last := p.samples[len(p.samples)-1]
-
-	deltaTime := last.timestamp.Sub(first.timestamp).Seconds()
-	deltaBytes := last.bytes - first.bytes
-
-	if deltaTime > 0 && deltaBytes > 0 {
-		p.avgSpeed = float64(deltaBytes) / deltaTime
-	}
-}
-
-// GetCurrentSpeed returns the current instantaneous speed
-func (p *Progress) GetCurrentSpeed() float64 {
-	return p.speed
-}
-
-// GetAverageSpeed returns the average speed over recent samples
-func (p *Progress) GetAverageSpeed() float64 {
-	return p.avgSpeed
-}
-
-// formatDuration formats a duration for display
-func (p *Progress) formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	} else if d < time.Hour {
-		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
-	} else {
-		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
-	}
-}
-
-// formatBytes formats byte count as human readable string
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

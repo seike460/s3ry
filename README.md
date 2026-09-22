@@ -6,29 +6,23 @@ s3ry is an interactive terminal client for Amazon S3. It is written in Go and us
 
 ## Status
 
-This project is being rebuilt. The current binary works but is limited; see Known limitations. The v2.0.0 release notes were corrected on 2026-09-03.
+This project is being rebuilt on AWS SDK for Go v2. The v2.0.0 release notes were corrected on 2026-09-03.
 
 ## What works today
 
 - List S3 buckets.
-- Browse objects in a selected bucket as a flat list. The current UI displays the first 1000 keys.
-- Download a selected object to the current directory.
+- Browse all objects in a selected bucket as a flat list. Listing paginates through every page, so buckets larger than 1000 keys are shown in full.
+- Download a selected object to the current directory. Downloads use the AWS transfer manager for parallel multipart transfer.
 - Upload a selected file that is not hidden (hidden files and directories are skipped) from the current directory tree to the selected bucket.
-- Delete a selected object.
-- Export the selected bucket's object list to `ObjectList-<timestamp>.txt` in the current directory; the 1000-object limit also applies to export.
+- Delete a selected object. Deletion and local overwrite ask for confirmation first.
+- Export the selected bucket's full object list to `ObjectList-<timestamp>.txt` in the current directory.
+- Press `Esc` during a transfer to cancel it.
 
 ![s3ry logo](doc/S3ry.png)
 
 ## Known limitations
 
-- Object browsing uses one `ListObjectsV2` request and is limited to the first 1000 keys. Pagination is not connected to the UI.
-- Delete and overwrite operations do not ask for confirmation.
-- `--region` and `AWS_REGION` affect only the bucket list; object operations (download / upload / delete / export) always use a client configured for `ap-northeast-1`.
-- `--profile` and `AWS_ENDPOINT_URL` are read or accepted but are not applied to the active S3 client.
-- `--lang` and `S3RY_LANGUAGE` have no effect in the current UI.
-- `--log-level` and `--verbose` do not change the logging output level; the UI does not emit logs.
-- The binary exits with an error when stdin or stdout is not a TTY. Non-interactive commands are not available.
-- The Japanese UI is temporarily unavailable while it is being rebuilt.
+- The binary exits with an error when stdin or stdout is not a TTY. S3 subcommands are not available yet.
 
 ## Installation
 
@@ -51,10 +45,10 @@ brew install seike460/tap/s3ry
 
 ### Build from source
 
-Use Go 1.25 or later:
+Use Go 1.27 or later:
 
 ```sh
-go build ./cmd/s3ry
+make build   # writes dist/s3ry
 ```
 
 ## Usage
@@ -65,48 +59,36 @@ Start the interactive client:
 s3ry
 ```
 
-The current binary's `--help` output is:
+The binary's `--help` output is:
 
 ```text
-s3ry - interactive terminal client for Amazon S3
+interactive terminal client for Amazon S3
 
-Usage: s3ry [OPTIONS]
+Usage:
+  s3ry [flags]
+  s3ry [command]
 
-Options:
-  -config string
-    	Path to config file
-  -h	Show help (short)
-  -help
-    	Show help
-  -lang string
-    	Language (en, ja)
-  -log-level string
-    	Log level (debug, info, warn, error)
-  -profile string
-    	AWS profile to use
-  -region string
-    	AWS region to use
-  -v	Enable verbose logging (short)
-  -verbose
-    	Enable verbose logging
-  -version
-    	Show version information
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  version     Show version information
 
-Examples:
-  s3ry                      # Start with the Bubble Tea UI
-  s3ry --region us-west-2   # Use specific AWS region
-  s3ry --profile dev      # Use specific AWS profile
-  s3ry --config ./s3ry.yml # Use a specific configuration file
-  s3ry --lang en          # Use English language
+Flags:
+      --config string      Path to config file
+  -h, --help               help for s3ry
+      --lang string        Language (en, ja)
+      --log-level string   Log level (debug, info, warn, error)
+      --profile string     AWS profile to use
+      --region string      AWS region to use
+  -v, --verbose            Enable verbose logging
+      --version            version for s3ry
 
-Environment Variables:
-  AWS_REGION            # AWS region
-  AWS_PROFILE           # AWS profile
-  S3RY_LANGUAGE         # Language (en, ja)
-  S3RY_LOG_LEVEL        # Log level
+Use "s3ry [command] --help" for more information about a command.
 ```
 
 The executable name in the `Usage` and example lines follows the name used to start the binary.
+
+The `s3ry version` and `s3ry completion <shell>` subcommands are available as well.
 
 ### Keyboard controls
 
@@ -125,13 +107,13 @@ The executable name in the `Usage` and example lines follows the name used to st
 The configuration loader reads these variables:
 
 - `AWS_REGION`
-- `AWS_DEFAULT_REGION` when the configured region is still the default
+- `AWS_DEFAULT_REGION` when `aws.region` and `AWS_REGION` are unset
 - `AWS_PROFILE`
-- `AWS_ENDPOINT_URL`
+- `AWS_ENDPOINT_URL` (custom endpoints, for example LocalStack, use path-style addressing automatically)
 - `S3RY_LANGUAGE`
 - `S3RY_LOG_LEVEL`
 
-The `AWS_PROFILE` and `AWS_ENDPOINT_URL` values are currently not applied to the active S3 client; see Known limitations.
+All of them are applied to the S3 session at startup.
 
 ### Configuration files
 
@@ -152,11 +134,55 @@ The YAML keys defined by the configuration type are:
 
 - `aws.region`, `aws.profile`, `aws.endpoint`
 - `ui.language`, `ui.theme`
-- `performance.workers`, `performance.chunk_size`, `performance.timeout`, `performance.max_concurrent_downloads`, `performance.max_concurrent_uploads`
+- `performance.concurrency`, `performance.part_size`, `performance.timeout`
 - `logging.level`, `logging.format`, `logging.file`
-- `log_level`, `log_format`, `log_file`, `debug_level`, `debug_file`, `profile_dir`, `environment`, `version`
 
-In the current binary, only `aws.region` affects behavior, and only for the bucket list; the other keys are read but not used. `logging.level` does not change output because the UI does not emit logs.
+`performance.concurrency` sets the number of parallel S3 workers used by multipart transfers and prefix listing. `performance.part_size` is the multipart chunk size in bytes (minimum 5 MiB). `performance.timeout` bounds each blocking S3 request from the TUI, in seconds.
+
+## Exit codes
+
+| Code | Meaning |
+| ---- | ------- |
+| 0    | Success |
+| 1    | General error |
+| 2    | Usage error (unknown flag or command, bad arguments) |
+| 3    | Bucket or object not found |
+| 4    | Access denied or no credentials |
+| 130  | Canceled (`Ctrl+C`, `Esc` during a transfer, or SIGINT) |
+
+## Development
+
+The Go toolchain and dev tools are pinned in `.mise.toml` (`mise install` picks
+them up). The standard checks are:
+
+```sh
+go build ./...
+go test -race ./...
+go vet ./...
+make lint       # golangci-lint via the mise-pinned version
+make build      # stamped binary at dist/s3ry
+```
+
+Integration tests run against a local MinIO container; see
+[docs/testing.md](docs/testing.md) for setup. `make bench` records the
+transfer benchmarks for regression comparisons.
+
+## Design notes
+
+- One `s3.Session` (AWS SDK for Go v2) is created at startup and shared by every view. It caches an S3 client and a transfer manager per bucket region, so cross-region buckets need no restart.
+- Uploads and downloads go through the AWS transfer manager, which parallelizes multipart work using `performance.concurrency` goroutines.
+- `Walk` lists with `Concurrency` 1 in lexical order, or crawls delimiter prefixes in parallel above that.
+- Transfer progress callbacks run on worker goroutines; a bounded broker channel hands them to the Bubble Tea update loop, so slow rendering never blocks a transfer worker and progress reporting is race-free.
+- Downloads are written to a temporary sibling file first and published only on success, honoring overwrite modes (`fail`, `skip`, `always`); `Esc` cancels and removes the partial file.
+- S3 keys are validated and mapped to local paths by `LocalPath`, which rejects absolute paths, `..` traversal, and prefix escapes.
+- The UI is a Bubble Tea model tree: `cli` parses flags, `app` owns the root model and global keys, `views` holds one screen per responsibility, and `components` holds the reusable widgets.
+
+### Extension points
+
+- **Operations**: add one entry to the `operations` table in `internal/ui/views/operation.go` (key, label, next view). No switch statements need editing.
+- **Languages**: add one catalog map to `internal/i18n/messages.go`; every view renders through its injected `Printer`.
+- **Views**: implement `tea.Model`, construct it from the operation table, and wire dependencies through `views.Deps`. The app handles transitions and transfer cleanup generically.
+- **Theme**: colors are named constants in `internal/ui/components/theme.go`, shared by all widgets and views.
 
 ## Roadmap
 

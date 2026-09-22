@@ -66,6 +66,8 @@ builds:
 # Universal binaries for macOS
 universal_binaries:
   - id: s3ry-universal
+    ids:
+      - s3ry
     name_template: s3ry
     replace: true
 

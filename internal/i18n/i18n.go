@@ -1,126 +1,67 @@
+// Package i18n wraps golang.org/x/text/message with the small surface s3ry
+// needs: an immutable printer per selected language.
 package i18n
 
 import (
-	"fmt"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"os"
 	"strings"
+
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
-var (
-	// Printer is the global message printer instance
-	Printer *message.Printer
-	// currentLanguage keeps track of the current language
-	currentLanguage language.Tag
-)
-
-// Init initializes the i18n system with the appropriate language
-func Init() {
-	lang := detectLanguage()
-	currentLanguage = lang
-	Printer = message.NewPrinter(lang)
+// Printer formats localized messages. It is immutable once created, so a
+// single printer can be shared by every view without synchronization.
+type Printer struct {
+	printer *message.Printer
+	lang    language.Tag
 }
 
-// InitWithLanguage initializes the i18n system with a specific language
-func InitWithLanguage(languageCode string) {
-	lang := parseLanguageCode(languageCode)
-	currentLanguage = lang
-	Printer = message.NewPrinter(lang)
+// NewPrinter selects the language for languageCode. An empty or unsupported
+// code falls back to locale detection and then to English.
+func NewPrinter(languageCode string) *Printer {
+	tag := parseLanguageCode(languageCode)
+	return &Printer{printer: message.NewPrinter(tag), lang: tag}
 }
 
-// detectLanguage detects the system language or returns English as default
+// Sprintf returns a localized string formatted with the given arguments.
+// Strings that have no catalog entry are returned unchanged.
+func (p *Printer) Sprintf(format string, args ...any) string {
+	return p.printer.Sprintf(format, args...)
+}
+
+// Language returns the tag of the printer.
+func (p *Printer) Language() language.Tag {
+	return p.lang
+}
+
+// detectLanguage returns the system language, defaulting to English.
 func detectLanguage() language.Tag {
-	// Check environment variables for language preference
-	if lang := os.Getenv("LANG"); lang != "" {
-		if strings.HasPrefix(lang, "ja") {
+	for _, key := range []string{"S3RY_LANGUAGE", "LANGUAGE", "LANG", "LC_ALL"} {
+		if strings.HasPrefix(os.Getenv(key), "ja") {
 			return language.Japanese
 		}
 	}
-
-	if lang := os.Getenv("LANGUAGE"); lang != "" {
-		if strings.HasPrefix(lang, "ja") {
-			return language.Japanese
-		}
-	}
-
-	// Default to English
 	return language.English
 }
 
-// parseLanguageCode converts a language code string to language.Tag
+// parseLanguageCode converts a language code string to a language.Tag.
 func parseLanguageCode(languageCode string) language.Tag {
-	if languageCode == "" {
+	switch strings.ToLower(strings.TrimSpace(languageCode)) {
+	case "":
 		return detectLanguage()
-	}
-
-	// Normalize the language code
-	languageCode = strings.ToLower(strings.TrimSpace(languageCode))
-
-	switch languageCode {
 	case "ja", "japanese", "jp":
 		return language.Japanese
 	case "en", "english":
 		return language.English
-	default:
-		// Try to parse the language code
-		if tag, err := language.Parse(languageCode); err == nil {
-			// Check if we support this language
-			if tag == language.Japanese {
-				return language.Japanese
-			}
-		}
-		// Default to English for unsupported languages
-		return language.English
 	}
-}
-
-// Sprintf returns a localized string formatted with the given arguments
-func Sprintf(format string, args ...interface{}) string {
-	if Printer == nil {
-		Init()
+	if tag, err := language.Parse(languageCode); err == nil && tag == language.Japanese {
+		return language.Japanese
 	}
-	return Printer.Sprintf(format, args...)
+	return language.English
 }
 
-// Printf prints a localized string formatted with the given arguments
-func Printf(format string, args ...interface{}) {
-	if Printer == nil {
-		Init()
-	}
-	Printer.Printf(format, args...)
-}
-
-// Print prints a localized string
-func Print(args ...interface{}) {
-	if Printer == nil {
-		Init()
-	}
-	fmt.Print(args...)
-}
-
-// Println prints a localized string with a newline
-func Println(args ...interface{}) {
-	if Printer == nil {
-		Init()
-	}
-	fmt.Println(args...)
-}
-
-// SetLanguage changes the current language
-func SetLanguage(languageCode string) {
-	InitWithLanguage(languageCode)
-}
-
-// GetCurrentLanguage returns the current language tag
-func GetCurrentLanguage() language.Tag {
-	if Printer == nil {
-		Init()
-	}
-	return currentLanguage
-}
-
-// GetSupportedLanguages returns a list of supported languages
-func GetSupportedLanguages() []string {
+// SupportedLanguages lists the languages with a registered catalog.
+func SupportedLanguages() []string {
 	return []string{"en", "ja"}
 }

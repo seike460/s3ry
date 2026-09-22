@@ -2,16 +2,25 @@ package components
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	// maxStoredErrors bounds the retained error history so a long session
+	// cannot grow the display unboundedly.
+	maxStoredErrors = 5
+	// errorAutoHideDelay keeps transient errors visible long enough to read
+	// without requiring a manual dismiss.
+	errorAutoHideDelay = 10 * time.Second
+)
+
 // ErrorLevel represents the severity of an error
 type ErrorLevel int
 
+// Error levels ordered by severity.
 const (
 	ErrorLevelInfo ErrorLevel = iota
 	ErrorLevelWarning
@@ -63,27 +72,27 @@ type ErrorDisplay struct {
 func NewErrorDisplay() *ErrorDisplay {
 	return &ErrorDisplay{
 		errors:        make([]ErrorMsg, 0),
-		maxErrors:     5, // Keep last 5 errors
+		maxErrors:     maxStoredErrors,
 		showTechnical: false,
 		autoHide:      true,
-		hideAfter:     time.Second * 10,
+		hideAfter:     errorAutoHideDelay,
 
 		infoStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04B575")).
+			Foreground(lipgloss.Color(ColorSuccess)).
 			Bold(true),
 
 		warningStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFA500")).
+			Foreground(lipgloss.Color(ColorWarning)).
 			Bold(true),
 
 		errorStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF5555")).
+			Foreground(lipgloss.Color(ColorDanger)).
 			Bold(true),
 
 		criticalStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
+			Foreground(lipgloss.Color(ColorCritical)).
 			Bold(true).
-			Background(lipgloss.Color("#441111")).
+			Background(lipgloss.Color(ColorDangerBg)).
 			Padding(0, 1),
 
 		titleStyle: lipgloss.NewStyle().
@@ -95,19 +104,19 @@ func NewErrorDisplay() *ErrorDisplay {
 			MarginLeft(2),
 
 		suggestionStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
+			Foreground(lipgloss.Color(ColorAccent)).
 			MarginTop(1).
 			MarginLeft(2).
 			Italic(true),
 
 		technicalStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888")).
+			Foreground(lipgloss.Color(ColorMuted)).
 			MarginTop(1).
 			MarginLeft(2).
 			Faint(true),
 
 		timestampStyle: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666")).
+			Foreground(lipgloss.Color(ColorFaint)).
 			Faint(true),
 	}
 }
@@ -139,84 +148,6 @@ func (e *ErrorDisplay) AddErrorWithActions(level ErrorLevel, title, message, sug
 	}
 }
 
-// AddAWSError adds an AWS-specific error with intelligent suggestions
-func (e *ErrorDisplay) AddAWSError(err error) {
-	if err == nil {
-		return
-	}
-
-	errStr := err.Error()
-	var title, message, suggestion string
-	var level ErrorLevel = ErrorLevelError
-	var recoverable bool = true
-
-	// Intelligent error categorization and suggestions
-	switch {
-	case strings.Contains(errStr, "NoCredentialsErr") || strings.Contains(errStr, "no credentials"):
-		title = "AWS Credentials Not Found"
-		message = "Unable to locate valid AWS credentials for authentication."
-		suggestion = "💡 Run 'aws configure' or set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
-
-	case strings.Contains(errStr, "InvalidAccessKeyId"):
-		title = "Invalid AWS Access Key"
-		message = "The provided AWS access key ID is not valid."
-		suggestion = "💡 Check your access key ID and run 'aws configure' to update credentials"
-
-	case strings.Contains(errStr, "SignatureDoesNotMatch"):
-		title = "Invalid AWS Secret Key"
-		message = "The AWS secret access key doesn't match the access key ID."
-		suggestion = "💡 Verify your secret access key and run 'aws configure' to update credentials"
-
-	case strings.Contains(errStr, "TokenRefreshRequired"):
-		title = "AWS Session Expired"
-		message = "Your AWS session token has expired and needs to be refreshed."
-		suggestion = "💡 Refresh your AWS session or re-run 'aws configure' if using temporary credentials"
-
-	case strings.Contains(errStr, "RequestTimeTooSkewed"):
-		title = "System Clock Incorrect"
-		message = "Your system clock is not synchronized with AWS servers."
-		suggestion = "💡 Synchronize your system time and try again"
-
-	case strings.Contains(errStr, "AccessDenied"):
-		title = "AWS Access Denied"
-		message = "You don't have permission to perform this operation."
-		suggestion = "💡 Check your IAM permissions for S3 access (ListBucket, GetObject, PutObject, DeleteObject)"
-
-	case strings.Contains(errStr, "NoSuchBucket"):
-		title = "S3 Bucket Not Found"
-		message = "The specified S3 bucket does not exist or is not accessible."
-		suggestion = "💡 Verify the bucket name and your access permissions to this bucket"
-
-	case strings.Contains(errStr, "NoSuchKey"):
-		title = "S3 Object Not Found"
-		message = "The specified S3 object does not exist."
-		suggestion = "💡 Check the object key and ensure it exists in the bucket"
-
-	case strings.Contains(errStr, "BucketNotEmpty"):
-		title = "S3 Bucket Not Empty"
-		message = "Cannot delete a bucket that contains objects."
-		suggestion = "💡 Delete all objects in the bucket first, then try deleting the bucket again"
-
-	case strings.Contains(errStr, "network") || strings.Contains(errStr, "timeout") || strings.Contains(errStr, "connection"):
-		title = "Network Connection Error"
-		message = "Unable to connect to AWS services."
-		suggestion = "🌐 Check your internet connection and try again. Consider using a different region if problems persist"
-
-	case strings.Contains(errStr, "TooManyRequests") || strings.Contains(errStr, "RequestLimitExceeded"):
-		title = "AWS Rate Limit Exceeded"
-		message = "Too many requests sent to AWS in a short time."
-		suggestion = "⏳ Wait a moment and try again. Consider reducing concurrent operations"
-		level = ErrorLevelWarning
-
-	default:
-		title = "AWS Operation Failed"
-		message = fmt.Sprintf("An AWS operation failed: %s", errStr)
-		suggestion = "💡 Check AWS status page and your configuration. Contact support if the problem persists"
-	}
-
-	e.AddError(level, title, message, suggestion, errStr, recoverable)
-}
-
 // AddNetworkError adds a network-specific error
 func (e *ErrorDisplay) AddNetworkError(operation string, err error) {
 	title := fmt.Sprintf("Network Error: %s", operation)
@@ -240,7 +171,7 @@ func (e *ErrorDisplay) AddValidationError(field, value, requirement string) {
 }
 
 // Update handles messages for the error display
-func (e *ErrorDisplay) Update(msg tea.Msg) (*ErrorDisplay, tea.Cmd) {
+func (e *ErrorDisplay) Update(_ tea.Msg) (*ErrorDisplay, tea.Cmd) {
 	// Auto-hide old errors if enabled
 	if e.autoHide {
 		now := time.Now()
@@ -258,120 +189,22 @@ func (e *ErrorDisplay) Update(msg tea.Msg) (*ErrorDisplay, tea.Cmd) {
 	return e, nil
 }
 
-// View renders the error display
-func (e *ErrorDisplay) View() string {
-	if len(e.errors) == 0 {
-		return ""
-	}
-
-	var s strings.Builder
-
-	for i, err := range e.errors {
-		if i > 0 {
-			s.WriteString("\n")
-		}
-
-		// Render error based on level
-		levelStyle := e.getLevelStyle(err.Level)
-		icon := e.getLevelIcon(err.Level)
-
-		// Header with icon and title
-		header := fmt.Sprintf("%s %s", icon, err.Title)
-		s.WriteString(levelStyle.Render(header))
-
-		// Timestamp for non-critical errors
-		if err.Level < ErrorLevelCritical {
-			timestamp := err.Timestamp.Format("15:04:05")
-			s.WriteString(" ")
-			s.WriteString(e.timestampStyle.Render(fmt.Sprintf("(%s)", timestamp)))
-		}
-
-		s.WriteString("\n")
-
-		// Message
-		if err.Message != "" {
-			s.WriteString(e.messageStyle.Render(err.Message))
-			s.WriteString("\n")
-		}
-
-		// Suggestion
-		if err.Suggestion != "" {
-			s.WriteString(e.suggestionStyle.Render(err.Suggestion))
-			s.WriteString("\n")
-		}
-
-		// Technical details (if enabled)
-		if e.showTechnical && err.Technical != "" {
-			s.WriteString(e.technicalStyle.Render(fmt.Sprintf("Technical: %s", err.Technical)))
-			s.WriteString("\n")
-		}
-
-		// Recovery actions
-		if len(err.RecoveryActions) > 0 {
-			s.WriteString(e.suggestionStyle.Render("📋 Available Actions:"))
-			s.WriteString("\n")
-			for _, action := range err.RecoveryActions {
-				actionText := fmt.Sprintf("  %s: %s (%s)", action.Shortcut, action.Label, action.Description)
-				s.WriteString(e.messageStyle.Render(actionText))
-				s.WriteString("\n")
-			}
-		} else if err.Recoverable {
-			s.WriteString(e.suggestionStyle.Render("🔄 Press 'r' to retry • ⬅️ Press 'esc' to go back • ❓ Press '?' for help"))
-		} else {
-			s.WriteString(e.errorStyle.Render("⚠️ This error requires manual intervention - check AWS configuration"))
-		}
-
-		s.WriteString("\n")
-	}
-
-	return s.String()
-}
-
-// Helper methods
-func (e *ErrorDisplay) getLevelStyle(level ErrorLevel) lipgloss.Style {
-	switch level {
-	case ErrorLevelInfo:
-		return e.infoStyle
-	case ErrorLevelWarning:
-		return e.warningStyle
-	case ErrorLevelError:
-		return e.errorStyle
-	case ErrorLevelCritical:
-		return e.criticalStyle
-	default:
-		return e.errorStyle
-	}
-}
-
-func (e *ErrorDisplay) getLevelIcon(level ErrorLevel) string {
-	switch level {
-	case ErrorLevelInfo:
-		return "ℹ️"
-	case ErrorLevelWarning:
-		return "⚠️"
-	case ErrorLevelError:
-		return "❌"
-	case ErrorLevelCritical:
-		return "🚨"
-	default:
-		return "❌"
-	}
-}
-
-// Configuration methods
+// SetShowTechnical toggles the technical details section.
 func (e *ErrorDisplay) SetShowTechnical(show bool) {
 	e.showTechnical = show
 }
 
+// SetAutoHide toggles automatic hiding of old non-critical errors.
 func (e *ErrorDisplay) SetAutoHide(autoHide bool, duration time.Duration) {
 	e.autoHide = autoHide
 	e.hideAfter = duration
 }
 
-func (e *ErrorDisplay) SetMaxErrors(max int) {
-	e.maxErrors = max
-	if len(e.errors) > max {
-		e.errors = e.errors[:max]
+// SetMaxErrors caps how many errors are retained.
+func (e *ErrorDisplay) SetMaxErrors(limit int) {
+	e.maxErrors = limit
+	if len(e.errors) > limit {
+		e.errors = e.errors[:limit]
 	}
 }
 

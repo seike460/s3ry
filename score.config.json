@@ -1,0 +1,5 @@
+{
+  "threshold": 9.0,
+  "maxChars": 160000,
+  "samples": 5
+}
