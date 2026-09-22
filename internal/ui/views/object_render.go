@@ -21,6 +21,8 @@ const (
 	minPreviewListWidth = 20
 	// etagDisplayLength truncates the ETag in the detail pane.
 	etagDisplayLength = 40
+	// maxListPageKeys bounds one ListObjectsV2 request.
+	maxListPageKeys = 1000
 )
 
 func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) {
@@ -28,34 +30,75 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 		v.state.fail(v.deps, v.deps.T("Error Loading Objects"), v.deps.T("Failed to load S3 objects"), msg.Err)
 		return v, nil
 	}
-
-	items := make([]components.ListItem, 0, len(msg.Objects))
-	for _, obj := range msg.Objects {
-		tag := "Object"
-		description := fmt.Sprintf("%s %s | %s %s",
-			v.deps.T("Size:"), components.FormatBytes(obj.Size),
-			v.deps.T("Modified:"), formatModified(obj.LastModified))
-		if strings.HasSuffix(obj.Key, "/") {
-			tag = "Folder"
-			description = v.deps.T("Folder marker")
+	pageItems := v.pageItems(msg.Page)
+	if msg.Append && v.state.list != nil {
+		if n := len(v.items); n > 0 && v.items[n-1].Tag == "More" {
+			v.items = v.items[:n-1]
 		}
+		v.items = append(v.items, pageItems...)
+		v.state.list.SetItems(v.items)
+		return v, nil
+	}
+	v.items = pageItems
+	v.state.loaded(v.listTitle(), v.items)
+	return v, nil
+}
+
+// listTitle returns the list header for the view's mode.
+func (v *ObjectView) listTitle() string {
+	if v.mode == ModeDelete {
+		return v.deps.T("Select Object to Delete")
+	}
+	return v.deps.T("Select Object to Download")
+}
+
+// pageItems builds list rows for one page: common prefixes as folder rows,
+// then objects, then the "Load more" sentinel while the listing is
+// truncated.
+func (v *ObjectView) pageItems(page *s3.Page) []components.ListItem {
+	if page == nil {
+		return nil
+	}
+	items := make([]components.ListItem, 0, len(page.Prefixes)+len(page.Objects)+1)
+	for _, prefix := range page.Prefixes {
 		items = append(items, components.ListItem{
-			Title:       obj.Key,
-			Description: description,
-			Tag:         tag,
-			Data:        obj,
+			Title:       strings.TrimPrefix(prefix, v.prefix),
+			Description: v.deps.T("Folder"),
+			Tag:         "Folder",
+			Data:        prefix,
 		})
 	}
-
-	title := v.deps.T("Select Object")
-	switch v.mode {
-	case ModeDownload:
-		title = v.deps.T("Select Object to Download")
-	case ModeDelete:
-		title = v.deps.T("Select Object to Delete")
+	for _, obj := range page.Objects {
+		items = append(items, v.objectItem(obj))
 	}
-	v.state.loaded(title, items)
-	return v, nil
+	if page.IsTruncated {
+		items = append(items, components.ListItem{
+			Title:       v.deps.T("Load more..."),
+			Description: v.deps.T("Show the next page of results"),
+			Tag:         "More",
+			Data:        page.NextToken,
+		})
+	}
+	return items
+}
+
+// objectItem builds one list row for an object. Titles show the key
+// relative to the current prefix; folder markers become folder rows.
+func (v *ObjectView) objectItem(obj s3.Object) components.ListItem {
+	tag := "Object"
+	description := fmt.Sprintf("%s %s | %s %s",
+		v.deps.T("Size:"), components.FormatBytes(obj.Size),
+		v.deps.T("Modified:"), formatModified(obj.LastModified))
+	if strings.HasSuffix(obj.Key, "/") {
+		tag = "Folder"
+		description = v.deps.T("Folder marker")
+	}
+	return components.ListItem{
+		Title:       strings.TrimPrefix(obj.Key, v.prefix),
+		Description: description,
+		Tag:         tag,
+		Data:        obj,
+	}
 }
 
 // View renders the object view.
