@@ -218,5 +218,6 @@ nfpms:
 
 # Announce
 announce:
-  # Skip announce on pre-releases
-  skip: "{{gt .Prerelease 0}}"
+  # Skip announce on pre-releases. .Prerelease resolves to the string
+  # "true"/"false", so compare with `eq` rather than `gt`.
+  skip: "{{ eq .Prerelease \"true\" }}"
