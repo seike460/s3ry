@@ -29,6 +29,8 @@ type Deps struct {
 	Timeout time.Duration
 	// Messages formats localized UI text. Nil falls back to English.
 	Messages *i18n.Printer
+	// StartURL, when set, skips the bucket picker and opens at this location.
+	StartURL *s3.URL
 }
 
 // errNoSession is reported when a view is created without an AWS session.

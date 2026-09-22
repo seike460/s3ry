@@ -130,6 +130,50 @@ func TestRunReachesTUIWhenTerminalIsAvailable(t *testing.T) {
 	}
 }
 
+func TestRunEndpointFlagsAndStartURL(t *testing.T) {
+	deps := RunDeps{
+		IsTerminal: func(uintptr) bool { return true },
+		RunTUI: func(_ context.Context, cfg *config.Config) error {
+			if cfg.AWS.Endpoint != "http://localhost:4566" {
+				t.Errorf("endpoint = %q", cfg.AWS.Endpoint)
+			}
+			if !cfg.AWS.PathStyle || !cfg.AWS.NoSignRequest {
+				t.Errorf("pathStyle=%v noSign=%v, want both true", cfg.AWS.PathStyle, cfg.AWS.NoSignRequest)
+			}
+			if cfg.StartURL != "s3://my-bucket/logs/" {
+				t.Errorf("startURL = %q", cfg.StartURL)
+			}
+			return nil
+		},
+	}
+
+	configPath := writeCLIConfig(t)
+	var output, errorOutput bytes.Buffer
+	code := Run(context.Background(), []string{
+		"--config", configPath,
+		"--endpoint", "http://localhost:4566",
+		"--path-style",
+		"--no-sign-request",
+		"s3://my-bucket/logs/",
+	}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, deps)
+
+	if code != 0 {
+		t.Fatalf("Run returned code %d, want 0; stderr: %q", code, errorOutput.String())
+	}
+}
+
+func TestRunRejectsMalformedS3URL(t *testing.T) {
+	deps := RunDeps{
+		IsTerminal: func(uintptr) bool { return true },
+		RunTUI:     func(context.Context, *config.Config) error { return nil },
+	}
+	var output, errorOutput bytes.Buffer
+	code := Run(context.Background(), []string{"s3://INVALID_BUCKET!!"}, strings.NewReader(""), &output, &errorOutput, BuildInfo{}, deps)
+	if code != 2 {
+		t.Fatalf("code = %d, want 2 (usage); stderr: %q", code, errorOutput.String())
+	}
+}
+
 func writeCLIConfig(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "s3ry.yml")

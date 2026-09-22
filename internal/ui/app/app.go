@@ -26,8 +26,21 @@ type App struct {
 func New(deps views.Deps) *App {
 	return &App{
 		deps: deps,
-		view: views.NewBucketView(deps),
+		view: initialView(deps),
 	}
+}
+
+// initialView picks the first screen. An s3:// start URL skips the bucket
+// picker: prefixes open the object browser, bare buckets open the operation
+// menu.
+func initialView(deps views.Deps) tea.Model {
+	if deps.StartURL == nil {
+		return views.NewBucketView(deps)
+	}
+	if deps.StartURL.IsPrefix() {
+		return views.NewObjectViewAt(deps, deps.StartURL.Bucket, deps.StartURL.Key, views.ModeDownload)
+	}
+	return views.NewOperationView(deps, deps.StartURL.Bucket)
 }
 
 // Init initializes the application.
@@ -99,11 +112,13 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	}
 
 	session, err := s3.NewSession(ctx, s3.Options{
-		Profile:     cfg.AWS.Profile,
-		Region:      cfg.AWS.Region,
-		EndpointURL: cfg.AWS.Endpoint,
-		Concurrency: cfg.Performance.Concurrency,
-		PartSize:    cfg.Performance.PartSize,
+		Profile:       cfg.AWS.Profile,
+		Region:        cfg.AWS.Region,
+		EndpointURL:   cfg.AWS.Endpoint,
+		PathStyle:     cfg.AWS.PathStyle,
+		NoSignRequest: cfg.AWS.NoSignRequest,
+		Concurrency:   cfg.Performance.Concurrency,
+		PartSize:      cfg.Performance.PartSize,
 	})
 	if err != nil {
 		return err
@@ -114,6 +129,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		Config:   cfg,
 		Timeout:  time.Duration(cfg.Performance.Timeout) * time.Second,
 		Messages: i18n.NewPrinter(cfg.UI.Language),
+		StartURL: startURL(cfg),
 	}
 
 	options := []tea.ProgramOption{
@@ -130,6 +146,19 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	p := tea.NewProgram(New(deps), options...)
 	_, err = p.Run()
 	return err
+}
+
+// startURL re-parses the configured start URL. The CLI already validated it,
+// so a parse error here is impossible and returns nil.
+func startURL(cfg *config.Config) *s3.URL {
+	if cfg.StartURL == "" {
+		return nil
+	}
+	u, err := s3.ParseURL(cfg.StartURL)
+	if err != nil {
+		return nil
+	}
+	return &u
 }
 
 // isTTYAvailable reports whether alternate-screen and mouse support are safe

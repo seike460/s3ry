@@ -29,6 +29,7 @@ const (
 type ObjectView struct {
 	deps        Deps
 	bucket      string
+	prefix      string
 	mode        ObjectMode
 	state       listState
 	preview     *components.Preview
@@ -38,8 +39,13 @@ type ObjectView struct {
 	transfer    transferState
 }
 
-// NewObjectView creates a new object view.
+// NewObjectView creates a new object view rooted at the bucket.
 func NewObjectView(deps Deps, bucket string, mode ObjectMode) *ObjectView {
+	return NewObjectViewAt(deps, bucket, "", mode)
+}
+
+// NewObjectViewAt creates an object view scoped to prefix.
+func NewObjectViewAt(deps Deps, bucket, prefix string, mode ObjectMode) *ObjectView {
 	var spinnerMessage string
 	if mode == ModeDelete {
 		spinnerMessage = deps.T("Loading S3 objects for delete...")
@@ -50,6 +56,7 @@ func NewObjectView(deps Deps, bucket string, mode ObjectMode) *ObjectView {
 	return &ObjectView{
 		deps:    deps,
 		bucket:  bucket,
+		prefix:  prefix,
 		mode:    mode,
 		state:   newListState(spinnerMessage),
 		preview: components.NewPreview(),
@@ -267,7 +274,7 @@ func (v *ObjectView) loadObjects() tea.Cmd {
 		defer cancel()
 
 		var objects []s3.Object
-		err := v.deps.Session.Walk(ctx, v.bucket, "", s3.WalkOptions{Concurrency: 1}, func(object s3.Object) error {
+		err := v.deps.Session.Walk(ctx, v.bucket, v.prefix, s3.WalkOptions{Concurrency: 1}, func(object s3.Object) error {
 			objects = append(objects, object)
 			return nil
 		})

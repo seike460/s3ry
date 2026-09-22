@@ -70,8 +70,7 @@ func (v *ObjectView) View() string {
 		return errorStyle.Render(v.deps.T("Failed to load S3 objects"))
 	}
 
-	context := contextStyle.Render(fmt.Sprintf("%s %s | %s %s",
-		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket))
+	context := v.contextLine()
 
 	if v.confirm != nil {
 		return context + "\n\n" + errorStyle.Render(v.confirmQuestion())
@@ -84,6 +83,16 @@ func (v *ObjectView) View() string {
 		result += "\n\n" + v.state.errors.View()
 	}
 	return result + "\n\n" + footer
+}
+
+// contextLine renders the "Region | Bucket [| Prefix]" header line.
+func (v *ObjectView) contextLine() string {
+	line := fmt.Sprintf("%s %s | %s %s",
+		v.deps.T("Region:"), v.deps.region(), v.deps.T("Bucket:"), v.bucket)
+	if v.prefix != "" {
+		line += fmt.Sprintf(" | %s %s", v.deps.T("Prefix:"), v.prefix)
+	}
+	return contextStyle.Render(line)
 }
 
 // confirmQuestion renders the open confirmation prompt's question.

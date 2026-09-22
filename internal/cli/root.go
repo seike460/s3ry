@@ -8,19 +8,24 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/seike460/s3ry/internal/config"
 	"github.com/seike460/s3ry/internal/i18n"
+	"github.com/seike460/s3ry/internal/s3"
 	"github.com/spf13/cobra"
 )
 
 type rootFlags struct {
-	Region     string
-	Profile    string
-	ConfigFile string
-	Verbose    bool
-	Language   string
-	LogLevel   string
+	Region        string
+	Profile       string
+	ConfigFile    string
+	Verbose       bool
+	Language      string
+	LogLevel      string
+	Endpoint      string
+	PathStyle     bool
+	NoSignRequest bool
 }
 
 // RunDeps carries the replaceable runtime dependencies of a command run.
@@ -39,9 +44,17 @@ func NewRootCommand(info BuildInfo, deps RunDeps) *cobra.Command {
 	flags := &rootFlags{}
 
 	root := &cobra.Command{
-		Use:           "s3ry",
-		Short:         "interactive terminal client for Amazon S3",
-		Args:          cobra.NoArgs,
+		Use:   "s3ry [s3://bucket/prefix]",
+		Short: "interactive terminal client for Amazon S3",
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("accepts at most 1 arg(s), received %d", len(args))
+			}
+			if len(args) == 1 && !strings.HasPrefix(args[0], "s3://") {
+				return fmt.Errorf("unknown command %q for \"s3ry\"", args[0])
+			}
+			return nil
+		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       info.Version,
@@ -49,8 +62,8 @@ func NewRootCommand(info BuildInfo, deps RunDeps) *cobra.Command {
 			"commit": info.Commit,
 			"date":   info.Date,
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runRoot(cmd, flags, deps)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRoot(cmd, args, flags, deps)
 		},
 	}
 
@@ -62,6 +75,9 @@ func NewRootCommand(info BuildInfo, deps RunDeps) *cobra.Command {
 	root.Flags().StringVar(&flags.Region, "region", "", "AWS region to use")
 	root.Flags().StringVar(&flags.Profile, "profile", "", "AWS profile to use")
 	root.Flags().StringVar(&flags.ConfigFile, "config", "", "Path to config file")
+	root.Flags().StringVar(&flags.Endpoint, "endpoint", "", "S3 endpoint URL for S3-compatible services")
+	root.Flags().BoolVar(&flags.PathStyle, "path-style", false, "Force path-style S3 addressing (MinIO, LocalStack)")
+	root.Flags().BoolVar(&flags.NoSignRequest, "no-sign-request", false, "Send unsigned requests for public endpoints")
 	root.Flags().BoolVarP(&flags.Verbose, "verbose", "v", false, "Enable verbose logging")
 	root.Flags().StringVar(&flags.LogLevel, "log-level", "", "Log level (debug, info, warn, error)")
 	root.PersistentFlags().StringVar(&flags.Language, "lang", "", "Language (en, ja)")
@@ -93,7 +109,7 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	return ExitCode(err)
 }
 
-func runRoot(cmd *cobra.Command, flags *rootFlags, deps RunDeps) error {
+func runRoot(cmd *cobra.Command, args []string, flags *rootFlags, deps RunDeps) error {
 	if err := cmd.Context().Err(); err != nil {
 		return err
 	}
@@ -101,6 +117,13 @@ func runRoot(cmd *cobra.Command, flags *rootFlags, deps RunDeps) error {
 	cfg, err := loadConfig(flags)
 	if err != nil {
 		return err
+	}
+
+	if len(args) == 1 {
+		if _, err := s3.ParseURL(args[0]); err != nil {
+			return &usageError{err: fmt.Errorf("invalid S3 URL %q: %w", args[0], err)}
+		}
+		cfg.StartURL = args[0]
 	}
 
 	printer := i18n.NewPrinter(cfg.UI.Language)
@@ -144,6 +167,15 @@ func loadConfig(flags *rootFlags) (*config.Config, error) {
 	}
 	if flags.LogLevel != "" {
 		cfg.Logging.Level = flags.LogLevel
+	}
+	if flags.Endpoint != "" {
+		cfg.AWS.Endpoint = flags.Endpoint
+	}
+	if flags.PathStyle {
+		cfg.AWS.PathStyle = true
+	}
+	if flags.NoSignRequest {
+		cfg.AWS.NoSignRequest = true
 	}
 
 	return cfg, nil
