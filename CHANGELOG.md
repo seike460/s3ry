@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-22
+
 ### Added
 
 - A CI workflow covering build, vet, race tests, golangci-lint, integration tests against MinIO, vulnerability checks with govulncheck, and cross-compilation.
@@ -17,7 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Removed
 
-- The release workflow; release automation is unavailable until it is rebuilt for v3.0.0.
+- The GitHub Actions release workflow; releases run through GoReleaser locally.
 - The `cmd/s3ry-tui` command.
 - The legacy promptui UI and the public Go package `github.com/seike460/s3ry`.
 - The AWS SDK for Go v1 backend (`internal/legacy`), the worker package, and the obsolete `pkg/interfaces` and `pkg/types` packages.
@@ -68,7 +70,8 @@ Release notes were corrected on 2026-09-03; the unsupported claims were retracte
 
 ## [0.1] - 2018-04-29
 
-[Unreleased]: https://github.com/seike460/s3ry/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/seike460/s3ry/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/seike460/s3ry/releases/tag/v3.0.0
 [2.0.0]: https://github.com/seike460/s3ry/releases/tag/v2.0.0
 [0.2]: https://github.com/seike460/s3ry/releases/tag/0.2
 [0.1.4]: https://github.com/seike460/s3ry/releases/tag/0.1.4
