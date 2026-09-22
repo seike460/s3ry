@@ -100,7 +100,7 @@ func (v *SettingsView) buildSettingsList() {
 			Tag:         "Setting",
 		},
 		{
-			Title:       fmt.Sprintf("%s %s", T("Part size:"), formatBytes(v.config.Performance.PartSize)),
+			Title:       fmt.Sprintf("%s %s", T("Part size:"), components.FormatBytes(v.config.Performance.PartSize)),
 			Description: T("Multipart chunk size in bytes"),
 			Tag:         "Setting",
 		},

@@ -232,10 +232,10 @@ func TestPreviewTruncatesToHeight(t *testing.T) {
 }
 
 func TestFormatBytesComponent(t *testing.T) {
-	if got := formatBytes(2048); got != "2.0 KB" {
-		t.Fatalf("formatBytes(2048) = %q", got)
+	if got := FormatBytes(2048); got != "2.0 KB" {
+		t.Fatalf("FormatBytes(2048) = %q", got)
 	}
-	if got := formatBytes(5); got != "5 B" {
-		t.Fatalf("formatBytes(5) = %q", got)
+	if got := FormatBytes(5); got != "5 B" {
+		t.Fatalf("FormatBytes(5) = %q", got)
 	}
 }

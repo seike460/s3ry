@@ -2,12 +2,14 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"golang.org/x/sync/errgroup"
 )
 
 // WalkOptions controls how Walk traverses a bucket.
@@ -78,243 +80,111 @@ func (s *Session) walkSequential(ctx context.Context, client *awss3.Client, buck
 	}
 }
 
-type prefixCrawler struct {
-	mu          sync.Mutex
-	cond        *sync.Cond
-	queue       []string
-	seen        map[string]struct{}
-	outstanding int
-	firstErr    error
-	panicValue  any
-	panicSet    bool
+// walkPanic carries a recovered Walk callback panic through the errgroup so
+// it can be repanicked on the calling goroutine after Wait returns.
+type walkPanic struct{ value any }
+
+func (e walkPanic) Error() string {
+	return fmt.Sprintf("panic in Walk callback: %v", e.value)
 }
 
-func (w *prefixCrawler) take() (string, bool) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	for len(w.queue) == 0 && w.outstanding > 0 && w.firstErr == nil {
-		w.cond.Wait()
-	}
-	if w.firstErr != nil || (len(w.queue) == 0 && w.outstanding == 0) {
-		return "", false
-	}
-
-	prefix := w.queue[0]
-	w.queue[0] = ""
-	w.queue = w.queue[1:]
-	return prefix, true
-}
-
-func (w *prefixCrawler) add(prefix string) bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.firstErr != nil {
-		return false
-	}
-	if _, ok := w.seen[prefix]; ok {
-		return true
-	}
-	w.seen[prefix] = struct{}{}
-	w.queue = append(w.queue, prefix)
-	w.outstanding++
-	w.cond.Signal()
-	return true
-}
-
-func (w *prefixCrawler) done() {
-	w.mu.Lock()
-	w.outstanding--
-	if w.outstanding == 0 {
-		w.cond.Broadcast()
-	}
-	w.mu.Unlock()
-}
-
-func (w *prefixCrawler) setErr(err error, cancel context.CancelFunc) {
-	if err == nil {
-		return
-	}
-
-	w.mu.Lock()
-	if w.firstErr != nil {
-		w.mu.Unlock()
-		return
-	}
-	w.firstErr = err
-	w.cond.Broadcast()
-	w.mu.Unlock()
-	cancel()
-}
-
-func (w *prefixCrawler) err() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.firstErr
-}
-
-func (w *prefixCrawler) complete() bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.firstErr == nil && w.outstanding == 0
-}
-
-func (w *prefixCrawler) setErrIfIncomplete(err error, cancel context.CancelFunc) {
-	if err == nil {
-		return
-	}
-
-	w.mu.Lock()
-	if w.firstErr != nil || w.outstanding == 0 {
-		w.mu.Unlock()
-		return
-	}
-	w.firstErr = err
-	w.cond.Broadcast()
-	w.mu.Unlock()
-	cancel()
-}
-
-func (w *prefixCrawler) recordPanic(value any) {
-	w.mu.Lock()
-	if !w.panicSet {
-		w.panicValue = value
-		w.panicSet = true
-	}
-	w.mu.Unlock()
-}
-
-func (w *prefixCrawler) panicInfo() (any, bool) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.panicValue, w.panicSet
-}
-
+// walkParallel crawls delimiter prefixes with a bounded goroutine pool. Each
+// discovered child prefix either acquires a semaphore slot and runs in the
+// errgroup or, when the pool is full, is crawled inline by the current
+// goroutine — this keeps the tree walk deadlock-free. errgroup.WithContext
+// cancels sibling crawls on the first error, and callback panics are
+// repanicked on the caller's goroutine.
 func (s *Session) walkParallel(ctx context.Context, client *awss3.Client, bucket, prefix string, o WalkOptions, fn func(Object) error) error {
 	if o.Concurrency > 64 {
 		o.Concurrency = 64
 	}
 
-	walkCtx, cancel := context.WithCancel(ctx)
-	crawler := &prefixCrawler{
-		queue:       []string{prefix},
-		seen:        map[string]struct{}{prefix: {}},
-		outstanding: 1,
-	}
-	crawler.cond = sync.NewCond(&crawler.mu)
-
+	g, walkCtx := errgroup.WithContext(ctx)
+	sem := make(chan struct{}, o.Concurrency)
 	var fnMu sync.Mutex
-	var workers sync.WaitGroup
-	workers.Add(o.Concurrency)
-	for i := 0; i < o.Concurrency; i++ {
-		go func() {
-			defer workers.Done()
-			defer func() {
-				if value := recover(); value != nil {
-					crawler.recordPanic(value)
-					crawler.setErr(fmt.Errorf("panic in Walk callback: %v", value), cancel)
-				}
-			}()
-			for {
-				currentPrefix, ok := crawler.take()
-				if !ok {
-					return
-				}
-				s.walkPrefix(ctx, walkCtx, cancel, client, bucket, currentPrefix, crawler, &fnMu, o.MaxKeys, fn)
+	var seenMu sync.Mutex
+	seen := map[string]struct{}{prefix: {}}
+
+	var crawl func(context.Context, string) error
+	crawl = func(callCtx context.Context, current string) (err error) {
+		defer func() {
+			if value := recover(); value != nil {
+				err = walkPanic{value: value}
 			}
 		}()
-	}
 
-	watchDone := make(chan struct{})
-	var watcher sync.WaitGroup
-	watcher.Add(1)
-	go func() {
-		defer watcher.Done()
-		select {
-		case <-ctx.Done():
-			if !crawler.complete() {
-				if err := ctx.Err(); err != nil {
-					crawler.setErrIfIncomplete(Classify("list", bucket, prefix, err), cancel)
-				}
+		token := ""
+		for {
+			if err := callCtx.Err(); err != nil {
+				return Classify("list", bucket, current, err)
 			}
-		case <-watchDone:
-		}
-	}()
 
-	workers.Wait()
-	close(watchDone)
-	watcher.Wait()
-	cancel()
-	if value, ok := crawler.panicInfo(); ok {
-		panic(value)
-	}
-	return crawler.err()
-}
+			out, err := client.ListObjectsV2(callCtx, listObjectsInput(bucket, current, token, o.MaxKeys, aws.String("/")))
+			if err != nil {
+				return Classify("list", bucket, current, err)
+			}
 
-func (s *Session) walkPrefix(ctx context.Context, walkCtx context.Context, cancel context.CancelFunc, client *awss3.Client, bucket, prefix string, crawler *prefixCrawler, fnMu *sync.Mutex, maxKeys int32, fn func(Object) error) {
-	token := ""
-	defer crawler.done()
-
-	for {
-		if crawler.err() != nil {
-			return
-		}
-		if err := ctx.Err(); err != nil {
-			crawler.setErr(Classify("list", bucket, prefix, err), cancel)
-			return
-		}
-
-		out, err := client.ListObjectsV2(walkCtx, listObjectsInput(bucket, prefix, token, maxKeys, aws.String("/")))
-		if err != nil {
-			crawler.setErr(Classify("list", bucket, prefix, err), cancel)
-			return
-		}
-
-		for _, item := range out.Contents {
-			var callbackErr error
-			var callbackCalled bool
-			fnMu.Lock()
-			func() {
-				defer fnMu.Unlock()
-				if crawler.err() != nil {
-					return
+			for _, item := range out.Contents {
+				fnMu.Lock()
+				if callCtx.Err() != nil {
+					fnMu.Unlock()
+					return Classify("list", bucket, current, callCtx.Err())
 				}
-				if err := ctx.Err(); err != nil {
-					callbackErr = Classify("list", bucket, prefix, err)
-					crawler.setErr(callbackErr, cancel)
-					return
-				}
-				callbackCalled = true
-				callbackErr = fn(objectFromListObject(item))
+				callbackErr := fn(objectFromListObject(item))
+				fnMu.Unlock()
 				if callbackErr != nil {
-					crawler.setErr(callbackErr, cancel)
-					return
+					return callbackErr
 				}
-				if err := ctx.Err(); err != nil {
-					callbackErr = Classify("list", bucket, prefix, err)
-					crawler.setErr(callbackErr, cancel)
+			}
+
+			for _, item := range out.CommonPrefixes {
+				p := aws.ToString(item.Prefix)
+				if p == "" || !strings.HasPrefix(p, current) || len(p) <= len(current) {
+					continue
 				}
-			}()
-			if !callbackCalled || callbackErr != nil {
-				return
-			}
-		}
 
-		for _, item := range out.CommonPrefixes {
-			p := aws.ToString(item.Prefix)
-			if p == "" || !strings.HasPrefix(p, prefix) || len(p) <= len(prefix) {
-				continue
-			}
-			if !crawler.add(p) {
-				return
-			}
-		}
+				seenMu.Lock()
+				if _, duplicate := seen[p]; duplicate {
+					seenMu.Unlock()
+					continue
+				}
+				seen[p] = struct{}{}
+				seenMu.Unlock()
 
-		nextToken := aws.ToString(out.NextContinuationToken)
-		if nextToken == "" {
-			return
+				select {
+				case sem <- struct{}{}:
+					g.Go(func() error {
+						defer func() { <-sem }()
+						return crawl(callCtx, p)
+					})
+				default:
+					// Pool is full: crawl inline so a full semaphore cannot
+					// deadlock the tree walk.
+					if err := crawl(callCtx, p); err != nil {
+						return err
+					}
+				}
+			}
+
+			token = aws.ToString(out.NextContinuationToken)
+			if token == "" {
+				return nil
+			}
 		}
-		token = nextToken
 	}
+
+	// The root prefix also occupies a pool slot; Concurrency > 1 here, so the
+	// send never blocks and at most Concurrency listings run in parallel.
+	sem <- struct{}{}
+	g.Go(func() error {
+		defer func() { <-sem }()
+		return crawl(walkCtx, prefix)
+	})
+	err := g.Wait()
+
+	var recovered walkPanic
+	if errors.As(err, &recovered) {
+		panic(recovered.value)
+	}
+	return err
 }

@@ -6,14 +6,15 @@ package views
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/seike460/s3ry/internal/config"
 	"github.com/seike460/s3ry/internal/i18n"
 	"github.com/seike460/s3ry/internal/s3"
+	"github.com/seike460/s3ry/internal/ui/components"
 )
 
 // Deps carries the services shared by every view.
@@ -68,18 +69,86 @@ var (
 	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555"))
 )
 
-// formatBytes formats a byte count as a human-readable string.
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
+// errorList builds the single-item list shown when a load fails. The
+// "Error" tag marks the item so pressing enter retries the load.
+func errorList(title, message string) *components.List {
+	return components.NewList(title, []components.ListItem{{
+		Title:       message,
+		Description: T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
+		Tag:         "Error",
+	}})
+}
+
+// listState is the shared scaffold for views that load a listing into a
+// selectable list: the spinner shown while loading, the error display, the
+// retryable error item, and the loading flag. Embedding it keeps each view
+// limited to its own data mapping and selection behavior.
+type listState struct {
+	list    *components.List
+	spinner *components.Spinner
+	errors  *components.ErrorDisplay
+	loading bool
+}
+
+func newListState(loadMessage string) listState {
+	return listState{
+		loading: true,
+		spinner: components.NewSpinner(loadMessage),
+		errors:  components.NewErrorDisplay(),
 	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
+}
+
+// startLoading switches back to the loading state and returns the spinner
+// plus load commands.
+func (s *listState) startLoading(retryMessage string, load tea.Cmd) tea.Cmd {
+	s.loading = true
+	s.errors.ClearErrors()
+	s.spinner = components.NewSpinner(retryMessage)
+	return tea.Batch(s.spinner.Start(), load)
+}
+
+// fail stops loading, records the error, and shows the retryable error list.
+func (s *listState) fail(title, message string, err error) {
+	s.loading = false
+	s.spinner.Stop()
+	s.errors.AddAWSError(err)
+	s.list = errorList(title, message)
+}
+
+// loaded stops loading and installs the freshly built item list.
+func (s *listState) loaded(title string, items []components.ListItem) {
+	s.loading = false
+	s.spinner.Stop()
+	s.list = components.NewList(title, items)
+}
+
+// onTick animates the spinner while a load is in flight.
+func (s *listState) onTick(msg components.SpinnerTickMsg) tea.Cmd {
+	if !s.loading {
+		return nil
 	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	s.spinner, _ = s.spinner.Update(msg)
+	return s.spinner.Start()
+}
+
+// retryRequested reports whether a keypress asks to reload: r, or enter on
+// the error item.
+func (s *listState) retryRequested(key string) bool {
+	if key == "r" {
+		return true
+	}
+	if key != "enter" && key != " " {
+		return false
+	}
+	item := s.currentItem()
+	return item != nil && item.Tag == "Error"
+}
+
+func (s *listState) currentItem() *components.ListItem {
+	if s.list == nil {
+		return nil
+	}
+	return s.list.GetCurrentItem()
 }
 
 // truncateShort middle-truncates s so it fits width runes.

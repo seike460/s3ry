@@ -3,20 +3,22 @@
 ## Current state
 
 - The project is being rebuilt around the interactive `cmd/s3ry` binary.
-- The legacy promptui UI and the old public root Go package were removed.
-- Unreachable internal packages and unused secondary application and packaging files were removed.
+- The S3 backend runs on AWS SDK for Go v2 with a shared session,
+  per-region client caches, and transfer-manager multipart concurrency.
+- Listing paginates through every page; prefix crawling can run in
+  parallel. Delete and overwrite operations ask for confirmation first.
+- The legacy promptui UI, the AWS SDK v1 backend, and the unreachable
+  internal package groups were removed.
+- CI covers build, vet, race tests, lint, MinIO integration tests,
+  govulncheck, and cross-compilation.
 
 ## Next release: v3.0.0
 
 The next release is planned to include:
 
-- Migrate the S3 backend to `aws-sdk-go-v2`.
-- Add hierarchical browsing and pagination.
-- Ask for confirmation before deletion and overwrite operations.
-- Fix region and profile handling.
+- Add hierarchical browsing beyond the flat object list.
 - Add non-interactive `ls`, `cp`, `rm`, and `presign` subcommands.
-- Restore the Japanese UI.
-- Add CI and release automation.
+- Rebuild release automation (GoReleaser or equivalent).
 
 ## Later
 
@@ -28,4 +30,5 @@ The next release is planned to include:
 
 ## Performance
 
-Performance figures will not be published until a reproducible harness is in the repository and its measurement conditions are recorded.
+Performance figures will not be published until a reproducible harness is
+in the repository and its measurement conditions are recorded.

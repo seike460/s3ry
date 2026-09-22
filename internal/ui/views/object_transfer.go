@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/seike460/s3ry/internal/s3"
+	"github.com/seike460/s3ry/internal/ui/components"
 )
 
 // confirmKind identifies which destructive step is being confirmed.
@@ -62,7 +63,7 @@ func (v *ObjectView) startDownload(obj s3.Object, overwrite s3.OverwriteMode) (t
 			})
 			return transferDoneMsg{
 				err:     err,
-				summary: T("Downloaded %s (%s)", localPath, formatBytes(obj.Size)),
+				summary: T("Downloaded %s (%s)", localPath, components.FormatBytes(obj.Size)),
 				broker:  broker,
 			}
 		},

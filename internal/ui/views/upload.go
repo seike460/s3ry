@@ -31,27 +31,22 @@ type FileInfo struct {
 type UploadView struct {
 	deps     Deps
 	bucket   string
-	list     *components.List
-	spinner  *components.Spinner
-	errors   *components.ErrorDisplay
-	loading  bool
+	state    listState
 	transfer transferState
 }
 
 // NewUploadView creates a new upload view.
 func NewUploadView(deps Deps, bucket string) *UploadView {
 	return &UploadView{
-		deps:    deps,
-		bucket:  bucket,
-		loading: true,
-		spinner: components.NewSpinner(T("Scanning local files...")),
-		errors:  components.NewErrorDisplay(),
+		deps:   deps,
+		bucket: bucket,
+		state:  newListState(T("Scanning local files...")),
 	}
 }
 
 // Init starts the spinner and the first scan.
 func (v *UploadView) Init() tea.Cmd {
-	return tea.Batch(v.spinner.Start(), v.loadFiles())
+	return tea.Batch(v.state.spinner.Start(), v.loadFiles())
 }
 
 // Update handles messages for the upload view.
@@ -60,8 +55,8 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		if v.list != nil {
-			v.list, _ = v.list.Update(msg)
+		if v.state.list != nil {
+			v.state.list, _ = v.state.list.Update(msg)
 		}
 		v.transfer.resize(msg)
 
@@ -86,10 +81,7 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case brokerClosedMsg:
 
 	case components.SpinnerTickMsg:
-		if v.loading {
-			v.spinner, _ = v.spinner.Update(msg)
-			cmds = append(cmds, v.spinner.Start())
-		}
+		cmds = append(cmds, v.state.onTick(msg))
 
 	case tea.KeyMsg:
 		return v.onKey(msg)
@@ -99,16 +91,8 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
-	v.loading = false
-	v.spinner.Stop()
-
 	if msg.Err != nil {
-		v.errors.AddAWSError(msg.Err)
-		v.list = components.NewList(T("Error Scanning Files"), []components.ListItem{{
-			Title:       T("Failed to scan local files"),
-			Description: T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
-			Tag:         "Error",
-		}})
+		v.state.fail(T("Error Scanning Files"), T("Failed to scan local files"), msg.Err)
 		return v, nil
 	}
 
@@ -117,13 +101,13 @@ func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
 		items = append(items, components.ListItem{
 			Title: file.RelativePath,
 			Description: fmt.Sprintf("%s %s | %s %s",
-				T("Size:"), formatBytes(file.Size),
+				T("Size:"), components.FormatBytes(file.Size),
 				T("Modified:"), formatModified(file.ModTime)),
 			Tag:  "File",
 			Data: file,
 		})
 	}
-	v.list = components.NewList(T("Select File to Upload"), items)
+	v.state.loaded(T("Select File to Upload"), items)
 	return v, nil
 }
 
@@ -141,12 +125,16 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
-	if v.loading {
+	if v.state.loading {
 		if key == "ctrl+c" || key == "q" {
 			v.transfer.abort()
 			return v, tea.Quit
 		}
 		return v, nil
+	}
+
+	if v.state.retryRequested(key) {
+		return v, v.state.startLoading(T("Retrying to scan local files..."), v.loadFiles())
 	}
 
 	switch key {
@@ -155,20 +143,10 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, tea.Quit
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
-	case "r":
-		v.loading = true
-		v.errors.ClearErrors()
-		v.spinner = components.NewSpinner(T("Retrying to scan local files..."))
-		return v, tea.Batch(v.spinner.Start(), v.loadFiles())
 	case "enter", " ":
-		item := v.currentItem()
+		item := v.state.currentItem()
 		if item == nil {
 			break
-		}
-		if item.Tag == "Error" {
-			v.loading = true
-			v.spinner = components.NewSpinner(T("Retrying to scan local files..."))
-			return v, tea.Batch(v.spinner.Start(), v.loadFiles())
 		}
 		file, ok := item.Data.(FileInfo)
 		if !ok {
@@ -177,8 +155,8 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v.startUpload(file)
 	}
 
-	if v.list != nil {
-		v.list, _ = v.list.Update(msg)
+	if v.state.list != nil {
+		v.state.list, _ = v.state.list.Update(msg)
 	}
 	return v, nil
 }
@@ -199,7 +177,7 @@ func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
 			})
 			return transferDoneMsg{
 				err:     err,
-				summary: T("Uploaded %s (%s)", file.RelativePath, formatBytes(file.Size)),
+				summary: T("Uploaded %s (%s)", file.RelativePath, components.FormatBytes(file.Size)),
 				broker:  broker,
 			}
 		},
@@ -213,11 +191,11 @@ func (v *UploadView) View() string {
 		return v.transfer.progress.View()
 	}
 
-	if v.loading {
-		return headerStyle.Render(T("Local Files")) + "\n\n" + v.spinner.View()
+	if v.state.loading {
+		return headerStyle.Render(T("Local Files")) + "\n\n" + v.state.spinner.View()
 	}
 
-	if v.list == nil {
+	if v.state.list == nil {
 		return errorStyle.Render(T("Failed to scan local files"))
 	}
 
@@ -225,9 +203,9 @@ func (v *UploadView) View() string {
 		T("Region:"), v.deps.region(), T("Bucket:"), v.bucket))
 	footer := footerStyle.Render(T("↑↓: navigate • enter: select • r: refresh • esc: back • q: quit"))
 
-	result := context + "\n\n" + v.list.View()
-	if v.errors.GetErrorCount() > 0 {
-		result += "\n\n" + v.errors.View()
+	result := context + "\n\n" + v.state.list.View()
+	if v.state.errors.GetErrorCount() > 0 {
+		result += "\n\n" + v.state.errors.View()
 	}
 	return result + "\n\n" + footer
 }
@@ -236,13 +214,6 @@ func (v *UploadView) View() string {
 // broker. The app calls it when replacing the view or quitting.
 func (v *UploadView) AbortTransfer() {
 	v.transfer.abort()
-}
-
-func (v *UploadView) currentItem() *components.ListItem {
-	if v.list == nil {
-		return nil
-	}
-	return v.list.GetCurrentItem()
 }
 
 // loadFiles walks the working directory and lists non-hidden regular files.

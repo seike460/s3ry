@@ -169,7 +169,7 @@ func (p *Progress) View() string {
 
 		// Show size information if available
 		if p.total > 0 {
-			fmt.Fprintf(&s, " (%s / %s)", formatBytes(p.current), formatBytes(p.total))
+			fmt.Fprintf(&s, " (%s / %s)", FormatBytes(p.current), FormatBytes(p.total))
 		}
 
 		// Show enhanced speed and ETA information
@@ -182,13 +182,13 @@ func (p *Progress) View() string {
 			}
 
 			s.WriteString(" | ")
-			s.WriteString(p.speedStyle.Render(fmt.Sprintf("%s/s", formatBytes(int64(displaySpeed)))))
+			s.WriteString(p.speedStyle.Render(fmt.Sprintf("%s/s", FormatBytes(int64(displaySpeed)))))
 
 			// Show instantaneous speed if significantly different
 			if p.speed > 0 && p.speed != displaySpeed {
 				instantDiff := (p.speed - displaySpeed) / displaySpeed
 				if instantDiff > 0.2 || instantDiff < -0.2 { // Show if >20% difference
-					fmt.Fprintf(&s, " (now: %s/s)", formatBytes(int64(p.speed)))
+					fmt.Fprintf(&s, " (now: %s/s)", FormatBytes(int64(p.speed)))
 				}
 			}
 
@@ -305,8 +305,8 @@ func (p *Progress) GetAverageSpeed() float64 {
 	return p.avgSpeed
 }
 
-// formatBytes formats byte count as human readable string
-func formatBytes(bytes int64) string {
+// FormatBytes formats byte count as human readable string
+func FormatBytes(bytes int64) string {
 	const unit = 1024
 	if bytes < unit {
 		return fmt.Sprintf("%d B", bytes)

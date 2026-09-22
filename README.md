@@ -150,6 +150,23 @@ The YAML keys defined by the configuration type are:
 | 4    | Access denied or no credentials |
 | 130  | Canceled (`Ctrl+C`, `Esc` during a transfer, or SIGINT) |
 
+## Development
+
+The Go toolchain and dev tools are pinned in `.mise.toml` (`mise install` picks
+them up). The standard checks are:
+
+```sh
+go build ./...
+go test -race ./...
+go vet ./...
+make lint       # golangci-lint via the mise-pinned version
+make build      # stamped binary at bin/s3ry
+```
+
+Integration tests run against a local MinIO container; see
+[docs/testing.md](docs/testing.md) for setup. `make bench` records the
+transfer benchmarks for regression comparisons.
+
 ## Design notes
 
 - One `s3.Session` (AWS SDK for Go v2) is created at startup and shared by every view. It caches an S3 client and a transfer manager per bucket region, so cross-region buckets need no restart.

@@ -61,6 +61,21 @@ func TestSprintf_Japanese(t *testing.T) {
 	assert.NotEmpty(t, result)
 }
 
+func TestJapaneseCatalog(t *testing.T) {
+	SetLanguage("ja")
+	t.Cleanup(func() { SetLanguage("en") })
+
+	if got := Sprintf("Canceled"); got != "キャンセルしました" {
+		t.Fatalf("ja catalog = %q, want キャンセルしました", got)
+	}
+	if got := Sprintf("Delete %s? [y/N]", "a.txt"); got != "a.txt を削除しますか？ [y/N]" {
+		t.Fatalf("ja formatted catalog = %q", got)
+	}
+	if got := Sprintf("key without a translation"); got != "key without a translation" {
+		t.Fatalf("untranslated key = %q, want the key itself", got)
+	}
+}
+
 func TestMultipleInitCalls(t *testing.T) {
 	Init()
 	first := CurrentLanguage()

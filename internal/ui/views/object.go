@@ -34,11 +34,8 @@ type ObjectView struct {
 	deps        Deps
 	bucket      string
 	mode        ObjectMode
-	list        *components.List
-	spinner     *components.Spinner
+	state       listState
 	preview     *components.Preview
-	errors      *components.ErrorDisplay
-	loading     bool
 	showPreview bool
 	width       int
 	confirm     *confirmPrompt
@@ -58,16 +55,14 @@ func NewObjectView(deps Deps, bucket string, mode ObjectMode) *ObjectView {
 		deps:    deps,
 		bucket:  bucket,
 		mode:    mode,
-		loading: true,
-		spinner: components.NewSpinner(spinnerMessage),
+		state:   newListState(spinnerMessage),
 		preview: components.NewPreview(),
-		errors:  components.NewErrorDisplay(),
 	}
 }
 
 // Init starts the spinner and the first object listing.
 func (v *ObjectView) Init() tea.Cmd {
-	return tea.Batch(v.spinner.Start(), v.loadObjects())
+	return tea.Batch(v.state.spinner.Start(), v.loadObjects())
 }
 
 // Update handles messages for the object view.
@@ -77,8 +72,8 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.width = msg.Width
-		if v.list != nil {
-			v.list, _ = v.list.Update(msg)
+		if v.state.list != nil {
+			v.state.list, _ = v.state.list.Update(msg)
 		}
 		v.transfer.resize(msg)
 		if v.preview != nil {
@@ -107,10 +102,7 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The broker was closed while a read was in flight; nothing to do.
 
 	case components.SpinnerTickMsg:
-		if v.loading {
-			v.spinner, _ = v.spinner.Update(msg)
-			cmds = append(cmds, v.spinner.Start())
-		}
+		cmds = append(cmds, v.state.onTick(msg))
 
 	case components.PreviewMsg:
 		if v.preview != nil {
@@ -126,16 +118,8 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // onObjectsLoaded renders the freshly fetched listing or its error.
 func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) {
-	v.loading = false
-	v.spinner.Stop()
-
 	if msg.Err != nil {
-		v.errors.AddAWSError(msg.Err)
-		v.list = components.NewList(T("Error Loading Objects"), []components.ListItem{{
-			Title:       T("Failed to load S3 objects"),
-			Description: T("Press 'r' to retry, 'esc' to go back, or 'q' to quit"),
-			Tag:         "Error",
-		}})
+		v.state.fail(T("Error Loading Objects"), T("Failed to load S3 objects"), msg.Err)
 		return v, nil
 	}
 
@@ -143,7 +127,7 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 	for _, obj := range msg.Objects {
 		tag := "Object"
 		description := fmt.Sprintf("%s %s | %s %s",
-			T("Size:"), formatBytes(obj.Size),
+			T("Size:"), components.FormatBytes(obj.Size),
 			T("Modified:"), formatModified(obj.LastModified))
 		if strings.HasSuffix(obj.Key, "/") {
 			tag = "Folder"
@@ -164,7 +148,7 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 	case ModeDelete:
 		title = T("Select Object to Delete")
 	}
-	v.list = components.NewList(title, items)
+	v.state.loaded(title, items)
 	return v, nil
 }
 
@@ -203,12 +187,16 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
-	if v.loading {
+	if v.state.loading {
 		if key == "ctrl+c" || key == "q" {
 			v.transfer.abort()
 			return v, tea.Quit
 		}
 		return v, nil
+	}
+
+	if v.state.retryRequested(key) {
+		return v, v.state.startLoading(T("Retrying to load S3 objects..."), v.loadObjects())
 	}
 
 	var cmds []tea.Cmd
@@ -229,20 +217,10 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, previewObject(*obj))
 			}
 		}
-	case "r":
-		v.loading = true
-		v.errors.ClearErrors()
-		v.spinner = components.NewSpinner(T("Retrying to load S3 objects..."))
-		return v, tea.Batch(v.spinner.Start(), v.loadObjects())
 	case "enter", " ":
-		item := v.currentItem()
+		item := v.state.currentItem()
 		if item == nil {
 			break
-		}
-		if item.Tag == "Error" {
-			v.loading = true
-			v.spinner = components.NewSpinner(T("Retrying to load S3 objects..."))
-			return v, tea.Batch(v.spinner.Start(), v.loadObjects())
 		}
 		obj, ok := item.Data.(s3.Object)
 		if !ok {
@@ -251,8 +229,8 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v.selectObject(obj)
 	}
 
-	if v.list != nil {
-		v.list, _ = v.list.Update(msg)
+	if v.state.list != nil {
+		v.state.list, _ = v.state.list.Update(msg)
 		if v.showPreview {
 			if obj := v.currentObject(); obj != nil {
 				cmds = append(cmds, previewObject(*obj))
@@ -268,11 +246,11 @@ func (v *ObjectView) View() string {
 		return v.transfer.progress.View()
 	}
 
-	if v.loading {
-		return headerStyle.Render(T("S3 Objects")) + "\n\n" + v.spinner.View()
+	if v.state.loading {
+		return headerStyle.Render(T("S3 Objects")) + "\n\n" + v.state.spinner.View()
 	}
 
-	if v.list == nil {
+	if v.state.list == nil {
 		return errorStyle.Render(T("Failed to load S3 objects"))
 	}
 
@@ -298,29 +276,22 @@ func (v *ObjectView) View() string {
 			listWidth = 20
 		}
 		body = lipgloss.JoinHorizontal(lipgloss.Top,
-			lipgloss.NewStyle().Width(listWidth).Render(v.list.View()),
+			lipgloss.NewStyle().Width(listWidth).Render(v.state.list.View()),
 			lipgloss.NewStyle().Width(v.width-listWidth).Render(v.preview.View()),
 		)
 	} else {
-		body = v.list.View()
+		body = v.state.list.View()
 	}
 
 	result := context + "\n\n" + body
-	if v.errors.GetErrorCount() > 0 {
-		result += "\n\n" + v.errors.View()
+	if v.state.errors.GetErrorCount() > 0 {
+		result += "\n\n" + v.state.errors.View()
 	}
 	return result + "\n\n" + footer
 }
 
-func (v *ObjectView) currentItem() *components.ListItem {
-	if v.list == nil {
-		return nil
-	}
-	return v.list.GetCurrentItem()
-}
-
 func (v *ObjectView) currentObject() *s3.Object {
-	item := v.currentItem()
+	item := v.state.currentItem()
 	if item == nil || item.Tag != "Object" {
 		return nil
 	}
@@ -362,7 +333,7 @@ func previewObject(obj s3.Object) tea.Cmd {
 		content := fmt.Sprintf("%s\n\n%s %s\n%s %s\n%s %s\n%s %s",
 			T("S3 Object Information"),
 			T("Key:"), obj.Key,
-			T("Size:"), formatBytes(obj.Size),
+			T("Size:"), components.FormatBytes(obj.Size),
 			T("Modified:"), modified,
 			T("ETag:"), truncateShort(obj.ETag, 40),
 		)
@@ -373,9 +344,9 @@ func previewObject(obj s3.Object) tea.Cmd {
 // progressMessage renders the text line shown under the progress bar.
 func progressMessage(event s3.Progress) string {
 	if event.Total > 0 {
-		return fmt.Sprintf("%s / %s", formatBytes(event.Transferred), formatBytes(event.Total))
+		return fmt.Sprintf("%s / %s", components.FormatBytes(event.Transferred), components.FormatBytes(event.Total))
 	}
-	return formatBytes(event.Transferred)
+	return components.FormatBytes(event.Transferred)
 }
 
 // formatModified renders a timestamp, substituting a dash for the zero time.

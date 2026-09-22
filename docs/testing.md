@@ -20,4 +20,4 @@ make test-integration
 
 `S3RY_TEST_BUCKET` defaults to `s3ry-it-<unix nanos>`. `S3RY_TEST_REGION` defaults to `us-east-1`.
 
-Unit tests use gofakes3 in-process. Integration tests use MinIO pinned to the same image tag as CI.
+Unit tests use gofakes3 in-process. Integration tests use MinIO pinned to the same image tag as CI; the `integration` CI job starts the identical container and runs `make test-integration`.

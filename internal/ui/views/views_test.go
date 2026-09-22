@@ -16,6 +16,7 @@ import (
 
 	"github.com/seike460/s3ry/internal/config"
 	"github.com/seike460/s3ry/internal/s3"
+	"github.com/seike460/s3ry/internal/ui/components"
 )
 
 // fakeS3 serves a minimal XML API: ListBuckets on / and ListObjectsV2 on
@@ -155,10 +156,10 @@ func TestBucketViewListsBuckets(t *testing.T) {
 
 	model, _ := view.Update(msg)
 	updated := model.(*BucketView)
-	if updated.loading {
+	if updated.state.loading {
 		t.Fatal("view still loading after BucketsLoadedMsg")
 	}
-	if updated.list == nil {
+	if updated.state.list == nil {
 		t.Fatal("list was not built")
 	}
 }
@@ -176,7 +177,7 @@ func TestBucketViewNoSession(t *testing.T) {
 
 	model, _ := view.Update(msg)
 	updated := model.(*BucketView)
-	if updated.loading || updated.list == nil {
+	if updated.state.loading || updated.state.list == nil {
 		t.Fatal("error path did not stop loading and build an error list")
 	}
 }
@@ -235,7 +236,7 @@ func TestObjectViewListsObjects(t *testing.T) {
 
 	model, _ := view.Update(msg)
 	updated := model.(*ObjectView)
-	if updated.loading || updated.list == nil {
+	if updated.state.loading || updated.state.list == nil {
 		t.Fatal("object list was not built")
 	}
 }
@@ -284,7 +285,7 @@ func TestUploadViewFilesLoaded(t *testing.T) {
 		{Path: "one.txt", RelativePath: "one.txt", Size: 5, ModTime: time.Now()},
 	}})
 	updated := model.(*UploadView)
-	if updated.loading || updated.list == nil {
+	if updated.state.loading || updated.state.list == nil {
 		t.Fatal("file list was not built")
 	}
 }
@@ -294,10 +295,10 @@ func TestUploadViewFilesLoadedError(t *testing.T) {
 
 	model, _ := view.Update(FilesLoadedMsg{Err: errors.New("scan failed")})
 	updated := model.(*UploadView)
-	if updated.loading || updated.list == nil {
+	if updated.state.loading || updated.state.list == nil {
 		t.Fatal("error path did not build the error list")
 	}
-	if updated.errors.GetErrorCount() == 0 {
+	if updated.state.errors.GetErrorCount() == 0 {
 		t.Fatal("error was not recorded")
 	}
 }
@@ -325,8 +326,8 @@ func TestFormatBytes(t *testing.T) {
 		12345678: "11.8 MB",
 	}
 	for input, want := range cases {
-		if got := formatBytes(input); got != want {
-			t.Errorf("formatBytes(%d) = %q, want %q", input, got, want)
+		if got := components.FormatBytes(input); got != want {
+			t.Errorf("components.FormatBytes(%d) = %q, want %q", input, got, want)
 		}
 	}
 }

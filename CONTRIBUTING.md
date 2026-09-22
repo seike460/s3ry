@@ -2,7 +2,7 @@
 
 ## Development environment
 
-Use Go 1.25 or later. Work from a clone of the repository and keep changes focused on the current command and packages.
+Use Go 1.27 or later. Work from a clone of the repository and keep changes focused on the current command and packages. [mise](https://mise.jdx.dev) users can run `mise install` to get the pinned Go, golangci-lint, and gofumpt versions.
 
 ## Build, test, and lint
 

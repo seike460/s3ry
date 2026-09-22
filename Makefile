@@ -1,7 +1,14 @@
 .PHONY: build test lint bench test-integration
 
+# Stamp version metadata into the binary; trimpath keeps the build
+# reproducible across checkout locations.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -trimpath -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
+
 build:
-	go build -o bin/s3ry ./cmd/s3ry
+	go build $(LDFLAGS) -o bin/s3ry ./cmd/s3ry
 
 test:
 	go test -race ./...
