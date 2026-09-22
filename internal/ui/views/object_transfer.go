@@ -36,9 +36,12 @@ type confirmPrompt struct {
 	countErr  error
 }
 
-// prefixCountMsg carries the dry-run result of a prefix delete.
+// prefixCountMsg carries the dry-run result of a prefix delete. prefix
+// records the location the count was requested at so a stale result cannot
+// update a prompt opened after navigation.
 type prefixCountMsg struct {
 	object s3.Object
+	prefix string
 	count  int
 	err    error
 }
@@ -56,9 +59,12 @@ var presignExpirations = []struct {
 }
 
 // presignResultMsg carries a generated presigned URL back to the view.
+// prefix records where the request was made; a result arriving after the
+// user navigated away is dropped.
 type presignResultMsg struct {
 	url     string
 	expires time.Duration
+	prefix  string
 	err     error
 }
 
@@ -136,16 +142,20 @@ func (v *ObjectView) startDelete(obj s3.Object) (tea.Model, tea.Cmd) {
 // countPrefixObjects performs a dry-run prefix delete to learn how many
 // objects live under the folder marker.
 func (v *ObjectView) countPrefixObjects(obj s3.Object) tea.Cmd {
+	bucket, prefix := v.bucket, v.prefix
 	return func() tea.Msg {
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-		result, err := v.deps.Session.DeletePrefix(ctx, v.bucket, obj.Key, s3.DeleteOptions{DryRun: true})
-		return prefixCountMsg{object: obj, count: len(result.Deleted), err: err}
+		result, err := v.deps.Session.DeletePrefix(ctx, bucket, obj.Key, s3.DeleteOptions{DryRun: true})
+		return prefixCountMsg{object: obj, prefix: prefix, count: len(result.Deleted), err: err}
 	}
 }
 
 // onPrefixCount stores the dry-run count on the open prefix-delete prompt.
 func (v *ObjectView) onPrefixCount(msg prefixCountMsg) {
+	if msg.prefix != v.prefix {
+		return
+	}
 	if v.confirm == nil || v.confirm.kind != confirmDeletePrefix {
 		return
 	}
@@ -156,33 +166,36 @@ func (v *ObjectView) onPrefixCount(msg prefixCountMsg) {
 	v.confirm.countErr = msg.err
 }
 
-// startPresign generates a presigned GET URL for the object and copies it to
-// the clipboard when stdout is a terminal.
+// startPresign generates a presigned GET URL for the object. The clipboard
+// copy happens in onPresignResult so the OSC52 write is issued on the
+// update path rather than a command goroutine.
 func (v *ObjectView) startPresign(obj s3.Object, expires time.Duration) tea.Cmd {
+	bucket, prefix, key := v.bucket, v.prefix, obj.Key
 	return func() tea.Msg {
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-		url, err := v.deps.Session.PresignGet(ctx, v.bucket, obj.Key, expires)
-		if err != nil {
-			return presignResultMsg{err: err}
-		}
-		if term.IsTerminal(os.Stdout.Fd()) {
-			_, _ = osc52.New(url).WriteTo(os.Stdout)
-		}
-		return presignResultMsg{url: url, expires: expires}
+		url, err := v.deps.Session.PresignGet(ctx, bucket, key, expires)
+		return presignResultMsg{url: url, expires: expires, prefix: prefix, err: err}
 	}
 }
 
-// onPresignResult records the generated URL (or failure) for display.
+// onPresignResult records the generated URL (or failure) for display and
+// copies it to the clipboard when stdout is a terminal.
 func (v *ObjectView) onPresignResult(msg presignResultMsg) {
+	if msg.prefix != v.prefix {
+		return
+	}
 	if msg.err != nil {
 		v.notice = v.deps.T("Presign failed") + ": " + msg.err.Error()
 		return
 	}
-	v.notice = fmt.Sprintf("%s %s\n%s %s — %s",
+	v.notice = fmt.Sprintf("%s %s\n%s %s",
 		v.deps.T("Presigned URL:"), msg.url,
-		v.deps.T("Expires:"), presignLabel(msg.expires),
-		v.deps.T("Copied to clipboard"))
+		v.deps.T("Expires:"), presignLabel(msg.expires))
+	if term.IsTerminal(os.Stdout.Fd()) {
+		_, _ = osc52.New(msg.url).WriteTo(os.Stdout)
+		v.notice += " — " + v.deps.T("Copied to clipboard")
+	}
 }
 
 // presignLabel renders an expiry duration with its prompt label.

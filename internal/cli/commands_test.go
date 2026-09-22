@@ -214,3 +214,11 @@ func TestPresignPrintsURL(t *testing.T) {
 		t.Fatalf("out = %q, want a 2h presigned URL", out)
 	}
 }
+
+func TestLsRejectsUnknownFormat(t *testing.T) {
+	server, _ := newFakeS3Server(t)
+	code, _, _ := runCommand(t, server, "ls", "-o", "xml")
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2 (usage error)", code)
+	}
+}

@@ -585,12 +585,15 @@ func TestObjectViewPreviewObject(t *testing.T) {
 		LastModified: time.Now(),
 		ETag:         "0123456789abcdef",
 	})()
-	preview, ok := msg.(components.PreviewMsg)
+	preview, ok := msg.(previewResultMsg)
 	if !ok {
-		t.Fatalf("previewObject returned %T, want components.PreviewMsg", msg)
+		t.Fatalf("previewObject returned %T, want previewResultMsg", msg)
 	}
-	if !strings.Contains(preview.Content, "a.txt") {
-		t.Fatalf("preview content = %q, want object key included", preview.Content)
+	if preview.key != "a.txt" {
+		t.Fatalf("previewResultMsg.key = %q, want a.txt", preview.key)
+	}
+	if !strings.Contains(preview.content, "a.txt") {
+		t.Fatalf("preview content = %q, want object key included", preview.content)
 	}
 }
 
@@ -899,5 +902,112 @@ func TestObjectViewDropsStalePrefixPage(t *testing.T) {
 		if item.Title == "stale.txt" {
 			t.Fatal("stale page leaked into the new prefix listing")
 		}
+	}
+}
+
+func TestObjectViewFilterAcceptsR(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	model, _ := view.Update(ObjectsLoadedMsg{Page: &s3.Page{
+		Objects: []s3.Object{{Key: "reports/a.txt"}, {Key: "b.txt"}},
+	}})
+	view = model.(*ObjectView)
+
+	model, _ = view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	view = model.(*ObjectView)
+	model, _ = view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	view = model.(*ObjectView)
+	if view.state.loading {
+		t.Fatal("typing 'r' in the filter triggered a reload")
+	}
+	if view.state.list.Filter() != "r" {
+		t.Fatalf("filter = %q, want r", view.state.list.Filter())
+	}
+}
+
+func TestObjectViewDeleteModeDescendsWithL(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDelete)
+	model, _ := view.Update(ObjectsLoadedMsg{Page: &s3.Page{
+		Prefixes: []string{"dir/"},
+	}})
+	view = model.(*ObjectView)
+
+	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	view = model.(*ObjectView)
+	if view.prefix != "dir/" || !view.state.loading {
+		t.Fatalf("l on folder: prefix=%q loading=%v", view.prefix, view.state.loading)
+	}
+	if cmd == nil {
+		t.Fatal("l on a folder returned no load command")
+	}
+}
+
+func TestObjectViewLoadMoreGuardsDuplicateAndCursor(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	model, _ := view.Update(ObjectsLoadedMsg{Page: &s3.Page{
+		Objects:     []s3.Object{{Key: "a.txt"}},
+		IsTruncated: true,
+		NextToken:   "tok",
+	}})
+	view = model.(*ObjectView)
+
+	view.state.list, _ = view.state.list.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view = model.(*ObjectView)
+	if cmd == nil || !view.loadingMore {
+		t.Fatal("first Load more press did not start a fetch")
+	}
+	model, cmd = view.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	view = model.(*ObjectView)
+	if cmd != nil {
+		t.Fatal("second Load more press started a duplicate fetch")
+	}
+
+	model, _ = view.Update(ObjectsLoadedMsg{
+		Page:   &s3.Page{Objects: []s3.Object{{Key: "b.txt"}}},
+		Append: true,
+	})
+	view = model.(*ObjectView)
+	if view.loadingMore {
+		t.Fatal("loadingMore stuck after the page arrived")
+	}
+	if len(view.items) != 2 || view.items[1].Title != "b.txt" {
+		t.Fatalf("items = %#v, want [a.txt b.txt]", view.items)
+	}
+	if got := view.state.list.GetCursor(); got != 1 {
+		t.Fatalf("cursor = %d, want 1 (kept at the former sentinel position)", got)
+	}
+}
+
+func TestObjectViewPrefixDeleteConfirmWaitsForCount(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDelete)
+	model, _ := view.selectObject(s3.Object{Key: "dir/"})
+	view = model.(*ObjectView)
+
+	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	view = model.(*ObjectView)
+	if cmd != nil || view.confirm == nil {
+		t.Fatal("y accepted the prompt while the dry-run count was in flight")
+	}
+
+	view.onPrefixCount(prefixCountMsg{object: s3.Object{Key: "dir/"}, count: 2})
+	model, cmd = view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if cmd == nil {
+		t.Fatal("y after the count arrived did not start the delete")
+	}
+	_ = model
+}
+
+func TestObjectViewStaleAsyncResultsDropped(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	view.prefix = "new/"
+
+	view.onPresignResult(presignResultMsg{url: "https://example", expires: time.Hour, prefix: "old/"})
+	if view.notice != "" {
+		t.Fatal("stale presign result landed on the new prefix")
+	}
+	view.onPrefixCount(prefixCountMsg{object: s3.Object{Key: "dir/"}, prefix: "old/", count: 3})
+	view.onPreviewResult(previewResultMsg{key: "other.txt", content: "stale"})
+	if view.preview != nil && strings.Contains(view.preview.View(), "stale") {
+		t.Fatal("stale preview result overwrote the pane")
 	}
 }

@@ -91,6 +91,9 @@ func newLsCommand(flags *rootFlags) *cobra.Command {
 		Short: "List buckets or objects without the TUI",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if output != "plain" && output != "json" {
+				return &usageError{err: fmt.Errorf("unsupported output format %q (expected plain or json)", output)}
+			}
 			session, ctx, cancel, err := openSession(cmd, flags)
 			if err != nil {
 				return err
@@ -130,11 +133,20 @@ func printBuckets(ctx context.Context, cmd *cobra.Command, session *s3.Session, 
 	return nil
 }
 
-// printObjects walks the URL prefix and writes each object key.
+// printObjects walks the URL prefix and writes each object key. Plain
+// output streams line by line — Concurrency 1 keeps Walk in listing order —
+// while JSON must buffer the full result to encode the array.
 func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, raw, output string) error {
 	u, err := s3.ParseURL(raw)
 	if err != nil {
 		return &usageError{err: fmt.Errorf("invalid S3 URL %q: %w", raw, err)}
+	}
+	out := cmd.OutOrStdout()
+	if output == "plain" {
+		return session.Walk(ctx, u.Bucket, u.Key, s3.WalkOptions{Concurrency: 1}, func(o s3.Object) error {
+			_, _ = fmt.Fprintln(out, o.Key)
+			return nil
+		})
 	}
 	var objects []s3.Object
 	err = session.Walk(ctx, u.Bucket, u.Key, s3.WalkOptions{Concurrency: 1}, func(o s3.Object) error {
@@ -144,24 +156,17 @@ func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, 
 	if err != nil {
 		return err
 	}
-	out := cmd.OutOrStdout()
-	if output == "json" {
-		rows := make([]objectJSON, 0, len(objects))
-		for _, o := range objects {
-			rows = append(rows, objectJSON{
-				Key:          o.Key,
-				Size:         o.Size,
-				LastModified: o.LastModified.UTC().Format(time.RFC3339),
-				ETag:         o.ETag,
-				StorageClass: o.StorageClass,
-			})
-		}
-		return json.NewEncoder(out).Encode(rows)
-	}
+	rows := make([]objectJSON, 0, len(objects))
 	for _, o := range objects {
-		_, _ = fmt.Fprintln(out, o.Key)
+		rows = append(rows, objectJSON{
+			Key:          o.Key,
+			Size:         o.Size,
+			LastModified: o.LastModified.UTC().Format(time.RFC3339),
+			ETag:         o.ETag,
+			StorageClass: o.StorageClass,
+		})
 	}
-	return nil
+	return json.NewEncoder(out).Encode(rows)
 }
 
 // newCatCommand streams one object's body to stdout.

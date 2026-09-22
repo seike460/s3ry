@@ -17,9 +17,9 @@ This project is being rebuilt on AWS SDK for Go v2. The v2.0.0 release notes wer
 - Copy a presigned GET URL for the selected object (`P`) with a 1h/24h/7d expiry choice.
 - Download a selected object to the current directory. Downloads use the AWS transfer manager for parallel multipart transfer.
 - Upload a selected file that is not hidden (hidden files and directories are skipped) from the current directory tree to the selected bucket.
-- Delete a selected object, or a whole folder — the confirmation shows the object count from a dry run first. Local overwrite also asks for confirmation.
+- Delete a selected object, or a whole folder — the confirmation shows the object count from a dry run first. In delete mode `Enter` on a folder deletes everything under it; press `l` or `→` to descend into the folder and delete individual objects instead. Local overwrite also asks for confirmation.
 - Export the selected bucket's full object list to `ObjectList-<timestamp>.txt` in the current directory.
-- Start directly at a bucket or prefix: `s3ry s3://bucket/prefix`.
+- Start directly at a bucket or prefix: `s3ry s3://bucket` opens the operation menu for the bucket, while `s3ry s3://bucket/prefix` (a path, or a bare `s3://bucket/` with a trailing slash) opens the object browser straight at that location.
 - Press `Esc` during a transfer to cancel it.
 - S3-compatible endpoints (MinIO, LocalStack) via `--endpoint`, `--path-style`, and `--no-sign-request`.
 

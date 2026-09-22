@@ -48,6 +48,9 @@ type ObjectView struct {
 	width       int
 	confirm     *confirmPrompt
 	transfer    transferState
+	// loadingMore is true while a "Load more" page request is in flight;
+	// it guards the sentinel row against duplicate fetches.
+	loadingMore bool
 }
 
 // NewObjectView creates a new object view rooted at the bucket.
@@ -93,6 +96,9 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
+
+	case previewResultMsg:
+		v.onPreviewResult(msg)
 
 	case prefixCountMsg, presignResultMsg:
 		v.onAsyncResult(msg)
@@ -200,6 +206,11 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
+
 	if v.state.retryRequested(key) {
 		return v, v.state.startLoading(v.deps.T("Retrying to load S3 objects..."), v.loadObjects())
 	}
@@ -215,6 +226,11 @@ func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "y", "Y":
 		pending := *v.confirm
+		if pending.kind == confirmDeletePrefix && pending.count < 0 && pending.countErr == nil {
+			// Still counting the dry-run result; wait for it before
+			// accepting the destructive answer.
+			return v, nil
+		}
 		v.confirm = nil
 		switch pending.kind {
 		case confirmDelete:
@@ -255,10 +271,6 @@ func (v *ObjectView) onPresignKey(key string) (tea.Model, tea.Cmd) {
 
 // onReadyKey handles input on the object list.
 func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if v.state.filterActive() {
-		v.state.routeFilterKey(msg)
-		return v, nil
-	}
 	key := msg.String()
 	if v.transfer.quitRequested(key) {
 		return v, tea.Quit
@@ -309,7 +321,11 @@ func (v *ObjectView) enterItem() (tea.Model, tea.Cmd) {
 	}
 	switch item.Tag {
 	case "More":
+		if v.loadingMore {
+			return v, nil
+		}
 		token, _ := item.Data.(string)
+		v.loadingMore = true
 		return v, v.fetchPage(token)
 	case "Folder":
 		return v.enterFolder(item)
@@ -365,6 +381,7 @@ func (v *ObjectView) ascend() (tea.Model, tea.Cmd) {
 func (v *ObjectView) reload() (tea.Model, tea.Cmd) {
 	v.previewKey = ""
 	v.notice = ""
+	v.loadingMore = false
 	return v, v.state.startLoading(v.loadMessage(), v.loadObjects())
 }
 
@@ -377,6 +394,16 @@ func (v *ObjectView) navView(key string) (tea.Model, tea.Cmd) {
 			return v.ascend()
 		}
 		return NewOperationView(v.deps, v.bucket), nil
+	case "right", "l":
+		// In every mode, right/l descends into the folder under the
+		// cursor. In delete mode this is the only way in: enter on a
+		// folder starts a prefix delete instead.
+		if item := v.state.currentItem(); item != nil && item.Tag == "Folder" {
+			if key := folderItemKey(item); key != "" {
+				return v.descend(key)
+			}
+		}
+		return nil, nil
 	case "?":
 		return NewHelpView(v.deps), nil
 	case "s":
@@ -437,14 +464,14 @@ func (v *ObjectView) loadObjects() tea.Cmd {
 // token continues the previous listing ("Load more" item). The prefix is
 // captured now so a stale response can be dropped on arrival.
 func (v *ObjectView) fetchPage(token string) tea.Cmd {
-	prefix := v.prefix
+	bucket, prefix := v.bucket, v.prefix
 	return func() tea.Msg {
 		if err := v.deps.sessionErr(); err != nil {
 			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
 		}
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-		page, err := v.deps.Session.ListPage(ctx, v.bucket, prefix, token, maxListPageKeys)
+		page, err := v.deps.Session.ListPage(ctx, bucket, prefix, token, maxListPageKeys)
 		if err != nil {
 			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
 		}

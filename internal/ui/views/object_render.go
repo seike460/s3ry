@@ -31,6 +31,7 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 	if msg.Prefix != v.prefix {
 		return v, nil
 	}
+	v.loadingMore = false
 	if msg.Err != nil {
 		v.state.fail(v.deps, v.deps.T("Error Loading Objects"), v.deps.T("Failed to load S3 objects"), msg.Err)
 		return v, nil
@@ -40,8 +41,10 @@ func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) 
 		if n := len(v.items); n > 0 && v.items[n-1].Tag == "More" {
 			v.items = v.items[:n-1]
 		}
+		cursor := v.state.list.GetCursor()
 		v.items = append(v.items, pageItems...)
 		v.state.list.SetItems(v.items)
+		v.state.list.SetCursor(cursor)
 		return v, nil
 	}
 	v.items = pageItems
@@ -211,22 +214,39 @@ func (v *ObjectView) currentObject() *s3.Object {
 	return &obj
 }
 
+// previewResultMsg carries a HeadObject result tagged with the requested
+// key, so a stale response cannot overwrite a newer selection's pane.
+type previewResultMsg struct {
+	key     string
+	content string
+}
+
 // previewObject fetches the object's metadata via HeadObject and renders it
 // into the preview pane.
 func (v *ObjectView) previewObject(obj s3.Object) tea.Cmd {
+	bucket, key := v.bucket, obj.Key
 	return func() tea.Msg {
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-		info, err := v.deps.Session.Stat(ctx, v.bucket, obj.Key)
+		info, err := v.deps.Session.Stat(ctx, bucket, key)
 		if err != nil {
 			content := fmt.Sprintf("%s\n\n%s", v.deps.T("S3 Object Information"), err.Error())
-			return components.PreviewMsg{Content: content, PreviewType: components.PreviewTypeText}
+			return previewResultMsg{key: key, content: content}
 		}
-		return components.PreviewMsg{
-			Content:     v.renderObjectInfo(info),
-			PreviewType: components.PreviewTypeText,
-		}
+		return previewResultMsg{key: key, content: v.renderObjectInfo(info)}
 	}
+}
+
+// onPreviewResult feeds a HeadObject result into the pane, unless the
+// cursor has moved on to a different object since the request.
+func (v *ObjectView) onPreviewResult(msg previewResultMsg) {
+	if msg.key != v.previewKey || v.preview == nil {
+		return
+	}
+	v.preview, _ = v.preview.Update(components.PreviewMsg{
+		Content:     msg.content,
+		PreviewType: components.PreviewTypeText,
+	})
 }
 
 // renderObjectInfo formats every field of a HeadObject response.

@@ -316,6 +316,18 @@ func (l *List) GetCursor() int {
 	return l.cursor
 }
 
+// SetCursor moves the cursor to index, clamped to the item bounds.
+func (l *List) SetCursor(index int) {
+	if index < 0 {
+		index = 0
+	}
+	if maxCursor := len(l.items) - 1; index > maxCursor {
+		index = max(maxCursor, 0)
+	}
+	l.cursor = index
+	l.updateViewport()
+}
+
 // GetSelected returns the selected item index (-1 if none selected)
 func (l *List) GetSelected() int {
 	return l.selected

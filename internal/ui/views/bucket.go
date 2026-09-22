@@ -90,6 +90,11 @@ func (v *BucketView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
+
 	if v.state.retryRequested(msg.String()) {
 		return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
 	}
@@ -99,10 +104,6 @@ func (v *BucketView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onListKey handles keys on the loaded bucket list.
 func (v *BucketView) onListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if v.state.filterActive() {
-		v.state.routeFilterKey(msg)
-		return v, nil
-	}
 	if quitKey(msg.String()) {
 		return v, tea.Quit
 	}
