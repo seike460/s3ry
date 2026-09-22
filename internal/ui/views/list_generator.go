@@ -75,10 +75,10 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			v.transfer.abort()
+		if v.transfer.quitRequested(msg.String()) {
 			return v, tea.Quit
+		}
+		switch msg.String() {
 		case "esc":
 			if v.transfer.active {
 				v.transfer.cancelTransfer()

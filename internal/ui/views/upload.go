@@ -55,9 +55,7 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		if v.state.list != nil {
-			v.state.list, _ = v.state.list.Update(msg)
-		}
+		v.state.resize(msg)
 		v.transfer.resize(msg)
 
 	case FilesLoadedMsg:
@@ -115,19 +113,14 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	if v.transfer.active {
-		switch key {
-		case "ctrl+c", "q":
-			v.transfer.abort()
+		if v.transfer.activeKey(key) {
 			return v, tea.Quit
-		case "esc":
-			v.transfer.cancelTransfer()
 		}
 		return v, nil
 	}
 
 	if v.state.loading {
-		if key == "ctrl+c" || key == "q" {
-			v.transfer.abort()
+		if v.transfer.quitRequested(key) {
 			return v, tea.Quit
 		}
 		return v, nil
@@ -137,10 +130,10 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, v.state.startLoading(v.deps.T("Retrying to scan local files..."), v.loadFiles())
 	}
 
-	switch key {
-	case "ctrl+c", "q":
-		v.transfer.abort()
+	if v.transfer.quitRequested(key) {
 		return v, tea.Quit
+	}
+	switch key {
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
 	case "enter", " ":

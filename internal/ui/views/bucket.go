@@ -78,9 +78,10 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
 		}
 
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if quitKey(msg.String()) {
 			return v, tea.Quit
+		}
+		switch msg.String() {
 		case "?":
 			return NewHelpView(v.deps), nil
 		case "s":

@@ -59,9 +59,10 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if quitKey(msg.String()) {
 			return v, tea.Quit
+		}
+		switch msg.String() {
 		case "esc":
 			return NewBucketView(v.deps), nil
 		}

@@ -108,9 +108,10 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		key := msg.String()
-		switch key {
-		case "ctrl+c", "q":
+		if quitKey(key) {
 			return v, tea.Quit
+		}
+		switch key {
 		case "esc":
 			return NewBucketView(v.deps), nil
 		case "?":

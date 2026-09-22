@@ -130,6 +130,13 @@ func (s *listState) loaded(title string, items []components.ListItem) {
 	s.list = components.NewList(title, items)
 }
 
+// resize forwards a window size change to the list, when it exists.
+func (s *listState) resize(msg tea.WindowSizeMsg) {
+	if s.list != nil {
+		s.list, _ = s.list.Update(msg)
+	}
+}
+
 // onTick animates the spinner while a load is in flight.
 func (s *listState) onTick(msg components.SpinnerTickMsg) tea.Cmd {
 	if !s.loading {
@@ -157,6 +164,11 @@ func (s *listState) currentItem() *components.ListItem {
 		return nil
 	}
 	return s.list.GetCurrentItem()
+}
+
+// quitKey reports whether key asks to quit the program.
+func quitKey(key string) bool {
+	return key == "ctrl+c" || key == "q"
 }
 
 // truncateShort middle-truncates s so it fits width runes.

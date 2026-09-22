@@ -233,16 +233,21 @@ func regionFromError(err error) string {
 	return response.Header.Get("x-amz-bucket-region")
 }
 
+// regionFor resolves the bucket's region. Custom endpoints are single-region
+// endpoints, so they skip the HeadBucket probe entirely.
+func (s *Session) regionFor(ctx context.Context, bucket string) (string, error) {
+	if s.endpointMode {
+		return s.cfg.Region, nil
+	}
+	return s.BucketRegion(ctx, bucket)
+}
+
 // client returns the cached client for bucket's region, creating it exactly
 // once per region while holding the session mutex.
 func (s *Session) client(ctx context.Context, bucket string) (*awss3.Client, error) {
-	region := s.cfg.Region
-	if !s.endpointMode {
-		var err error
-		region, err = s.BucketRegion(ctx, bucket)
-		if err != nil {
-			return nil, err
-		}
+	region, err := s.regionFor(ctx, bucket)
+	if err != nil {
+		return nil, err
 	}
 	return s.clientForRegion(region), nil
 }
@@ -250,7 +255,12 @@ func (s *Session) client(ctx context.Context, bucket string) (*awss3.Client, err
 func (s *Session) clientForRegion(region string) *awss3.Client {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.clientForRegionLocked(region)
+}
 
+// clientForRegionLocked returns the cached client for region. Callers must
+// hold s.mu.
+func (s *Session) clientForRegionLocked(region string) *awss3.Client {
 	if client := s.clients[region]; client != nil {
 		return client
 	}
@@ -274,16 +284,7 @@ func (s *Session) transferOptions() func(*transfermanager.Options) {
 
 // transfer returns the cached transfer manager for bucket's region.
 func (s *Session) transfer(ctx context.Context, bucket string) (*transfermanager.Client, error) {
-	region := s.cfg.Region
-	if !s.endpointMode {
-		var err error
-		region, err = s.BucketRegion(ctx, bucket)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	client, err := s.client(ctx, bucket)
+	region, err := s.regionFor(ctx, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +295,7 @@ func (s *Session) transfer(ctx context.Context, bucket string) (*transfermanager
 		return manager, nil
 	}
 
-	manager := transfermanager.New(client, s.transferOptions())
+	manager := transfermanager.New(s.clientForRegionLocked(region), s.transferOptions())
 	s.tms[region] = manager
 	return manager, nil
 }

@@ -195,6 +195,28 @@ func (t *transferState) cancelTransfer() {
 	}
 }
 
+// quitRequested aborts the transfer and reports whether key asks to quit
+// the program.
+func (t *transferState) quitRequested(key string) bool {
+	if key != "ctrl+c" && key != "q" {
+		return false
+	}
+	t.abort()
+	return true
+}
+
+// activeKey handles the keys valid while a transfer runs and reports
+// whether the program should quit.
+func (t *transferState) activeKey(key string) (quit bool) {
+	if t.quitRequested(key) {
+		return true
+	}
+	if key == "esc" {
+		t.cancelTransfer()
+	}
+	return false
+}
+
 // abort cancels the transfer and closes the broker so blocked waiters and
 // Done callbacks are released. It is used when the owning view is being
 // replaced or the program is quitting.
