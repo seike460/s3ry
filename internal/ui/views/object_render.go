@@ -78,9 +78,13 @@ func (v *ObjectView) View() string {
 		return context + "\n\n" + errorStyle.Render(v.confirmQuestion())
 	}
 
-	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit"))
+	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • /: filter • r: refresh • p: preview • P: presign • ?: help • s: settings • esc: back • q: quit"))
 
-	result := context + "\n\n" + v.listBody()
+	result := context
+	if v.notice != "" {
+		result += "\n\n" + noticeStyle.Render(v.notice)
+	}
+	result += "\n\n" + v.listBody()
 	if v.state.errors.GetErrorCount() > 0 {
 		result += "\n\n" + v.state.errors.View()
 	}
@@ -104,6 +108,8 @@ func (v *ObjectView) confirmQuestion() string {
 		return v.deps.T("Delete %s? [y/N]", v.confirm.object.Key)
 	case confirmDeletePrefix:
 		return v.prefixDeleteQuestion()
+	case confirmPresign:
+		return v.deps.T("Presigned URL for %s — expiry: [1] 1 hour  [2] 24 hours  [3] 7 days (esc: cancel)", v.confirm.object.Key)
 	default:
 		return v.deps.T("The file exists. Overwrite %s? [y/N]", v.confirm.localPath)
 	}

@@ -35,6 +35,7 @@ type ObjectView struct {
 	preview     *components.Preview
 	showPreview bool
 	previewKey  string // key whose HeadObject request is in flight or shown
+	notice      string // transient status line (e.g. a presigned URL)
 	width       int
 	confirm     *confirmPrompt
 	transfer    transferState
@@ -84,6 +85,9 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case prefixCountMsg:
 		v.onPrefixCount(msg)
+
+	case presignResultMsg:
+		v.onPresignResult(msg)
 
 	case backToOperationMsg, brokerClosedMsg:
 		// brokerClosedMsg means the broker was closed while a read was in
@@ -179,6 +183,9 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onConfirmKey handles input while a confirmation prompt is open.
 func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
+	if v.confirm.kind == confirmPresign {
+		return v.onPresignKey(key)
+	}
 	switch key {
 	case "y", "Y":
 		pending := *v.confirm
@@ -192,6 +199,25 @@ func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
 			return v.startDownload(pending.object, s3.OverwriteAlways)
 		}
 	case "n", "N", "esc":
+		v.confirm = nil
+		return v, nil
+	}
+	if v.transfer.quitRequested(key) {
+		return v, tea.Quit
+	}
+	return v, nil
+}
+
+// onPresignKey picks an expiry from the presign prompt or cancels it.
+func (v *ObjectView) onPresignKey(key string) (tea.Model, tea.Cmd) {
+	for _, choice := range presignExpirations {
+		if key == choice.key {
+			obj := v.confirm.object
+			v.confirm = nil
+			return v, v.startPresign(obj, choice.expires)
+		}
+	}
+	if key == "esc" || key == "n" {
 		v.confirm = nil
 		return v, nil
 	}
@@ -220,6 +246,10 @@ func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "p":
 		v.showPreview = !v.showPreview
 		v.refreshPreview(&cmds)
+	case "P":
+		if obj := v.currentObject(); obj != nil {
+			v.confirm = &confirmPrompt{kind: confirmPresign, object: *obj}
+		}
 	case "enter", " ":
 		if obj := v.selectedObject(); obj != nil {
 			return v.selectObject(*obj)

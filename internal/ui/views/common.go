@@ -75,6 +75,7 @@ var (
 	contextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorMuted))
 	footerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorDisabled))
 	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(components.ColorDanger))
+	noticeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorAccent))
 )
 
 // errorList builds the single-item list shown when a load fails. The

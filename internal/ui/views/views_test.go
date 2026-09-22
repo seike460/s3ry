@@ -671,3 +671,63 @@ func TestObjectViewFolderDeleteCancelKeepsMarker(t *testing.T) {
 		t.Fatal("n did not cancel the prefix delete")
 	}
 }
+
+func TestObjectViewPresignFlow(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
+	session, err := s3.NewSession(t.Context(), s3.Options{
+		Region:      "us-east-1",
+		EndpointURL: "http://localhost",
+	})
+	if err != nil {
+		t.Fatalf("NewSession: %v", err)
+	}
+	deps := Deps{Session: session, Config: config.Default(), Timeout: 5 * time.Second}
+	view := NewObjectView(deps, "test-bucket", ModeDownload)
+
+	model, _ := view.Update(ObjectsLoadedMsg{Objects: []s3.Object{
+		{Key: "a.txt", Size: 1, LastModified: time.Now()},
+	}})
+	view = model.(*ObjectView)
+
+	// "P" opens the expiry chooser for the object under the cursor.
+	model, _ = view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("P")})
+	view = model.(*ObjectView)
+	if view.confirm == nil || view.confirm.kind != confirmPresign {
+		t.Fatalf("confirm = %+v, want a presign prompt", view.confirm)
+	}
+
+	// "2" picks the 24-hour expiry; the command signs locally.
+	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	view = model.(*ObjectView)
+	if view.confirm != nil {
+		t.Fatal("presign prompt was not cleared")
+	}
+	result, ok := cmd().(presignResultMsg)
+	if !ok {
+		t.Fatalf("presign command returned %T, want presignResultMsg", cmd())
+	}
+	if result.err != nil {
+		t.Fatalf("PresignGet: %v", result.err)
+	}
+	if !strings.Contains(result.url, "X-Amz-Expires=86400") {
+		t.Fatalf("url = %q, want 24h expiry", result.url)
+	}
+
+	model, _ = view.Update(result)
+	view = model.(*ObjectView)
+	if !strings.Contains(view.notice, result.url) {
+		t.Fatalf("notice = %q, want the presigned URL", view.notice)
+	}
+}
+
+func TestObjectViewPresignCancel(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	view.confirm = &confirmPrompt{kind: confirmPresign, object: s3.Object{Key: "a.txt"}}
+
+	model, _ := view.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	view = model.(*ObjectView)
+	if view.confirm != nil {
+		t.Fatal("esc did not cancel the presign prompt")
+	}
+}

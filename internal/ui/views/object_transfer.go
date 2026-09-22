@@ -2,11 +2,15 @@ package views
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/aymanbagabas/go-osc52/v2"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/seike460/s3ry/internal/s3"
 	"github.com/seike460/s3ry/internal/ui/components"
@@ -18,6 +22,7 @@ type confirmKind int
 const (
 	confirmDelete confirmKind = iota
 	confirmDeletePrefix
+	confirmPresign
 	confirmOverwrite
 )
 
@@ -36,6 +41,25 @@ type prefixCountMsg struct {
 	object s3.Object
 	count  int
 	err    error
+}
+
+// presignExpirations maps the presign prompt's digit keys to expiry
+// durations and their display labels.
+var presignExpirations = []struct {
+	key     string
+	label   string
+	expires time.Duration
+}{
+	{"1", "1 hour", time.Hour},
+	{"2", "24 hours", 24 * time.Hour},
+	{"3", "7 days", 7 * 24 * time.Hour},
+}
+
+// presignResultMsg carries a generated presigned URL back to the view.
+type presignResultMsg struct {
+	url     string
+	expires time.Duration
+	err     error
 }
 
 // selectObject routes the selected object to the configured operation.
@@ -130,6 +154,45 @@ func (v *ObjectView) onPrefixCount(msg prefixCountMsg) {
 	}
 	v.confirm.count = msg.count
 	v.confirm.countErr = msg.err
+}
+
+// startPresign generates a presigned GET URL for the object and copies it to
+// the clipboard when stdout is a terminal.
+func (v *ObjectView) startPresign(obj s3.Object, expires time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := v.deps.listContext(context.Background())
+		defer cancel()
+		url, err := v.deps.Session.PresignGet(ctx, v.bucket, obj.Key, expires)
+		if err != nil {
+			return presignResultMsg{err: err}
+		}
+		if term.IsTerminal(os.Stdout.Fd()) {
+			_, _ = osc52.New(url).WriteTo(os.Stdout)
+		}
+		return presignResultMsg{url: url, expires: expires}
+	}
+}
+
+// onPresignResult records the generated URL (or failure) for display.
+func (v *ObjectView) onPresignResult(msg presignResultMsg) {
+	if msg.err != nil {
+		v.notice = v.deps.T("Presign failed") + ": " + msg.err.Error()
+		return
+	}
+	v.notice = fmt.Sprintf("%s %s\n%s %s — %s",
+		v.deps.T("Presigned URL:"), msg.url,
+		v.deps.T("Expires:"), presignLabel(msg.expires),
+		v.deps.T("Copied to clipboard"))
+}
+
+// presignLabel renders an expiry duration with its prompt label.
+func presignLabel(d time.Duration) string {
+	for _, choice := range presignExpirations {
+		if choice.expires == d {
+			return choice.label
+		}
+	}
+	return d.String()
 }
 
 // startDeletePrefix runs Session.DeletePrefix on a command goroutine.

@@ -25,7 +25,7 @@ func init() {
 
 	// Navigation and footer hints
 	catalog(ja, "↑↓: navigate • enter: select • r: refresh • esc: back • q: quit", "↑↓: 移動 • enter: 選択 • r: 更新 • esc: 戻る • q: 終了")
-	catalog(ja, "↑↓: navigate • enter: select • r: refresh • p: preview • ?: help • s: settings • esc: back • q: quit", "↑↓: 移動 • enter: 選択 • r: 更新 • p: プレビュー • ?: ヘルプ • s: 設定 • esc: 戻る • q: 終了")
+	catalog(ja, "↑↓: navigate • enter: select • /: filter • r: refresh • p: preview • P: presign • ?: help • s: settings • esc: back • q: quit", "↑↓: 移動 • enter: 選択 • /: フィルタ • r: 更新 • p: プレビュー • P: 署名付きURL • ?: ヘルプ • s: 設定 • esc: 戻る • q: 終了")
 	catalog(ja, "↑↓: navigate • enter: select • r: retry • ?: help • s: settings • q: quit", "↑↓: 移動 • enter: 選択 • r: 再試行 • ?: ヘルプ • s: 設定 • q: 終了")
 	catalog(ja, "↑↓: navigate • esc: back • q: quit", "↑↓: 移動 • esc: 戻る • q: 終了")
 	catalog(ja, "d: download • u: upload • delete: delete • ?: help • s: settings • esc: back • q: quit", "d: ダウンロード • u: アップロード • delete: 削除 • ?: ヘルプ • s: 設定 • esc: 戻る • q: 終了")
@@ -162,6 +162,7 @@ func init() {
 	catalog(ja, "Presigned URL:", "署名付きURL:")
 	catalog(ja, "Expires:", "有効期限:")
 	catalog(ja, "Presign failed", "署名付きURLの生成に失敗しました")
+	catalog(ja, "Presigned URL for %s — expiry: [1] 1 hour  [2] 24 hours  [3] 7 days (esc: cancel)", "%s の署名付きURL — 有効期限: [1] 1時間  [2] 24時間  [3] 7日間（esc: キャンセル）")
 	catalog(ja, "Canceled", "キャンセルしました")
 	catalog(ja, "Timed out", "タイムアウトしました")
 	catalog(ja, "Press 'r' to retry, 'esc' to go back, or 'q' to quit", "'r' で再試行、'esc' で戻る、'q' で終了")
