@@ -195,6 +195,19 @@ func filterItems(items []ListItem, filter string) []ListItem {
 
 // onKey moves the cursor or selects for navigation keys.
 func (l *List) onKey(key string) {
+	if l.moveKey(key) {
+		return
+	}
+	switch key {
+	case "enter", " ":
+		l.selected = l.cursor
+	case "/":
+		l.filtering = true
+	}
+}
+
+// moveKey applies cursor-movement keys and reports whether key was one.
+func (l *List) moveKey(key string) bool {
 	switch key {
 	case "up", "k":
 		l.moveCursor(-1)
@@ -204,17 +217,16 @@ func (l *List) onKey(key string) {
 		l.moveCursor(-l.maxVisible)
 	case "pgdown", "ctrl+f":
 		l.moveCursor(l.maxVisible)
-	case "enter", " ":
-		l.selected = l.cursor
 	case "home":
 		l.cursor = 0
 		l.updateViewport()
 	case "end":
 		l.cursor = len(l.items) - 1
 		l.updateViewport()
-	case "/":
-		l.filtering = true
+	default:
+		return false
 	}
+	return true
 }
 
 // moveCursor moves the cursor by delta, clamped to the item bounds.
@@ -236,31 +248,17 @@ func (l *List) moveCursor(delta int) {
 // View renders the list component
 func (l *List) View() string {
 	var s strings.Builder
-
-	// Title
-	s.WriteString(l.titleStyle.Render(l.title))
-	if l.filtering || l.filter != "" {
-		s.WriteString(" ")
-		s.WriteString(l.helpStyle.Render("filter: " + l.filter + "▏"))
-	}
-	s.WriteString("\n\n")
+	l.renderTitle(&s)
 
 	// Early return for empty lists
 	if len(l.items) == 0 {
-		s.WriteString(l.helpStyle.Render("No items available"))
-		if l.showHelp {
-			s.WriteString("\n\n")
-			s.WriteString(l.helpStyle.Render("No items to display"))
-		}
+		l.renderEmpty(&s)
 		return s.String()
 	}
 
 	// Calculate visible range using virtual scrolling
 	start := l.viewportTop
-	end := l.viewportTop + l.maxVisible
-	if end > len(l.items) {
-		end = len(l.items)
-	}
+	end := min(l.viewportTop+l.maxVisible, len(l.items))
 
 	// Simple synchronous rendering to fix duplicate selection issue
 	for i := start; i < end; i++ {
@@ -269,16 +267,7 @@ func (l *List) View() string {
 
 	// Show scrolling indicators
 	l.renderScrollIndicators(&s, start, end)
-
-	// Help text
-	if l.showHelp {
-		s.WriteString("\n")
-		if len(l.items) > l.maxVisible {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • /: filter • enter/space: select"))
-		} else {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • /: filter • enter/space: select • q: quit"))
-		}
-	}
+	l.renderHelp(&s)
 
 	result := s.String()
 
@@ -288,6 +277,38 @@ func (l *List) View() string {
 	}
 
 	return result
+}
+
+// renderTitle writes the title line plus the active filter indicator.
+func (l *List) renderTitle(s *strings.Builder) {
+	s.WriteString(l.titleStyle.Render(l.title))
+	if l.filtering || l.filter != "" {
+		s.WriteString(" ")
+		s.WriteString(l.helpStyle.Render("filter: " + l.filter + "▏"))
+	}
+	s.WriteString("\n\n")
+}
+
+// renderEmpty writes the placeholder shown when no items remain.
+func (l *List) renderEmpty(s *strings.Builder) {
+	s.WriteString(l.helpStyle.Render("No items available"))
+	if l.showHelp {
+		s.WriteString("\n\n")
+		s.WriteString(l.helpStyle.Render("No items to display"))
+	}
+}
+
+// renderHelp writes the footer key hints.
+func (l *List) renderHelp(s *strings.Builder) {
+	if !l.showHelp {
+		return
+	}
+	s.WriteString("\n")
+	if len(l.items) > l.maxVisible {
+		s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • /: filter • enter/space: select"))
+	} else {
+		s.WriteString(l.helpStyle.Render("↑/↓: navigate • /: filter • enter/space: select • q: quit"))
+	}
 }
 
 // GetCursor returns the current cursor position

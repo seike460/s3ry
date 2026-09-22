@@ -1,6 +1,7 @@
-// Non-interactive subcommands: ls, cat, rm, and presign. They share the
-// root flag set (region, profile, endpoint, ...) through persistent flags
-// and print to the command's stdout so they compose with pipes.
+// Package cli implements the s3ry command line: flag parsing, configuration
+// loading, the interactive TUI entrypoint, and the non-interactive
+// subcommands (ls, cat, rm, presign). Subcommands share the root flag set
+// through persistent flags and print to stdout so they compose with pipes.
 package cli
 
 import (
@@ -96,9 +97,9 @@ func newLsCommand(flags *rootFlags) *cobra.Command {
 			}
 			defer cancel()
 			if len(args) == 0 {
-				return printBuckets(cmd, session, ctx, output)
+				return printBuckets(ctx, cmd, session, output)
 			}
-			return printObjects(cmd, session, ctx, args[0], output)
+			return printObjects(ctx, cmd, session, args[0], output)
 		},
 	}
 	cmd.Flags().StringVarP(&output, "output", "o", "plain", "Output format (plain, json)")
@@ -106,7 +107,7 @@ func newLsCommand(flags *rootFlags) *cobra.Command {
 }
 
 // printBuckets writes the bucket list in the requested format.
-func printBuckets(cmd *cobra.Command, session *s3.Session, ctx context.Context, output string) error {
+func printBuckets(ctx context.Context, cmd *cobra.Command, session *s3.Session, output string) error {
 	buckets, err := session.ListBuckets(ctx)
 	if err != nil {
 		return err
@@ -130,7 +131,7 @@ func printBuckets(cmd *cobra.Command, session *s3.Session, ctx context.Context, 
 }
 
 // printObjects walks the URL prefix and writes each object key.
-func printObjects(cmd *cobra.Command, session *s3.Session, ctx context.Context, raw, output string) error {
+func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, raw, output string) error {
 	u, err := s3.ParseURL(raw)
 	if err != nil {
 		return &usageError{err: fmt.Errorf("invalid S3 URL %q: %w", raw, err)}
@@ -183,7 +184,7 @@ func newCatCommand(flags *rootFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer body.Close()
+			defer func() { _ = body.Close() }()
 			_, err = io.Copy(cmd.OutOrStdout(), body)
 			return err
 		},
@@ -210,7 +211,7 @@ func newRmCommand(flags *rootFlags) *cobra.Command {
 				return err
 			}
 			defer cancel()
-			return removeTarget(cmd, session, ctx, u, dryRun)
+			return removeTarget(ctx, cmd, session, u, dryRun)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Report what would be deleted without deleting")
@@ -219,7 +220,7 @@ func newRmCommand(flags *rootFlags) *cobra.Command {
 
 // removeTarget dispatches to DeleteKeys or DeletePrefix and prints a
 // one-line summary. Partial failures surface as a BulkError.
-func removeTarget(cmd *cobra.Command, session *s3.Session, ctx context.Context, u s3.URL, dryRun bool) error {
+func removeTarget(ctx context.Context, cmd *cobra.Command, session *s3.Session, u s3.URL, dryRun bool) error {
 	var result s3.DeleteResult
 	var err error
 	if strings.HasSuffix(u.Key, "/") {

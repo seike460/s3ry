@@ -121,6 +121,12 @@ func (v *ObjectView) View() string {
 		return context + "\n\n" + errorStyle.Render(v.confirmQuestion())
 	}
 
+	return v.readyBody(context)
+}
+
+// readyBody renders the loaded list with its notice, error panel, and
+// footer.
+func (v *ObjectView) readyBody(context string) string {
 	footer := footerStyle.Render(v.deps.T("↑↓: navigate • enter: select • /: filter • r: refresh • p: preview • P: presign • ?: help • s: settings • esc: back • q: quit"))
 
 	result := context

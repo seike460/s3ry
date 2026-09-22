@@ -91,16 +91,13 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
 
-	case prefixCountMsg:
-		v.onPrefixCount(msg)
-
-	case presignResultMsg:
-		v.onPresignResult(msg)
+	case prefixCountMsg, presignResultMsg:
+		v.onAsyncResult(msg)
 
 	case backToOperationMsg, brokerClosedMsg:
 		// brokerClosedMsg means the broker was closed while a read was in
 		// flight; nothing to do.
-		if msg, ok := msg.(backToOperationMsg); ok && v.transfer.backToOperation(msg) {
+		if v.backToOperation(msg) {
 			return NewOperationView(v.deps, v.bucket), nil
 		}
 
@@ -109,6 +106,24 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onAsyncResult stores asynchronous lookup results — the prefix delete
+// count or a presigned URL — on the view.
+func (v *ObjectView) onAsyncResult(msg tea.Msg) {
+	switch msg := msg.(type) {
+	case prefixCountMsg:
+		v.onPrefixCount(msg)
+	case presignResultMsg:
+		v.onPresignResult(msg)
+	}
+}
+
+// backToOperation reports whether msg is the post-transfer return tick for
+// the most recent broker.
+func (v *ObjectView) backToOperation(msg tea.Msg) bool {
+	tick, ok := msg.(backToOperationMsg)
+	return ok && v.transfer.backToOperation(tick)
 }
 
 // onEvent routes resize, transfer, and passive events to their handlers.
@@ -249,26 +264,36 @@ func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 
-	var cmds []tea.Cmd
-	switch key {
-	case "p":
-		v.showPreview = !v.showPreview
-		v.refreshPreview(&cmds)
-	case "P":
-		if obj := v.currentObject(); obj != nil {
-			v.confirm = &confirmPrompt{kind: confirmPresign, object: *obj}
-		}
-	case "enter", " ":
-		if next, cmd := v.enterItem(); next != nil || cmd != nil {
-			return next, cmd
-		}
+	if next, cmd := v.actionKey(msg); next != nil || cmd != nil {
+		return next, cmd
 	}
 
+	var cmds []tea.Cmd
 	if v.state.list != nil {
 		v.state.list, _ = v.state.list.Update(msg)
 		v.refreshPreview(&cmds)
 	}
 	return v, tea.Batch(cmds...)
+}
+
+// actionKey handles the ready-state action keys: preview toggle, presign,
+// and item selection. It returns nil when the key is not an action key.
+func (v *ObjectView) actionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	switch msg.String() {
+	case "p":
+		v.showPreview = !v.showPreview
+		v.refreshPreview(&cmds)
+		return v, tea.Batch(cmds...)
+	case "P":
+		if obj := v.currentObject(); obj != nil {
+			v.confirm = &confirmPrompt{kind: confirmPresign, object: *obj}
+		}
+		return v, nil
+	case "enter", " ":
+		return v.enterItem()
+	}
+	return nil, nil
 }
 
 // enterItem dispatches enter/space on the item under the cursor: "Load

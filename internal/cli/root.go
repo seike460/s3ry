@@ -165,20 +165,25 @@ func loadConfig(flags *rootFlags) (*config.Config, error) {
 		return nil, err
 	}
 
-	if flags.Region != "" {
-		cfg.AWS.Region = flags.Region
-	}
-	if flags.Profile != "" {
-		cfg.AWS.Profile = flags.Profile
-	}
-	if flags.Language != "" {
-		cfg.UI.Language = flags.Language
-	}
-	if flags.LogLevel != "" {
-		cfg.Logging.Level = flags.LogLevel
-	}
-	if flags.Endpoint != "" {
-		cfg.AWS.Endpoint = flags.Endpoint
+	applyFlagOverrides(cfg, flags)
+	return cfg, nil
+}
+
+// applyFlagOverrides lets CLI flags win over config-file values.
+func applyFlagOverrides(cfg *config.Config, flags *rootFlags) {
+	for _, bind := range []struct {
+		flag string
+		dst  *string
+	}{
+		{flags.Region, &cfg.AWS.Region},
+		{flags.Profile, &cfg.AWS.Profile},
+		{flags.Language, &cfg.UI.Language},
+		{flags.LogLevel, &cfg.Logging.Level},
+		{flags.Endpoint, &cfg.AWS.Endpoint},
+	} {
+		if bind.flag != "" {
+			*bind.dst = bind.flag
+		}
 	}
 	if flags.PathStyle {
 		cfg.AWS.PathStyle = true
@@ -186,8 +191,6 @@ func loadConfig(flags *rootFlags) (*config.Config, error) {
 	if flags.NoSignRequest {
 		cfg.AWS.NoSignRequest = true
 	}
-
-	return cfg, nil
 }
 
 func setupLogging(cfg *config.Config) {
