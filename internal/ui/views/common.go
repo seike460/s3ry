@@ -58,14 +58,12 @@ func (d Deps) listContext(parent context.Context) (context.Context, context.Canc
 	return context.WithCancel(parent)
 }
 
-// english is the fallback printer used when Deps carries no printer.
-var english = i18n.NewPrinter("en")
-
 // T localizes a message key. Keys are written in English and the catalog
-// returns the translation for the active language.
+// returns the translation for the active language. A nil Messages falls back
+// to English.
 func (d Deps) T(format string, args ...any) string {
 	if d.Messages == nil {
-		return english.Sprintf(format, args...)
+		return i18n.NewPrinter("en").Sprintf(format, args...)
 	}
 	return d.Messages.Sprintf(format, args...)
 }

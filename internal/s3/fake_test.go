@@ -77,7 +77,7 @@ func newFakeSessionWithMiddleware(t *testing.T, mw func(http.Handler) http.Handl
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}
-	return session, session.clientForRegion(session.Region()), ts
+	return session, session.cache.clientForRegion(session.Region()), ts
 }
 
 func tryLocalTestServer(create func() *httptest.Server) (server *httptest.Server, err error) {

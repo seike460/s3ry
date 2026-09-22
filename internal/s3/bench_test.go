@@ -63,7 +63,7 @@ func benchmarkFakeSession(b *testing.B, mods ...func(*Options)) (*Session, *awss
 	if err != nil {
 		b.Fatalf("NewSession: %v", err)
 	}
-	return session, session.clientForRegion(session.Region())
+	return session, session.cache.clientForRegion(session.Region())
 }
 
 func benchmarkPutObjects(b *testing.B, client *awss3.Client, bucket string, keys ...string) {

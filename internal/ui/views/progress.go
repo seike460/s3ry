@@ -155,7 +155,7 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 
 	localize := t.localize
 	if localize == nil {
-		localize = english.Sprintf
+		localize = Deps{}.T
 	}
 	text := msg.summary
 	success := msg.err == nil

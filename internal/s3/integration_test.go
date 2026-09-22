@@ -102,7 +102,7 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 		t.Fatalf("NewSession: %v", err)
 	}
 
-	client := session.clientForRegion(session.Region())
+	client := session.cache.clientForRegion(session.Region())
 	createdBucket := false
 	if _, err := client.HeadBucket(t.Context(), &awss3.HeadBucketInput{Bucket: aws.String(bucket)}); err != nil {
 		if !integrationBucketMissing(err) {

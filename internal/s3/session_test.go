@@ -298,7 +298,7 @@ func TestTransferOptions(t *testing.T) {
 	}
 
 	got := transfermanager.Options{}
-	session.transferOptions()(&got)
+	session.cache.transferOptions()(&got)
 	if got.PartSizeBytes != opts.PartSize {
 		t.Fatalf("PartSizeBytes = %d, want %d", got.PartSizeBytes, opts.PartSize)
 	}
@@ -426,7 +426,7 @@ func TestBucketRegionConcurrent(t *testing.T) {
 			t.Fatalf("BucketRegion = %q, want eu-west-1", region)
 		}
 	}
-	if got := len(session.clients); got > 2 {
+	if got := len(session.cache.clients); got > 2 {
 		t.Fatalf("client cache size = %d, want at most 2", got)
 	}
 }

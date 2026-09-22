@@ -12,7 +12,7 @@ import (
 // global operation; each bucket's region is retained when the service returns
 // it and is otherwise resolved lazily by BucketRegion.
 func (s *Session) ListBuckets(ctx context.Context) ([]Bucket, error) {
-	client := s.clientForRegion(s.cfg.Region)
+	client := s.cache.clientForRegion(s.cfg.Region)
 
 	var (
 		buckets []Bucket
@@ -36,7 +36,7 @@ func (s *Session) ListBuckets(ctx context.Context) ([]Bucket, error) {
 			}
 			bucket.Region = aws.ToString(item.BucketRegion)
 			if bucket.Region != "" {
-				s.cacheRegion(name, bucket.Region)
+				s.cache.cacheRegion(name, bucket.Region)
 			}
 			buckets = append(buckets, bucket)
 		}
