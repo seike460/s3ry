@@ -36,6 +36,9 @@ func normalizeUsageError(err error) error {
 	return err
 }
 
+// exitCodeCanceled is the conventional shell exit status for SIGINT (128+2).
+const exitCodeCanceled = 130
+
 // ExitCode maps command errors to the process codes used by s3ry.
 func ExitCode(err error) int {
 	if err == nil {
@@ -45,14 +48,14 @@ func ExitCode(err error) int {
 		return 2
 	}
 	if errors.Is(err, context.Canceled) {
-		return 130
+		return exitCodeCanceled
 	}
 
 	var s3Err *s3.Error
 	if errors.As(err, &s3Err) && s3Err != nil {
 		switch s3Err.Kind {
 		case s3.KindCanceled:
-			return 130
+			return exitCodeCanceled
 		case s3.KindNotFound:
 			return 3
 		case s3.KindAccessDenied, s3.KindNoCredentials:

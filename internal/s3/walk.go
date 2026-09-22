@@ -88,6 +88,9 @@ func (e walkPanic) Error() string {
 	return fmt.Sprintf("panic in Walk callback: %v", e.value)
 }
 
+// maxWalkConcurrency bounds the prefix crawler's goroutine pool.
+const maxWalkConcurrency = 64
+
 // walkParallel crawls delimiter prefixes with a bounded goroutine pool. Each
 // discovered child prefix either acquires a semaphore slot and runs in the
 // errgroup or, when the pool is full, is crawled inline by the current
@@ -95,8 +98,8 @@ func (e walkPanic) Error() string {
 // cancels sibling crawls on the first error, and callback panics are
 // repanicked on the caller's goroutine.
 func (s *Session) walkParallel(ctx context.Context, client *awss3.Client, bucket, prefix string, o WalkOptions, fn func(Object) error) error {
-	if o.Concurrency > 64 {
-		o.Concurrency = 64
+	if o.Concurrency > maxWalkConcurrency {
+		o.Concurrency = maxWalkConcurrency
 	}
 
 	g, walkCtx := errgroup.WithContext(ctx)

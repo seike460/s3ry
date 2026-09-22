@@ -12,9 +12,19 @@ import (
 	"unicode/utf8"
 )
 
+// S3 bucket names are 3-63 characters per the service naming rules.
+const (
+	minBucketNameLength = 3
+	maxBucketNameLength = 63
+)
+
+// sniffLength is the number of leading bytes inspected for content-type
+// detection, matching the amount http.DetectContentType uses.
+const sniffLength = 512
+
 // ValidateBucketName checks name against the S3 bucket naming rules.
 func ValidateBucketName(name string) error {
-	if len(name) < 3 || len(name) > 63 {
+	if len(name) < minBucketNameLength || len(name) > maxBucketNameLength {
 		return newInvalidError("validate", name, "", "bucket name must be between 3 and 63 characters")
 	}
 	if strings.HasPrefix(name, "xn--") {
@@ -143,7 +153,7 @@ func newInvalidError(op, bucket, key, reason string) *Error {
 }
 
 // DetectContentType guesses the MIME type of path, first by extension and
-// then by sniffing the file's first 512 bytes.
+// then by sniffing the file's first sniffLength bytes.
 func DetectContentType(path string) string {
 	if contentType := mime.TypeByExtension(filepath.Ext(path)); contentType != "" {
 		return contentType
@@ -155,7 +165,7 @@ func DetectContentType(path string) string {
 	}
 	defer func() { _ = file.Close() }()
 
-	buf := make([]byte, 512)
+	buf := make([]byte, sniffLength)
 	read, err := io.ReadFull(file, buf)
 	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 		return "application/octet-stream"

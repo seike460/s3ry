@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+const (
+	// listChromeLines reserves rows for the title, help line, and padding.
+	listChromeLines = 6
+	// minVisibleItems keeps the viewport usable on very small terminals.
+	minVisibleItems = 5
+	// positionIndicatorThreshold shows "Position: n/m" only on large lists.
+	positionIndicatorThreshold = 50
+)
+
 // updateViewport updates the viewport for virtual scrolling
 func (l *List) updateViewport() {
 	if len(l.items) == 0 {
@@ -13,9 +22,9 @@ func (l *List) updateViewport() {
 
 	// Update max visible items based on height
 	if l.height > 0 {
-		l.maxVisible = l.height - 6 // Account for title, help, padding
-		if l.maxVisible < 5 {
-			l.maxVisible = 5 // Minimum visible items
+		l.maxVisible = l.height - listChromeLines
+		if l.maxVisible < minVisibleItems {
+			l.maxVisible = minVisibleItems
 		}
 	}
 
@@ -81,7 +90,7 @@ func (l *List) renderScrollIndicators(s *strings.Builder, start, end int) {
 		}
 
 		// Add a progress indicator for large lists (>50 items)
-		if totalItems > 50 {
+		if totalItems > positionIndicatorThreshold {
 			progress := float64(l.cursor) / float64(totalItems-1) * 100
 			s.WriteString(l.helpStyle.Render(fmt.Sprintf("Position: %d/%d (%.1f%%)", l.cursor+1, totalItems, progress)))
 			s.WriteString("\n")

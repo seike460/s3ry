@@ -13,6 +13,14 @@ import (
 )
 
 // onObjectsLoaded renders the freshly fetched listing or its error.
+const (
+	// minPreviewListWidth keeps the object list usable when the preview pane
+	// takes the right half of a narrow terminal.
+	minPreviewListWidth = 20
+	// etagDisplayLength truncates the ETag in the detail pane.
+	etagDisplayLength = 40
+)
+
 func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		v.state.fail(v.deps, v.deps.T("Error Loading Objects"), v.deps.T("Failed to load S3 objects"), msg.Err)
@@ -80,8 +88,8 @@ func (v *ObjectView) View() string {
 	var body string
 	if v.showPreview && v.preview != nil {
 		listWidth := v.width / 2
-		if listWidth < 20 {
-			listWidth = 20
+		if listWidth < minPreviewListWidth {
+			listWidth = minPreviewListWidth
 		}
 		body = lipgloss.JoinHorizontal(lipgloss.Top,
 			lipgloss.NewStyle().Width(listWidth).Render(v.state.list.View()),
@@ -119,7 +127,7 @@ func (v *ObjectView) previewObject(obj s3.Object) tea.Cmd {
 			v.deps.T("Key:"), obj.Key,
 			v.deps.T("Size:"), components.FormatBytes(obj.Size),
 			v.deps.T("Modified:"), modified,
-			v.deps.T("ETag:"), truncateShort(obj.ETag, 40),
+			v.deps.T("ETag:"), truncateShort(obj.ETag, etagDisplayLength),
 		)
 		return components.PreviewMsg{Content: content, PreviewType: components.PreviewTypeText}
 	}

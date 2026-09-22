@@ -43,6 +43,11 @@ const defaultDoneDelay = 2 * time.Second
 // progressBroker adapts concurrent s3.ProgressFunc callbacks to the
 // Bubble Tea message loop. Intermediate events may be dropped when the UI
 // falls behind; the final Done event is always queued.
+// brokerBufferSize bounds queued progress events; intermediate events are
+// dropped when the UI falls behind, while the terminal Done event is always
+// delivered.
+const brokerBufferSize = 64
+
 type progressBroker struct {
 	ch   chan s3.Progress
 	done chan struct{}
@@ -51,7 +56,7 @@ type progressBroker struct {
 
 func newProgressBroker() *progressBroker {
 	return &progressBroker{
-		ch:   make(chan s3.Progress, 64),
+		ch:   make(chan s3.Progress, brokerBufferSize),
 		done: make(chan struct{}),
 	}
 }

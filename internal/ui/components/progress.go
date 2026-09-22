@@ -7,6 +7,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// speedSampleWindow is how many recent samples feed the average speed.
+const speedSampleWindow = 10
+
 // ProgressMsg represents a progress update message
 type ProgressMsg struct {
 	Current int64
@@ -53,8 +56,8 @@ func NewProgress(title string, total int64) *Progress {
 		total:      total,
 		startTime:  now,
 		lastUpdate: now,
-		maxSamples: 10, // Keep last 10 samples for average speed calculation
-		samples:    make([]speedSample, 0, 10),
+		maxSamples: speedSampleWindow,
+		samples:    make([]speedSample, 0, speedSampleWindow),
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).

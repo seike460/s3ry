@@ -63,13 +63,13 @@ func Classify(op, bucket, key string, err error) error {
 
 	if status, ok := responseStatus(err); ok {
 		switch status {
-		case 404:
+		case http.StatusNotFound:
 			return &Error{Kind: KindNotFound, Op: op, Bucket: bucket, Key: key, Err: err}
-		case 401, 403:
+		case http.StatusUnauthorized, http.StatusForbidden:
 			return &Error{Kind: KindAccessDenied, Op: op, Bucket: bucket, Key: key, Err: err}
-		case 429, 503:
+		case http.StatusTooManyRequests, http.StatusServiceUnavailable:
 			return &Error{Kind: KindThrottled, Op: op, Bucket: bucket, Key: key, Err: err}
-		case 501:
+		case http.StatusNotImplemented:
 			return &Error{Kind: KindUnsupported, Op: op, Bucket: bucket, Key: key, Err: err}
 		}
 	}

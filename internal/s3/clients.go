@@ -134,12 +134,16 @@ func (c *clientCache) clientForRegionLocked(region string) *awss3.Client {
 	return client
 }
 
+// transferFailTimeout is how long the transfer manager waits for a
+// failed part before aborting a multipart transfer.
+const transferFailTimeout = 30 * time.Second
+
 func (c *clientCache) transferOptions() func(*transfermanager.Options) {
 	return func(o *transfermanager.Options) {
 		o.PartSizeBytes = c.partSize
 		o.Concurrency = c.parallel
 		o.GetObjectType = transfertypes.GetObjectRanges
-		o.FailTimeout = 30 * time.Second
+		o.FailTimeout = transferFailTimeout
 	}
 }
 

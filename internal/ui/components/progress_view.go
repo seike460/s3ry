@@ -6,6 +6,18 @@ import (
 	"time"
 )
 
+const (
+	// defaultBarWidth is the progress bar width on wide terminals.
+	defaultBarWidth = 40
+	// compactWidth is the terminal width below which the bar shrinks.
+	compactWidth = 60
+	// compactBarMargin reserves cells for the percentage and labels.
+	compactBarMargin = 20
+	// speedDiffThreshold shows the instantaneous speed alongside the average
+	// when they differ by more than this fraction.
+	speedDiffThreshold = 0.2
+)
+
 // View renders the progress component
 func (p *Progress) View() string {
 	var s strings.Builder
@@ -23,9 +35,9 @@ func (p *Progress) View() string {
 		}
 	} else {
 		// Show progress bar
-		barWidth := 40
-		if p.width > 0 && p.width < 60 {
-			barWidth = p.width - 20
+		barWidth := defaultBarWidth
+		if p.width > 0 && p.width < compactWidth {
+			barWidth = p.width - compactBarMargin
 			if barWidth < 1 {
 				barWidth = 1
 			}
@@ -67,7 +79,7 @@ func (p *Progress) View() string {
 			// Show instantaneous speed if significantly different
 			if p.speed > 0 && p.speed != displaySpeed {
 				instantDiff := (p.speed - displaySpeed) / displaySpeed
-				if instantDiff > 0.2 || instantDiff < -0.2 { // Show if >20% difference
+				if instantDiff > speedDiffThreshold || instantDiff < -speedDiffThreshold {
 					fmt.Fprintf(&s, " (now: %s/s)", FormatBytes(int64(p.speed)))
 				}
 			}

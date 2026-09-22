@@ -25,6 +25,9 @@ type ListGeneratorView struct {
 // a normal transfer outcome, since the path text is the result itself.
 const generationDoneDelay = 3 * time.Second
 
+// listProgressFlushInterval reports progress every N walked objects.
+const listProgressFlushInterval = 100
+
 // NewListGeneratorView creates a new list generator view.
 func NewListGeneratorView(deps Deps, bucket string) *ListGeneratorView {
 	return &ListGeneratorView{
@@ -139,7 +142,7 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 					return err
 				}
 				count++
-				if count%100 == 0 {
+				if count%listProgressFlushInterval == 0 {
 					broker.callback(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: -1})
 				}
 				return nil

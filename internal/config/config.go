@@ -45,11 +45,15 @@ type Config struct {
 	} `yaml:"logging" json:"logging"`
 }
 
+// defaultTimeoutSeconds is the operation timeout used when the config file
+// does not set performance.timeout.
+const defaultTimeoutSeconds = 30
+
 // Default returns a configuration with sensible defaults.
 func Default() *Config {
 	cfg := &Config{}
 	cfg.UI.Theme = "default"
-	cfg.Performance.Timeout = 30
+	cfg.Performance.Timeout = defaultTimeoutSeconds
 	cfg.Logging.Level = "info"
 	cfg.Logging.Format = "text"
 	return cfg

@@ -45,6 +45,14 @@ type Session struct {
 	singleDelete atomic.Bool
 }
 
+// HTTP transport tuning for the default client. The idle pool scales with
+// the configured concurrency so parallel transfers reuse connections.
+const (
+	baselineIdleConns = 64
+	idleConnHeadroom  = 16
+	idleConnTimeout   = 90 * time.Second
+)
+
 // NewSession loads the AWS configuration and prepares the client caches.
 func NewSession(ctx context.Context, opts Options) (*Session, error) {
 	if opts.Concurrency <= 0 {
@@ -63,11 +71,11 @@ func NewSession(ctx context.Context, opts Options) (*Session, error) {
 
 	httpClient := opts.HTTPClient
 	if httpClient == nil {
-		maxIdleConns := max(64, 2*opts.Concurrency+16)
+		maxIdleConns := max(baselineIdleConns, 2*opts.Concurrency+idleConnHeadroom)
 		httpClient = awshttp.NewBuildableClient().WithTransportOptions(func(tr *stdhttp.Transport) {
 			tr.MaxIdleConns = maxIdleConns
 			tr.MaxIdleConnsPerHost = maxIdleConns
-			tr.IdleConnTimeout = 90 * time.Second
+			tr.IdleConnTimeout = idleConnTimeout
 		})
 	}
 

@@ -13,6 +13,10 @@ import (
 // configured list width.
 const borderPadding = 4
 
+// defaultMaxVisible is the viewport height used before a WindowSizeMsg
+// arrives.
+const defaultMaxVisible = 20
+
 // ListItem represents a selectable item in a list
 type ListItem struct {
 	Title       string
@@ -56,7 +60,7 @@ func NewList(title string, items []ListItem) *List {
 
 		// Initialize virtual scrolling
 		viewportTop: 0,
-		maxVisible:  20,
+		maxVisible:  defaultMaxVisible,
 
 		titleStyle: lipgloss.NewStyle().
 			Bold(true).
