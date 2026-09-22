@@ -107,32 +107,38 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.list, _ = v.list.Update(msg)
 
 	case tea.KeyMsg:
-		key := msg.String()
-		if quitKey(key) {
-			return v, tea.Quit
-		}
-		switch key {
-		case "esc":
-			return NewBucketView(v.deps), nil
-		case "?":
-			return NewHelpView(v.deps), nil
-		case "s":
-			return NewSettingsView(v.deps), nil
-		case "enter", " ":
-			if item := v.list.GetCurrentItem(); item != nil {
-				if op := findOperation(v.ops, func(o operation) bool { return o.tag == item.Tag }); op != nil {
-					return op.view(v.deps, v.bucket), nil
-				}
-			}
-		default:
-			if op := findOperation(v.ops, func(o operation) bool { return o.shortcut == key && key != "" }); op != nil {
+		return v.onKey(msg)
+	}
+
+	return v, nil
+}
+
+// onKey handles keyboard input on the operation list.
+func (v *OperationView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	if quitKey(key) {
+		return v, tea.Quit
+	}
+	switch key {
+	case "esc":
+		return NewBucketView(v.deps), nil
+	case "?":
+		return NewHelpView(v.deps), nil
+	case "s":
+		return NewSettingsView(v.deps), nil
+	case "enter", " ":
+		if item := v.list.GetCurrentItem(); item != nil {
+			if op := findOperation(v.ops, func(o operation) bool { return o.tag == item.Tag }); op != nil {
 				return op.view(v.deps, v.bucket), nil
 			}
 		}
-
-		v.list, _ = v.list.Update(msg)
+	default:
+		if op := findOperation(v.ops, func(o operation) bool { return o.shortcut == key && key != "" }); op != nil {
+			return op.view(v.deps, v.bucket), nil
+		}
 	}
 
+	v.list, _ = v.list.Update(msg)
 	return v, nil
 }
 

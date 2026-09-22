@@ -118,43 +118,48 @@ func (l *List) Update(msg tea.Msg) (*List, tea.Cmd) {
 		l.updateViewport()
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "up", "k":
-			if l.cursor > 0 {
-				l.cursor--
-				l.updateViewport()
-			}
-		case "down", "j":
-			if l.cursor < len(l.items)-1 {
-				l.cursor++
-				l.updateViewport()
-			}
-		case "pgup", "ctrl+b":
-			// Page up navigation
-			l.cursor -= l.maxVisible
-			if l.cursor < 0 {
-				l.cursor = 0
-			}
-			l.updateViewport()
-		case "pgdown", "ctrl+f":
-			// Page down navigation
-			l.cursor += l.maxVisible
-			if l.cursor >= len(l.items) {
-				l.cursor = len(l.items) - 1
-			}
-			l.updateViewport()
-		case "enter", " ":
-			l.selected = l.cursor
-		case "home":
-			l.cursor = 0
-			l.updateViewport()
-		case "end":
-			l.cursor = len(l.items) - 1
-			l.updateViewport()
-		}
+		l.onKey(msg.String())
 	}
 
 	return l, nil
+}
+
+// onKey moves the cursor or selects for navigation keys.
+func (l *List) onKey(key string) {
+	switch key {
+	case "up", "k":
+		l.moveCursor(-1)
+	case "down", "j":
+		l.moveCursor(1)
+	case "pgup", "ctrl+b":
+		l.moveCursor(-l.maxVisible)
+	case "pgdown", "ctrl+f":
+		l.moveCursor(l.maxVisible)
+	case "enter", " ":
+		l.selected = l.cursor
+	case "home":
+		l.cursor = 0
+		l.updateViewport()
+	case "end":
+		l.cursor = len(l.items) - 1
+		l.updateViewport()
+	}
+}
+
+// moveCursor moves the cursor by delta, clamped to the item bounds.
+func (l *List) moveCursor(delta int) {
+	maxCursor := len(l.items) - 1
+	if maxCursor < 0 {
+		maxCursor = 0
+	}
+	l.cursor += delta
+	if l.cursor < 0 {
+		l.cursor = 0
+	}
+	if l.cursor > maxCursor {
+		l.cursor = maxCursor
+	}
+	l.updateViewport()
 }
 
 // View renders the list component

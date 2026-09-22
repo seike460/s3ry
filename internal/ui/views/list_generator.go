@@ -51,15 +51,8 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		v.transfer.resize(msg)
 
-	case transferProgressMsg:
-		message := fmt.Sprintf(v.deps.T("%d objects written"), msg.event.Transferred)
-		if cmd := v.transfer.onProgress(msg, message); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-	case transferDoneMsg:
-		v.spinner.Stop()
-		if cmd := v.transfer.finish(msg); cmd != nil {
+	case transferProgressMsg, transferDoneMsg:
+		if cmd := v.onTransfer(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -82,6 +75,19 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onTransfer feeds progress and completion events into the transfer state.
+func (v *ListGeneratorView) onTransfer(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case transferProgressMsg:
+		message := fmt.Sprintf(v.deps.T("%d objects written"), msg.event.Transferred)
+		return v.transfer.onProgress(msg, message)
+	case transferDoneMsg:
+		v.spinner.Stop()
+		return v.transfer.finish(msg)
+	}
+	return nil
 }
 
 // onKey handles keyboard input while the list is being generated.

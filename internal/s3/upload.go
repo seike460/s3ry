@@ -46,32 +46,17 @@ func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o U
 		err = finishTransfer(m, "upload", bucket, key, err)
 	}()
 
-	if err := ValidateBucketName(bucket); err != nil {
-		return err
-	}
-	if err := ValidateKey(key); err != nil {
-		return err
-	}
-
-	info, err := os.Stat(localPath)
+	file, size, err := uploadSource(localPath, bucket, key)
 	if err != nil {
-		return localFileError("upload", bucket, key, localPath, err)
+		return err
 	}
-	if info.IsDir() {
-		return newInvalidError("upload", bucket, key, "local path is a directory")
-	}
-	m.setTotal(info.Size())
+	defer func() { _ = file.Close() }()
+	m.setTotal(size)
 
 	contentType := o.ContentType
 	if contentType == "" {
 		contentType = DetectContentType(localPath)
 	}
-
-	file, err := os.Open(localPath)
-	if err != nil {
-		return localFileError("upload", bucket, key, localPath, err)
-	}
-	defer func() { _ = file.Close() }()
 
 	tm, err := s.transfer(ctx, bucket)
 	if err != nil {
@@ -93,4 +78,29 @@ func (s *Session) Upload(ctx context.Context, localPath, bucket, key string, o U
 		err = ctx.Err()
 	}
 	return err
+}
+
+// uploadSource validates the inputs and opens localPath, returning the file
+// and its size for the transfer.
+func uploadSource(localPath, bucket, key string) (*os.File, int64, error) {
+	if err := ValidateBucketName(bucket); err != nil {
+		return nil, 0, err
+	}
+	if err := ValidateKey(key); err != nil {
+		return nil, 0, err
+	}
+
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return nil, 0, localFileError("upload", bucket, key, localPath, err)
+	}
+	if info.IsDir() {
+		return nil, 0, newInvalidError("upload", bucket, key, "local path is a directory")
+	}
+
+	file, err := os.Open(localPath)
+	if err != nil {
+		return nil, 0, localFileError("upload", bucket, key, localPath, err)
+	}
+	return file, info.Size(), nil
 }

@@ -61,13 +61,8 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FilesLoadedMsg:
 		return v.onFilesLoaded(msg)
 
-	case transferProgressMsg:
-		if cmd := v.transfer.onProgress(msg, progressMessage(msg.event)); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-	case transferDoneMsg:
-		if cmd := v.transfer.finish(msg); cmd != nil {
+	case transferProgressMsg, transferDoneMsg:
+		if cmd := v.onTransfer(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -86,6 +81,17 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onTransfer feeds progress and completion events into the transfer state.
+func (v *UploadView) onTransfer(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case transferProgressMsg:
+		return v.transfer.onProgress(msg, progressMessage(msg.event))
+	case transferDoneMsg:
+		return v.transfer.finish(msg)
+	}
+	return nil
 }
 
 func (v *UploadView) onFilesLoaded(msg FilesLoadedMsg) (tea.Model, tea.Cmd) {
@@ -137,21 +143,28 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
 	case "enter", " ":
-		item := v.state.currentItem()
-		if item == nil {
-			break
+		if file := v.selectedFile(); file != nil {
+			return v.startUpload(*file)
 		}
-		file, ok := item.Data.(FileInfo)
-		if !ok {
-			break
-		}
-		return v.startUpload(file)
 	}
 
 	if v.state.list != nil {
 		v.state.list, _ = v.state.list.Update(msg)
 	}
 	return v, nil
+}
+
+// selectedFile returns the FileInfo under the cursor, if any.
+func (v *UploadView) selectedFile() *FileInfo {
+	item := v.state.currentItem()
+	if item == nil {
+		return nil
+	}
+	file, ok := item.Data.(FileInfo)
+	if !ok {
+		return nil
+	}
+	return &file
 }
 
 // startUpload runs Session.Upload on a command goroutine. The S3 key is the
