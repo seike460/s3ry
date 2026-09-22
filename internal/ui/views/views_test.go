@@ -879,3 +879,25 @@ func TestObjectViewLoadMorePages(t *testing.T) {
 		t.Fatalf("items = %#v, want a.txt + b.txt", view.items)
 	}
 }
+
+func TestObjectViewDropsStalePrefixPage(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	model, _ := view.Update(ObjectsLoadedMsg{Page: &s3.Page{
+		Objects: []s3.Object{{Key: "a.txt"}},
+	}})
+	view = model.(*ObjectView)
+
+	// Descend, then deliver a page that was requested for the old prefix.
+	view.parents = []string{""}
+	view.prefix = "dir/"
+	model, _ = view.Update(ObjectsLoadedMsg{
+		Page:   &s3.Page{Objects: []s3.Object{{Key: "stale.txt"}}},
+		Prefix: "",
+	})
+	view = model.(*ObjectView)
+	for _, item := range view.items {
+		if item.Title == "stale.txt" {
+			t.Fatal("stale page leaked into the new prefix listing")
+		}
+	}
+}

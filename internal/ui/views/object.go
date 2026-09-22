@@ -10,10 +10,13 @@ import (
 )
 
 // ObjectsLoadedMsg carries one page of a hierarchical object listing.
-// Append marks continuation pages requested through the "Load more" item.
+// Append marks continuation pages requested through the "Load more" item;
+// Prefix records which prefix the page belongs to so a stale response is
+// dropped after the user navigates away.
 type ObjectsLoadedMsg struct {
 	Page   *s3.Page
 	Append bool
+	Prefix string
 	Err    error
 }
 
@@ -431,18 +434,20 @@ func (v *ObjectView) loadObjects() tea.Cmd {
 }
 
 // fetchPage requests one page of the hierarchical listing. A non-empty
-// token continues the previous listing ("Load more" item).
+// token continues the previous listing ("Load more" item). The prefix is
+// captured now so a stale response can be dropped on arrival.
 func (v *ObjectView) fetchPage(token string) tea.Cmd {
+	prefix := v.prefix
 	return func() tea.Msg {
 		if err := v.deps.sessionErr(); err != nil {
-			return ObjectsLoadedMsg{Err: err}
+			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
 		}
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-		page, err := v.deps.Session.ListPage(ctx, v.bucket, v.prefix, token, maxListPageKeys)
+		page, err := v.deps.Session.ListPage(ctx, v.bucket, prefix, token, maxListPageKeys)
 		if err != nil {
-			return ObjectsLoadedMsg{Err: err}
+			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
 		}
-		return ObjectsLoadedMsg{Page: page, Append: token != ""}
+		return ObjectsLoadedMsg{Page: page, Append: token != "", Prefix: prefix}
 	}
 }

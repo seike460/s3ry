@@ -26,6 +26,11 @@ const (
 )
 
 func (v *ObjectView) onObjectsLoaded(msg ObjectsLoadedMsg) (tea.Model, tea.Cmd) {
+	// A page fetched for a previous prefix (e.g. a "Load more" request still
+	// in flight when the user ascends) must not touch the current list.
+	if msg.Prefix != v.prefix {
+		return v, nil
+	}
 	if msg.Err != nil {
 		v.state.fail(v.deps, v.deps.T("Error Loading Objects"), v.deps.T("Failed to load S3 objects"), msg.Err)
 		return v, nil
