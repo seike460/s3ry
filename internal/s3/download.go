@@ -79,27 +79,39 @@ func checkDownloadTarget(bucket, key, localPath string, overwrite OverwriteMode,
 	if err := ValidateKey(key); err != nil {
 		return false, err
 	}
+	return resolveExistingTarget(localPath, bucket, key, overwrite, m)
+}
 
+// resolveExistingTarget applies the overwrite mode to an existing or missing
+// localPath.
+func resolveExistingTarget(localPath, bucket, key string, overwrite OverwriteMode, m *meter) (bool, error) {
 	info, statErr := os.Stat(localPath)
+	if statErr != nil {
+		if errors.Is(statErr, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, statErr
+	}
+	return existingTargetDecision(info, bucket, key, overwrite, m)
+}
+
+// existingTargetDecision applies the overwrite mode to an existing path.
+func existingTargetDecision(info fs.FileInfo, bucket, key string, overwrite OverwriteMode, m *meter) (bool, error) {
 	switch {
-	case statErr == nil && info.IsDir():
+	case info.IsDir():
 		return false, newInvalidError("download", bucket, key, "local path is a directory")
-	case statErr == nil && overwrite == OverwriteSkip:
+	case overwrite == OverwriteSkip:
 		m.finishSkipped()
 		return true, nil
-	case statErr == nil && overwrite != OverwriteAlways:
+	case overwrite != OverwriteAlways:
 		return false, &Error{
 			Kind:   KindExists,
 			Op:     "download",
 			Bucket: bucket,
 			Key:    key,
 		}
-	case statErr == nil:
-		return false, nil
-	case errors.Is(statErr, fs.ErrNotExist):
-		return false, nil
 	default:
-		return false, statErr
+		return false, nil
 	}
 }
 

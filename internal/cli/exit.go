@@ -39,6 +39,14 @@ func normalizeUsageError(err error) error {
 // exitCodeCanceled is the conventional shell exit status for SIGINT (128+2).
 const exitCodeCanceled = 130
 
+// kindExitCodes maps classified s3 errors to their process exit codes.
+var kindExitCodes = map[s3.Kind]int{
+	s3.KindCanceled:      exitCodeCanceled,
+	s3.KindNotFound:      3,
+	s3.KindAccessDenied:  4,
+	s3.KindNoCredentials: 4,
+}
+
 // ExitCode maps command errors to the process codes used by s3ry.
 func ExitCode(err error) int {
 	if err == nil {
@@ -53,13 +61,8 @@ func ExitCode(err error) int {
 
 	var s3Err *s3.Error
 	if errors.As(err, &s3Err) && s3Err != nil {
-		switch s3Err.Kind {
-		case s3.KindCanceled:
-			return exitCodeCanceled
-		case s3.KindNotFound:
-			return 3
-		case s3.KindAccessDenied, s3.KindNoCredentials:
-			return 4
+		if code, ok := kindExitCodes[s3Err.Kind]; ok {
+			return code
 		}
 	}
 	return 1

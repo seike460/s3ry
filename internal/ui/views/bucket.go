@@ -94,6 +94,11 @@ func (v *BucketView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
 	}
 
+	return v.onListKey(msg)
+}
+
+// onListKey handles keys on the loaded bucket list.
+func (v *BucketView) onListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if quitKey(msg.String()) {
 		return v, tea.Quit
 	}

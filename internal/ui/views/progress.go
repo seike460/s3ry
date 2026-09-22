@@ -162,21 +162,11 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	if localize == nil {
 		localize = Deps{}.T
 	}
-	text := msg.summary
-	success := msg.err == nil
-	if msg.err != nil {
-		text = msg.err.Error()
-		switch {
-		case errors.Is(msg.err, s3.ErrCanceled):
-			text = localize("Canceled")
-		case errors.Is(msg.err, s3.ErrTimeout):
-			text = localize("Timed out")
-		}
-	}
+	text := finishText(msg, localize)
 	if t.progress == nil {
 		t.progress = components.NewProgress("", 0)
 	}
-	t.progress, _ = t.progress.Update(components.CompletedMsg{Success: success, Message: text})
+	t.progress, _ = t.progress.Update(components.CompletedMsg{Success: msg.err == nil, Message: text})
 	delay := t.doneDelay
 	if delay <= 0 {
 		delay = defaultDoneDelay
@@ -185,6 +175,22 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	return tea.Tick(delay, func(time.Time) tea.Msg {
 		return backToOperationMsg{broker: finishedBroker}
 	})
+}
+
+// finishText renders the completed transfer's outcome line, preferring
+// localized messages for known error kinds.
+func finishText(msg transferDoneMsg, localize func(string, ...any) string) string {
+	if msg.err == nil {
+		return msg.summary
+	}
+	switch {
+	case errors.Is(msg.err, s3.ErrCanceled):
+		return localize("Canceled")
+	case errors.Is(msg.err, s3.ErrTimeout):
+		return localize("Timed out")
+	default:
+		return msg.err.Error()
+	}
 }
 
 // backToOperation reports whether a delayed navigation tick is still valid:
