@@ -196,9 +196,13 @@ func (v *ObjectView) listBody() string {
 	if listWidth < minPreviewListWidth {
 		listWidth = minPreviewListWidth
 	}
+	previewWidth := v.width - listWidth
+	if previewWidth < minPreviewListWidth {
+		previewWidth = minPreviewListWidth
+	}
 	return lipgloss.JoinHorizontal(lipgloss.Top,
 		lipgloss.NewStyle().Width(listWidth).Render(v.state.list.View()),
-		lipgloss.NewStyle().Width(v.width-listWidth).Render(v.preview.View()),
+		lipgloss.NewStyle().Width(previewWidth).Render(v.preview.View()),
 	)
 }
 

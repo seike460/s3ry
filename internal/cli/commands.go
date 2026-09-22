@@ -94,15 +94,24 @@ func newLsCommand(flags *rootFlags) *cobra.Command {
 			if output != "plain" && output != "json" {
 				return &usageError{err: fmt.Errorf("unsupported output format %q (expected plain or json)", output)}
 			}
+			if len(args) == 0 {
+				session, ctx, cancel, err := openSession(cmd, flags)
+				if err != nil {
+					return err
+				}
+				defer cancel()
+				return printBuckets(ctx, cmd, session, output)
+			}
+			u, err := s3.ParseURL(args[0])
+			if err != nil {
+				return &usageError{err: fmt.Errorf("invalid S3 URL %q: %w", args[0], err)}
+			}
 			session, ctx, cancel, err := openSession(cmd, flags)
 			if err != nil {
 				return err
 			}
 			defer cancel()
-			if len(args) == 0 {
-				return printBuckets(ctx, cmd, session, output)
-			}
-			return printObjects(ctx, cmd, session, args[0], output)
+			return printObjects(ctx, cmd, session, u, output)
 		},
 	}
 	cmd.Flags().StringVarP(&output, "output", "o", "plain", "Output format (plain, json)")
@@ -136,11 +145,7 @@ func printBuckets(ctx context.Context, cmd *cobra.Command, session *s3.Session, 
 // printObjects walks the URL prefix and writes each object key. Plain
 // output streams line by line — Concurrency 1 keeps Walk in listing order —
 // while JSON must buffer the full result to encode the array.
-func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, raw, output string) error {
-	u, err := s3.ParseURL(raw)
-	if err != nil {
-		return &usageError{err: fmt.Errorf("invalid S3 URL %q: %w", raw, err)}
-	}
+func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, u s3.URL, output string) error {
 	out := cmd.OutOrStdout()
 	if output == "plain" {
 		return session.Walk(ctx, u.Bucket, u.Key, s3.WalkOptions{Concurrency: 1}, func(o s3.Object) error {
@@ -149,7 +154,7 @@ func printObjects(ctx context.Context, cmd *cobra.Command, session *s3.Session, 
 		})
 	}
 	var objects []s3.Object
-	err = session.Walk(ctx, u.Bucket, u.Key, s3.WalkOptions{Concurrency: 1}, func(o s3.Object) error {
+	err := session.Walk(ctx, u.Bucket, u.Key, s3.WalkOptions{Concurrency: 1}, func(o s3.Object) error {
 		objects = append(objects, o)
 		return nil
 	})

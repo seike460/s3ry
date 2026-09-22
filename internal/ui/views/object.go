@@ -382,6 +382,10 @@ func (v *ObjectView) reload() (tea.Model, tea.Cmd) {
 	v.previewKey = ""
 	v.notice = ""
 	v.loadingMore = false
+	if v.preview != nil {
+		// The previous location's metadata must not linger in the pane.
+		v.preview, _ = v.preview.Update(components.PreviewMsg{})
+	}
 	return v, v.state.startLoading(v.loadMessage(), v.loadObjects())
 }
 
