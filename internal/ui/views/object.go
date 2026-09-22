@@ -34,6 +34,7 @@ type ObjectView struct {
 	state       listState
 	preview     *components.Preview
 	showPreview bool
+	previewKey  string // key whose HeadObject request is in flight or shown
 	width       int
 	confirm     *confirmPrompt
 	transfer    transferState
@@ -253,13 +254,18 @@ func (v *ObjectView) selectedObject() *s3.Object {
 }
 
 // refreshPreview reloads the preview pane for the object under the cursor.
+// HeadObject runs once per distinct key; repeat calls for the same object
+// are skipped.
 func (v *ObjectView) refreshPreview(cmds *[]tea.Cmd) {
 	if !v.showPreview {
 		return
 	}
-	if obj := v.currentObject(); obj != nil {
-		*cmds = append(*cmds, v.previewObject(*obj))
+	obj := v.currentObject()
+	if obj == nil || obj.Key == v.previewKey {
+		return
 	}
+	v.previewKey = obj.Key
+	*cmds = append(*cmds, v.previewObject(*obj))
 }
 
 // AbortTransfer cancels any in-flight transfer and releases the progress

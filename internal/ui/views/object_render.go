@@ -1,7 +1,9 @@
 package views
 
 import (
+	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -131,18 +133,60 @@ func (v *ObjectView) currentObject() *s3.Object {
 	return &obj
 }
 
-// previewObject renders the object's metadata into the preview pane.
+// previewObject fetches the object's metadata via HeadObject and renders it
+// into the preview pane.
 func (v *ObjectView) previewObject(obj s3.Object) tea.Cmd {
 	return func() tea.Msg {
-		modified := formatModified(obj.LastModified)
-		content := fmt.Sprintf("%s\n\n%s %s\n%s %s\n%s %s\n%s %s",
-			v.deps.T("S3 Object Information"),
-			v.deps.T("Key:"), obj.Key,
-			v.deps.T("Size:"), components.FormatBytes(obj.Size),
-			v.deps.T("Modified:"), modified,
-			v.deps.T("ETag:"), truncateShort(obj.ETag, etagDisplayLength),
-		)
-		return components.PreviewMsg{Content: content, PreviewType: components.PreviewTypeText}
+		ctx, cancel := v.deps.listContext(context.Background())
+		defer cancel()
+		info, err := v.deps.Session.Stat(ctx, v.bucket, obj.Key)
+		if err != nil {
+			content := fmt.Sprintf("%s\n\n%s", v.deps.T("S3 Object Information"), err.Error())
+			return components.PreviewMsg{Content: content, PreviewType: components.PreviewTypeText}
+		}
+		return components.PreviewMsg{
+			Content:     v.renderObjectInfo(info),
+			PreviewType: components.PreviewTypeText,
+		}
+	}
+}
+
+// renderObjectInfo formats every field of a HeadObject response.
+func (v *ObjectView) renderObjectInfo(info *s3.ObjectInfo) string {
+	var b strings.Builder
+	b.WriteString(v.deps.T("S3 Object Information") + "\n\n")
+	writeInfoField(&b, v.deps.T("Key:"), info.Key)
+	writeInfoField(&b, v.deps.T("Size:"), components.FormatBytes(info.Size))
+	writeInfoField(&b, v.deps.T("Modified:"), formatModified(info.LastModified))
+	writeInfoField(&b, v.deps.T("ETag:"), truncateShort(info.ETag, etagDisplayLength))
+	writeInfoField(&b, v.deps.T("Storage Class:"), info.StorageClass)
+	writeInfoField(&b, v.deps.T("Content Type:"), info.ContentType)
+	writeInfoField(&b, v.deps.T("Version ID:"), info.VersionID)
+	writeMetadata(&b, v.deps, info.Metadata)
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// writeInfoField appends a "label value" line, skipping empty values.
+func writeInfoField(b *strings.Builder, label, value string) {
+	if value == "" {
+		return
+	}
+	b.WriteString(label + " " + value + "\n")
+}
+
+// writeMetadata appends the user-defined metadata block in sorted key order.
+func writeMetadata(b *strings.Builder, d Deps, metadata map[string]string) {
+	if len(metadata) == 0 {
+		return
+	}
+	b.WriteString(d.T("Metadata:") + "\n")
+	keys := make([]string, 0, len(metadata))
+	for k := range metadata {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		b.WriteString("  " + k + ": " + metadata[k] + "\n")
 	}
 }
 
