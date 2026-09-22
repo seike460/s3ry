@@ -47,6 +47,9 @@ func (s *Session) DownloadPrefix(ctx context.Context, bucket, prefix, destDir st
 		}
 	}
 
+	if prefix != "" && !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
 	parallel := bulkParallel(s, o)
 	bulk := newBulkTransfers(ctx, parallel, o.ContinueOnError)
 

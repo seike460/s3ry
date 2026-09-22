@@ -74,6 +74,35 @@ func TestDownloadPrefix(t *testing.T) {
 	}
 }
 
+// A prefix without a trailing slash must be treated as a directory prefix:
+// sibling prefixes (src2/...) and a bare key equal to the prefix itself are
+// not part of the download.
+func TestDownloadPrefixNormalizesDirectoryPrefix(t *testing.T) {
+	session, client, _ := newFakeSession(t, transferTestOptions)
+	makeTransferTestBucket(t, client, transferTestBucket)
+
+	putObjects(t, client, transferTestBucket,
+		"src/file.txt",
+		"src", // bare key sharing the prefix name
+		"src2/sibling.txt",
+	)
+
+	destDir := t.TempDir()
+	n, err := session.DownloadPrefix(t.Context(), transferTestBucket, "src", destDir, BulkOptions{
+		Overwrite: OverwriteAlways,
+	})
+	if err != nil {
+		t.Fatalf("DownloadPrefix: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("DownloadPrefix count = %d, want 1", n)
+	}
+	got, readErr := os.ReadFile(filepath.Join(destDir, "file.txt"))
+	if readErr != nil || string(got) != "src/file.txt" {
+		t.Fatalf("file.txt = %q, read error = %v", got, readErr)
+	}
+}
+
 func TestDownloadPrefixTraversalContinueModes(t *testing.T) {
 	session, client, _ := newFakeSession(t, transferTestOptions)
 	makeTransferTestBucket(t, client, transferTestBucket)
