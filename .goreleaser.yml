@@ -174,7 +174,13 @@ brews:
 nfpms:
   - id: packages
     package_name: s3ry
-    file_name_template: "{{ .ConventionalFileName }}"
+    # Debian names both ARMv6 and ARMv7 packages "armhf"; disambiguate the
+    # armv6 deb so the two do not collide. (GoReleaser docs workaround.)
+    file_name_template: >-
+      {{- trimsuffix .ConventionalFileName .ConventionalExtension -}}
+      {{- if and (eq .Arm "6") (eq .ConventionalExtension ".deb") }}6{{ end -}}
+      {{- if not (eq .Amd64 "v1")}}{{ .Amd64 }}{{ end -}}
+      {{- .ConventionalExtension -}}
     
     # Metadata
     vendor: seike460
