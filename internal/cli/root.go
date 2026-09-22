@@ -150,14 +150,11 @@ func loadConfig(flags *rootFlags) (*config.Config, error) {
 }
 
 func setupLogging(cfg *config.Config) {
-	switch cfg.Logging.Level {
-	case "debug":
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-	case "info", "warn", "error":
-		log.SetFlags(log.LstdFlags)
-	default:
-		log.SetFlags(log.LstdFlags)
+	flags := log.LstdFlags
+	if cfg.Logging.Level == "debug" {
+		flags |= log.Lshortfile
 	}
+	log.SetFlags(flags)
 
 	if cfg.Logging.File != "" {
 		file, err := os.OpenFile(cfg.Logging.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
