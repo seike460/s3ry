@@ -28,12 +28,17 @@ type ListItem struct {
 // List represents a selectable list component with virtual scrolling
 type List struct {
 	title    string
-	items    []ListItem
+	items    []ListItem // filtered view of allItems
+	allItems []ListItem
 	cursor   int
 	selected int
 	width    int
 	height   int
 	showHelp bool
+
+	// "/" opens the filter input; filtering narrows items by substring.
+	filter    string
+	filtering bool
 
 	// Virtual scrolling for performance
 	viewportTop int
@@ -54,6 +59,7 @@ func NewList(title string, items []ListItem) *List {
 	l := &List{
 		title:    title,
 		items:    items,
+		allItems: items,
 		cursor:   0,
 		selected: -1,
 		showHelp: true,
@@ -118,14 +124,90 @@ func (l *List) Update(msg tea.Msg) (*List, tea.Cmd) {
 		l.updateViewport()
 
 	case tea.KeyMsg:
-		l.onKey(msg.String())
+		if l.filtering {
+			l.onFilterKey(msg)
+		} else {
+			l.onKey(msg.String())
+		}
 	}
 
 	return l, nil
 }
 
+// Filtering reports whether the filter input is capturing keystrokes.
+// Views route every key to the list while this is true.
+func (l *List) Filtering() bool {
+	return l.filtering
+}
+
+// Filter returns the active filter text.
+func (l *List) Filter() string {
+	return l.filter
+}
+
+// onFilterKey edits the filter while input capture is active.
+func (l *List) onFilterKey(msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		l.filtering = false
+	case tea.KeyEscape:
+		l.filtering = false
+		l.filter = ""
+		l.applyFilter()
+	case tea.KeyBackspace:
+		if r := []rune(l.filter); len(r) > 0 {
+			l.filter = string(r[:len(r)-1])
+		}
+		l.applyFilter()
+	case tea.KeySpace:
+		l.filter += " "
+		l.applyFilter()
+	case tea.KeyRunes:
+		l.filter += string(msg.Runes)
+		l.applyFilter()
+	}
+}
+
+// applyFilter rebuilds the visible items from the filter text.
+func (l *List) applyFilter() {
+	l.items = filterItems(l.allItems, l.filter)
+	l.cursor = 0
+	l.selected = -1
+	l.viewportTop = 0
+	l.updateViewport()
+}
+
+// filterItems returns items whose title or description contains filter.
+func filterItems(items []ListItem, filter string) []ListItem {
+	if filter == "" {
+		return items
+	}
+	needle := strings.ToLower(filter)
+	var out []ListItem
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item.Title), needle) ||
+			strings.Contains(strings.ToLower(item.Description), needle) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
 // onKey moves the cursor or selects for navigation keys.
 func (l *List) onKey(key string) {
+	if l.moveKey(key) {
+		return
+	}
+	switch key {
+	case "enter", " ":
+		l.selected = l.cursor
+	case "/":
+		l.filtering = true
+	}
+}
+
+// moveKey applies cursor-movement keys and reports whether key was one.
+func (l *List) moveKey(key string) bool {
 	switch key {
 	case "up", "k":
 		l.moveCursor(-1)
@@ -135,15 +217,16 @@ func (l *List) onKey(key string) {
 		l.moveCursor(-l.maxVisible)
 	case "pgdown", "ctrl+f":
 		l.moveCursor(l.maxVisible)
-	case "enter", " ":
-		l.selected = l.cursor
 	case "home":
 		l.cursor = 0
 		l.updateViewport()
 	case "end":
 		l.cursor = len(l.items) - 1
 		l.updateViewport()
+	default:
+		return false
 	}
+	return true
 }
 
 // moveCursor moves the cursor by delta, clamped to the item bounds.
@@ -165,27 +248,17 @@ func (l *List) moveCursor(delta int) {
 // View renders the list component
 func (l *List) View() string {
 	var s strings.Builder
-
-	// Title
-	s.WriteString(l.titleStyle.Render(l.title))
-	s.WriteString("\n\n")
+	l.renderTitle(&s)
 
 	// Early return for empty lists
 	if len(l.items) == 0 {
-		s.WriteString(l.helpStyle.Render("No items available"))
-		if l.showHelp {
-			s.WriteString("\n\n")
-			s.WriteString(l.helpStyle.Render("No items to display"))
-		}
+		l.renderEmpty(&s)
 		return s.String()
 	}
 
 	// Calculate visible range using virtual scrolling
 	start := l.viewportTop
-	end := l.viewportTop + l.maxVisible
-	if end > len(l.items) {
-		end = len(l.items)
-	}
+	end := min(l.viewportTop+l.maxVisible, len(l.items))
 
 	// Simple synchronous rendering to fix duplicate selection issue
 	for i := start; i < end; i++ {
@@ -194,16 +267,7 @@ func (l *List) View() string {
 
 	// Show scrolling indicators
 	l.renderScrollIndicators(&s, start, end)
-
-	// Help text
-	if l.showHelp {
-		s.WriteString("\n")
-		if len(l.items) > l.maxVisible {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • enter/space: select"))
-		} else {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • enter/space: select • q: quit"))
-		}
-	}
+	l.renderHelp(&s)
 
 	result := s.String()
 
@@ -215,9 +279,53 @@ func (l *List) View() string {
 	return result
 }
 
+// renderTitle writes the title line plus the active filter indicator.
+func (l *List) renderTitle(s *strings.Builder) {
+	s.WriteString(l.titleStyle.Render(l.title))
+	if l.filtering || l.filter != "" {
+		s.WriteString(" ")
+		s.WriteString(l.helpStyle.Render("filter: " + l.filter + "▏"))
+	}
+	s.WriteString("\n\n")
+}
+
+// renderEmpty writes the placeholder shown when no items remain.
+func (l *List) renderEmpty(s *strings.Builder) {
+	s.WriteString(l.helpStyle.Render("No items available"))
+	if l.showHelp {
+		s.WriteString("\n\n")
+		s.WriteString(l.helpStyle.Render("No items to display"))
+	}
+}
+
+// renderHelp writes the footer key hints.
+func (l *List) renderHelp(s *strings.Builder) {
+	if !l.showHelp {
+		return
+	}
+	s.WriteString("\n")
+	if len(l.items) > l.maxVisible {
+		s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • /: filter • enter/space: select"))
+	} else {
+		s.WriteString(l.helpStyle.Render("↑/↓: navigate • /: filter • enter/space: select • q: quit"))
+	}
+}
+
 // GetCursor returns the current cursor position
 func (l *List) GetCursor() int {
 	return l.cursor
+}
+
+// SetCursor moves the cursor to index, clamped to the item bounds.
+func (l *List) SetCursor(index int) {
+	if index < 0 {
+		index = 0
+	}
+	if maxCursor := len(l.items) - 1; index > maxCursor {
+		index = max(maxCursor, 0)
+	}
+	l.cursor = index
+	l.updateViewport()
 }
 
 // GetSelected returns the selected item index (-1 if none selected)
@@ -243,11 +351,8 @@ func (l *List) GetCurrentItem() *ListItem {
 
 // SetItems updates the list items
 func (l *List) SetItems(items []ListItem) {
-	l.items = items
-	l.cursor = 0
-	l.selected = -1
-	l.viewportTop = 0
-	l.updateViewport()
+	l.allItems = items
+	l.applyFilter()
 }
 
 // SetShowHelp sets whether to show help text
@@ -260,5 +365,7 @@ func (l *List) Reset() {
 	l.cursor = 0
 	l.selected = -1
 	l.viewportTop = 0
-	l.updateViewport()
+	l.filter = ""
+	l.filtering = false
+	l.applyFilter()
 }

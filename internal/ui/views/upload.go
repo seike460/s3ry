@@ -138,6 +138,11 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
+
 	if v.state.retryRequested(key) {
 		return v, v.state.startLoading(v.deps.T("Retrying to scan local files..."), v.loadFiles())
 	}

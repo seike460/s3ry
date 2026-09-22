@@ -115,6 +115,10 @@ func (v *OperationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // onKey handles keyboard input on the operation list.
 func (v *OperationView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.list.Filtering() {
+		v.list, _ = v.list.Update(msg)
+		return v, nil
+	}
 	key := msg.String()
 	if quitKey(key) {
 		return v, tea.Quit

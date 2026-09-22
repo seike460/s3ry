@@ -29,6 +29,8 @@ type Deps struct {
 	Timeout time.Duration
 	// Messages formats localized UI text. Nil falls back to English.
 	Messages *i18n.Printer
+	// StartURL, when set, skips the bucket picker and opens at this location.
+	StartURL *s3.URL
 }
 
 // errNoSession is reported when a view is created without an AWS session.
@@ -73,6 +75,7 @@ var (
 	contextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorMuted))
 	footerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorDisabled))
 	errorStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(components.ColorDanger))
+	noticeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(components.ColorAccent))
 )
 
 // errorList builds the single-item list shown when a load fails. The
@@ -155,6 +158,16 @@ func (s *listState) retryRequested(key string) bool {
 	}
 	item := s.currentItem()
 	return item != nil && item.Tag == "Error"
+}
+
+// filterActive reports whether the list is capturing filter keystrokes.
+func (s *listState) filterActive() bool {
+	return s.list != nil && s.list.Filtering()
+}
+
+// routeFilterKey forwards a keystroke to the list's filter input.
+func (s *listState) routeFilterKey(msg tea.KeyMsg) {
+	s.list, _ = s.list.Update(msg)
 }
 
 func (s *listState) currentItem() *components.ListItem {

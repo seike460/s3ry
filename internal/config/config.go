@@ -19,6 +19,11 @@ type Config struct {
 		Region   string `yaml:"region" json:"region"`
 		Profile  string `yaml:"profile" json:"profile"`
 		Endpoint string `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+		// PathStyle forces path-style S3 addressing, required by some
+		// S3-compatible endpoints such as MinIO.
+		PathStyle bool `yaml:"path_style,omitempty" json:"path_style,omitempty"`
+		// NoSignRequest sends unsigned requests for public endpoints.
+		NoSignRequest bool `yaml:"no_sign_request,omitempty" json:"no_sign_request,omitempty"`
 	} `yaml:"aws" json:"aws"`
 
 	UI struct {
@@ -43,6 +48,10 @@ type Config struct {
 		Format string `yaml:"format" json:"format"` // "text", "json"
 		File   string `yaml:"file,omitempty" json:"file,omitempty"`
 	} `yaml:"logging" json:"logging"`
+
+	// StartURL is an optional s3:// URI passed on the command line. The TUI
+	// opens directly at that bucket or prefix. It is never persisted.
+	StartURL string `yaml:"-" json:"-"`
 }
 
 // defaultTimeoutSeconds is the operation timeout used when the config file

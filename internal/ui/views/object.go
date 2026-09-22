@@ -9,10 +9,15 @@ import (
 	"github.com/seike460/s3ry/internal/ui/components"
 )
 
-// ObjectsLoadedMsg carries the result of an object listing.
+// ObjectsLoadedMsg carries one page of a hierarchical object listing.
+// Append marks continuation pages requested through the "Load more" item;
+// Prefix records which prefix the page belongs to so a stale response is
+// dropped after the user navigates away.
 type ObjectsLoadedMsg struct {
-	Objects []s3.Object
-	Err     error
+	Page   *s3.Page
+	Append bool
+	Prefix string
+	Err    error
 }
 
 // ObjectMode selects which operation the object view performs on selection.
@@ -26,34 +31,52 @@ const (
 )
 
 // ObjectView is the object selection view used by downloads and deletes.
+// It browses the bucket hierarchically: parents holds the prefixes above the
+// current one and items accumulates the listing across "Load more" pages.
 type ObjectView struct {
 	deps        Deps
 	bucket      string
+	prefix      string
+	parents     []string
 	mode        ObjectMode
 	state       listState
+	items       []components.ListItem
 	preview     *components.Preview
 	showPreview bool
+	previewKey  string // key whose HeadObject request is in flight or shown
+	notice      string // transient status line (e.g. a presigned URL)
 	width       int
 	confirm     *confirmPrompt
 	transfer    transferState
+	// loadingMore is true while a "Load more" page request is in flight;
+	// it guards the sentinel row against duplicate fetches.
+	loadingMore bool
 }
 
-// NewObjectView creates a new object view.
+// NewObjectView creates a new object view rooted at the bucket.
 func NewObjectView(deps Deps, bucket string, mode ObjectMode) *ObjectView {
-	var spinnerMessage string
-	if mode == ModeDelete {
-		spinnerMessage = deps.T("Loading S3 objects for delete...")
-	} else {
-		spinnerMessage = deps.T("Loading S3 objects for download...")
-	}
+	return NewObjectViewAt(deps, bucket, "", mode)
+}
 
-	return &ObjectView{
+// NewObjectViewAt creates an object view scoped to prefix.
+func NewObjectViewAt(deps Deps, bucket, prefix string, mode ObjectMode) *ObjectView {
+	v := &ObjectView{
 		deps:    deps,
 		bucket:  bucket,
+		prefix:  prefix,
 		mode:    mode,
-		state:   newListState(spinnerMessage),
 		preview: components.NewPreview(),
 	}
+	v.state = newListState(v.loadMessage())
+	return v
+}
+
+// loadMessage returns the spinner text used while the listing loads.
+func (v *ObjectView) loadMessage() string {
+	if v.mode == ModeDelete {
+		return v.deps.T("Loading S3 objects for delete...")
+	}
+	return v.deps.T("Loading S3 objects for download...")
 }
 
 // Init starts the spinner and the first object listing.
@@ -74,10 +97,16 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
 
+	case previewResultMsg:
+		v.onPreviewResult(msg)
+
+	case prefixCountMsg, presignResultMsg:
+		v.onAsyncResult(msg)
+
 	case backToOperationMsg, brokerClosedMsg:
 		// brokerClosedMsg means the broker was closed while a read was in
 		// flight; nothing to do.
-		if msg, ok := msg.(backToOperationMsg); ok && v.transfer.backToOperation(msg) {
+		if v.backToOperation(msg) {
 			return NewOperationView(v.deps, v.bucket), nil
 		}
 
@@ -86,6 +115,24 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onAsyncResult stores asynchronous lookup results — the prefix delete
+// count or a presigned URL — on the view.
+func (v *ObjectView) onAsyncResult(msg tea.Msg) {
+	switch msg := msg.(type) {
+	case prefixCountMsg:
+		v.onPrefixCount(msg)
+	case presignResultMsg:
+		v.onPresignResult(msg)
+	}
+}
+
+// backToOperation reports whether msg is the post-transfer return tick for
+// the most recent broker.
+func (v *ObjectView) backToOperation(msg tea.Msg) bool {
+	tick, ok := msg.(backToOperationMsg)
+	return ok && v.transfer.backToOperation(tick)
 }
 
 // onEvent routes resize, transfer, and passive events to their handlers.
@@ -159,6 +206,11 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
+
 	if v.state.retryRequested(key) {
 		return v, v.state.startLoading(v.deps.T("Retrying to load S3 objects..."), v.loadObjects())
 	}
@@ -168,15 +220,46 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onConfirmKey handles input while a confirmation prompt is open.
 func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
+	if v.confirm.kind == confirmPresign {
+		return v.onPresignKey(key)
+	}
 	switch key {
 	case "y", "Y":
 		pending := *v.confirm
-		v.confirm = nil
-		if pending.kind == confirmDelete {
-			return v.startDelete(pending.object)
+		if pending.kind == confirmDeletePrefix && pending.count < 0 && pending.countErr == nil {
+			// Still counting the dry-run result; wait for it before
+			// accepting the destructive answer.
+			return v, nil
 		}
-		return v.startDownload(pending.object, s3.OverwriteAlways)
+		v.confirm = nil
+		switch pending.kind {
+		case confirmDelete:
+			return v.startDelete(pending.object)
+		case confirmDeletePrefix:
+			return v.startDeletePrefix(pending.object, max(int64(pending.count), 0))
+		default:
+			return v.startDownload(pending.object, s3.OverwriteAlways)
+		}
 	case "n", "N", "esc":
+		v.confirm = nil
+		return v, nil
+	}
+	if v.transfer.quitRequested(key) {
+		return v, tea.Quit
+	}
+	return v, nil
+}
+
+// onPresignKey picks an expiry from the presign prompt or cancels it.
+func (v *ObjectView) onPresignKey(key string) (tea.Model, tea.Cmd) {
+	for _, choice := range presignExpirations {
+		if key == choice.key {
+			obj := v.confirm.object
+			v.confirm = nil
+			return v, v.startPresign(obj, choice.expires)
+		}
+	}
+	if key == "esc" || key == "n" {
 		v.confirm = nil
 		return v, nil
 	}
@@ -192,21 +275,15 @@ func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if v.transfer.quitRequested(key) {
 		return v, tea.Quit
 	}
-	if next := v.navView(key); next != nil {
-		return next, nil
+	if next, cmd := v.navView(key); next != nil {
+		return next, cmd
+	}
+
+	if next, cmd := v.actionKey(msg); next != nil || cmd != nil {
+		return next, cmd
 	}
 
 	var cmds []tea.Cmd
-	switch key {
-	case "p":
-		v.showPreview = !v.showPreview
-		v.refreshPreview(&cmds)
-	case "enter", " ":
-		if obj := v.selectedObject(); obj != nil {
-			return v.selectObject(*obj)
-		}
-	}
-
 	if v.state.list != nil {
 		v.state.list, _ = v.state.list.Update(msg)
 		v.refreshPreview(&cmds)
@@ -214,18 +291,129 @@ func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return v, tea.Batch(cmds...)
 }
 
-// navView returns the destination view for navigation keys, or nil when the
-// key is not a navigation key.
-func (v *ObjectView) navView(key string) tea.Model {
+// actionKey handles the ready-state action keys: preview toggle, presign,
+// and item selection. It returns nil when the key is not an action key.
+func (v *ObjectView) actionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	switch msg.String() {
+	case "p":
+		v.showPreview = !v.showPreview
+		v.refreshPreview(&cmds)
+		return v, tea.Batch(cmds...)
+	case "P":
+		if obj := v.currentObject(); obj != nil {
+			v.confirm = &confirmPrompt{kind: confirmPresign, object: *obj}
+		}
+		return v, nil
+	case "enter", " ":
+		return v.enterItem()
+	}
+	return nil, nil
+}
+
+// enterItem dispatches enter/space on the item under the cursor: "Load
+// more" fetches the next page, folders descend (or start a prefix delete),
+// and objects run the view's operation.
+func (v *ObjectView) enterItem() (tea.Model, tea.Cmd) {
+	item := v.state.currentItem()
+	if item == nil {
+		return nil, nil
+	}
+	switch item.Tag {
+	case "More":
+		if v.loadingMore {
+			return v, nil
+		}
+		token, _ := item.Data.(string)
+		v.loadingMore = true
+		return v, v.fetchPage(token)
+	case "Folder":
+		return v.enterFolder(item)
+	default:
+		if obj := v.selectedObject(); obj != nil {
+			return v.selectObject(*obj)
+		}
+	}
+	return nil, nil
+}
+
+// enterFolder opens a folder row. In delete mode it starts the prefix
+// delete confirmation; otherwise it descends into the prefix.
+func (v *ObjectView) enterFolder(item *components.ListItem) (tea.Model, tea.Cmd) {
+	key := folderItemKey(item)
+	if key == "" {
+		return v, nil
+	}
+	if v.mode == ModeDelete {
+		return v.selectObject(s3.Object{Key: key})
+	}
+	return v.descend(key)
+}
+
+// folderItemKey extracts the folder's full key from a row created for a
+// common prefix (string) or a folder-marker object (s3.Object).
+func folderItemKey(item *components.ListItem) string {
+	switch data := item.Data.(type) {
+	case string:
+		return data
+	case s3.Object:
+		return data.Key
+	}
+	return ""
+}
+
+// descend moves the listing into a child prefix.
+func (v *ObjectView) descend(prefix string) (tea.Model, tea.Cmd) {
+	v.parents = append(v.parents, v.prefix)
+	v.prefix = prefix
+	return v.reload()
+}
+
+// ascend returns to the parent prefix.
+func (v *ObjectView) ascend() (tea.Model, tea.Cmd) {
+	v.prefix = v.parents[len(v.parents)-1]
+	v.parents = v.parents[:len(v.parents)-1]
+	return v.reload()
+}
+
+// reload clears per-location state and fetches the first page of the
+// current prefix.
+func (v *ObjectView) reload() (tea.Model, tea.Cmd) {
+	v.previewKey = ""
+	v.notice = ""
+	v.loadingMore = false
+	if v.preview != nil {
+		// The previous location's metadata must not linger in the pane.
+		v.preview, _ = v.preview.Update(components.PreviewMsg{})
+	}
+	return v, v.state.startLoading(v.loadMessage(), v.loadObjects())
+}
+
+// navView returns the destination for navigation keys — ascending a prefix
+// for esc, or a sibling view — or nil when the key is not a navigation key.
+func (v *ObjectView) navView(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
-		return NewOperationView(v.deps, v.bucket)
+		if len(v.parents) > 0 {
+			return v.ascend()
+		}
+		return NewOperationView(v.deps, v.bucket), nil
+	case "right", "l":
+		// In every mode, right/l descends into the folder under the
+		// cursor. In delete mode this is the only way in: enter on a
+		// folder starts a prefix delete instead.
+		if item := v.state.currentItem(); item != nil && item.Tag == "Folder" {
+			if key := folderItemKey(item); key != "" {
+				return v.descend(key)
+			}
+		}
+		return nil, nil
 	case "?":
-		return NewHelpView(v.deps)
+		return NewHelpView(v.deps), nil
 	case "s":
-		return NewSettingsView(v.deps)
+		return NewSettingsView(v.deps), nil
 	}
-	return nil
+	return nil, nil
 }
 
 // selectedObject returns the s3.Object under the cursor, if any.
@@ -242,13 +430,27 @@ func (v *ObjectView) selectedObject() *s3.Object {
 }
 
 // refreshPreview reloads the preview pane for the object under the cursor.
+// HeadObject runs once per distinct key; repeat calls for the same object
+// are skipped.
 func (v *ObjectView) refreshPreview(cmds *[]tea.Cmd) {
 	if !v.showPreview {
 		return
 	}
-	if obj := v.currentObject(); obj != nil {
-		*cmds = append(*cmds, v.previewObject(*obj))
+	obj := v.currentObject()
+	key := ""
+	if obj != nil {
+		key = obj.Key
 	}
+	if key == v.previewKey {
+		return
+	}
+	v.previewKey = key
+	if obj == nil {
+		// Folder or sentinel rows have no HeadObject; clear the pane.
+		*cmds = append(*cmds, func() tea.Msg { return components.PreviewMsg{} })
+		return
+	}
+	*cmds = append(*cmds, v.previewObject(*obj))
 }
 
 // AbortTransfer cancels any in-flight transfer and releases the progress
@@ -257,20 +459,26 @@ func (v *ObjectView) AbortTransfer() {
 	v.transfer.abort()
 }
 
-// loadObjects walks the bucket sequentially, preserving lexical order.
+// loadObjects fetches the first page of the current prefix.
 func (v *ObjectView) loadObjects() tea.Cmd {
+	return v.fetchPage("")
+}
+
+// fetchPage requests one page of the hierarchical listing. A non-empty
+// token continues the previous listing ("Load more" item). The prefix is
+// captured now so a stale response can be dropped on arrival.
+func (v *ObjectView) fetchPage(token string) tea.Cmd {
+	bucket, prefix := v.bucket, v.prefix
 	return func() tea.Msg {
 		if err := v.deps.sessionErr(); err != nil {
-			return ObjectsLoadedMsg{Err: err}
+			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
 		}
 		ctx, cancel := v.deps.listContext(context.Background())
 		defer cancel()
-
-		var objects []s3.Object
-		err := v.deps.Session.Walk(ctx, v.bucket, "", s3.WalkOptions{Concurrency: 1}, func(object s3.Object) error {
-			objects = append(objects, object)
-			return nil
-		})
-		return ObjectsLoadedMsg{Objects: objects, Err: err}
+		page, err := v.deps.Session.ListPage(ctx, bucket, prefix, token, maxListPageKeys)
+		if err != nil {
+			return ObjectsLoadedMsg{Err: err, Prefix: prefix}
+		}
+		return ObjectsLoadedMsg{Page: page, Append: token != "", Prefix: prefix}
 	}
 }

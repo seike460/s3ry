@@ -62,7 +62,7 @@ func TestViewRenderingAfterLoad(t *testing.T) {
 	}
 
 	object := NewObjectView(deps, "test-bucket", ModeDownload)
-	model, _ = object.Update(ObjectsLoadedMsg{Objects: []s3.Object{{Key: "k", LastModified: time.Now()}}})
+	model, _ = object.Update(ObjectsLoadedMsg{Page: &s3.Page{Objects: []s3.Object{{Key: "k", LastModified: time.Now()}}}})
 	if out := model.(*ObjectView).View(); !strings.Contains(out, "k") {
 		t.Error("object view did not render the loaded object")
 	}
@@ -94,7 +94,7 @@ func TestViewKeyNavigation(t *testing.T) {
 	}
 
 	object := NewObjectView(deps, "test-bucket", ModeDownload)
-	object.Update(ObjectsLoadedMsg{Objects: []s3.Object{{Key: "k"}}})
+	object.Update(ObjectsLoadedMsg{Page: &s3.Page{Objects: []s3.Object{{Key: "k"}}}})
 	if model, _ := object.Update(tea.KeyMsg{Type: tea.KeyEsc}); model.(*OperationView) == nil {
 		t.Error("esc did not return to the operation view")
 	}
@@ -161,7 +161,7 @@ func TestObjectViewDeleteEndToEnd(t *testing.T) {
 	obj := s3.Object{Key: "victim.txt", Size: 1, LastModified: time.Now()}
 	view := NewObjectView(testDeps(t, []s3.Object{obj}), "test-bucket", ModeDelete)
 
-	model, _ := view.Update(ObjectsLoadedMsg{Objects: []s3.Object{obj}})
+	model, _ := view.Update(ObjectsLoadedMsg{Page: &s3.Page{Objects: []s3.Object{obj}}})
 	view = model.(*ObjectView)
 
 	model, _ = view.selectObject(obj)

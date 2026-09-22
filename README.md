@@ -11,18 +11,35 @@ This project is being rebuilt on AWS SDK for Go v2. The v2.0.0 release notes wer
 ## What works today
 
 - List S3 buckets.
-- Browse all objects in a selected bucket as a flat list. Listing paginates through every page, so buckets larger than 1000 keys are shown in full.
+- Browse a bucket hierarchically: folders (common prefixes) open with `Enter`, `Esc` climbs back, and long listings load page by page via a `Load more...` row.
+- Filter any list in place with `/` (case-insensitive substring match on title and description).
+- Preview an object's full metadata (`p`): Content-Type, storage class, version ID, and user metadata from `HeadObject`.
+- Copy a presigned GET URL for the selected object (`P`) with a 1h/24h/7d expiry choice.
 - Download a selected object to the current directory. Downloads use the AWS transfer manager for parallel multipart transfer.
 - Upload a selected file that is not hidden (hidden files and directories are skipped) from the current directory tree to the selected bucket.
-- Delete a selected object. Deletion and local overwrite ask for confirmation first.
+- Delete a selected object, or a whole folder — the confirmation shows the object count from a dry run first. In delete mode `Enter` on a folder deletes everything under it; press `l` or `→` to descend into the folder and delete individual objects instead. Local overwrite also asks for confirmation.
 - Export the selected bucket's full object list to `ObjectList-<timestamp>.txt` in the current directory.
+- Start directly at a bucket or prefix: `s3ry s3://bucket` opens the operation menu for the bucket, while `s3ry s3://bucket/prefix` (a path, or a bare `s3://bucket/` with a trailing slash) opens the object browser straight at that location.
 - Press `Esc` during a transfer to cancel it.
+- S3-compatible endpoints (MinIO, LocalStack) via `--endpoint`, `--path-style`, and `--no-sign-request`.
+
+### Non-interactive subcommands
+
+```sh
+s3ry ls [s3://bucket[/prefix]] [-o json]   # list buckets or objects
+s3ry cat s3://bucket/key                   # print an object to stdout
+s3ry rm s3://bucket/key [--dry-run]        # delete an object
+s3ry rm s3://bucket/prefix/ [--dry-run]    # delete every object under a prefix
+s3ry presign s3://bucket/key [--expires 2h]  # print a presigned GET URL
+```
+
+All subcommands accept the global AWS flags (`--profile`, `--region`, `--endpoint`, `--path-style`, `--no-sign-request`).
 
 ![s3ry logo](doc/S3ry.png)
 
 ## Known limitations
 
-- The binary exits with an error when stdin or stdout is not a TTY. S3 subcommands are not available yet.
+- The interactive TUI still requires a TTY; without one, use the `ls`, `cat`, `rm`, and `presign` subcommands.
 
 ## Installation
 
@@ -65,19 +82,26 @@ The binary's `--help` output is:
 interactive terminal client for Amazon S3
 
 Usage:
-  s3ry [flags]
+  s3ry [s3://bucket/prefix] [flags]
   s3ry [command]
 
 Available Commands:
+  cat         Print an object's contents to stdout
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
+  ls          List buckets or objects without the TUI
+  presign     Print a presigned GET URL for an object
+  rm          Delete an object or a prefix without the TUI
   version     Show version information
 
 Flags:
       --config string      Path to config file
+      --endpoint string    S3 endpoint URL for S3-compatible services
   -h, --help               help for s3ry
       --lang string        Language (en, ja)
       --log-level string   Log level (debug, info, warn, error)
+      --no-sign-request    Send unsigned requests for public endpoints
+      --path-style         Force path-style S3 addressing (MinIO, LocalStack)
       --profile string     AWS profile to use
       --region string      AWS region to use
   -v, --verbose            Enable verbose logging
@@ -94,7 +118,7 @@ The `s3ry version` and `s3ry completion <shell>` subcommands are available as we
 
 - In lists, `↑`/`↓` or `k`/`j` move between items. `PgUp`/`PgDn`, `Ctrl+B`/`Ctrl+F`, and `Home`/`End` provide page and position navigation. `Enter` or `Space` selects the current item.
 - In the operation view, `d` starts download, `u` starts upload, and `Delete` starts delete.
-- In the object view, `p` toggles the object metadata preview, `r` reloads the list, `?` opens help, `s` opens settings, and `Esc` returns to the operation view.
+- In the object view, `/` filters the list, `p` toggles the object metadata preview, `P` generates a presigned URL, `Enter` opens a folder, `r` reloads the list, `?` opens help, `s` opens settings, and `Esc` climbs to the parent prefix or returns to the operation view.
 - In the bucket view, `r` retries loading buckets, `?` opens help, and `s` opens settings.
 - In the upload view, `r` rescans local files and `Esc` returns to the operation view.
 - Globally, `Ctrl+H` or `F1` opens help, and `Ctrl+S` opens settings.
@@ -132,7 +156,7 @@ With `--config PATH`, the specified YAML file is read and environment variables 
 
 The YAML keys defined by the configuration type are:
 
-- `aws.region`, `aws.profile`, `aws.endpoint`
+- `aws.region`, `aws.profile`, `aws.endpoint`, `aws.path_style`, `aws.no_sign_request`
 - `ui.language`, `ui.theme`
 - `performance.concurrency`, `performance.part_size`, `performance.timeout`
 - `logging.level`, `logging.format`, `logging.file`
@@ -171,7 +195,7 @@ transfer benchmarks for regression comparisons.
 
 - One `s3.Session` (AWS SDK for Go v2) is created at startup and shared by every view. It caches an S3 client and a transfer manager per bucket region, so cross-region buckets need no restart.
 - Uploads and downloads go through the AWS transfer manager, which parallelizes multipart work using `performance.concurrency` goroutines.
-- `Walk` lists with `Concurrency` 1 in lexical order, or crawls delimiter prefixes in parallel above that.
+- `Walk` lists with `Concurrency` 1 in lexical order, or crawls delimiter prefixes in parallel above that; the object browser uses `ListPage` (delimiter + continuation tokens) for hierarchical paging.
 - Transfer progress callbacks run on worker goroutines; a bounded broker channel hands them to the Bubble Tea update loop, so slow rendering never blocks a transfer worker and progress reporting is race-free.
 - Downloads are written to a temporary sibling file first and published only on success, honoring overwrite modes (`fail`, `skip`, `always`); `Esc` cancels and removes the partial file.
 - S3 keys are validated and mapped to local paths by `LocalPath`, which rejects absolute paths, `..` traversal, and prefix escapes.

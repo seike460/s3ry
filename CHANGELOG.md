@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Non-interactive subcommands: `ls` (buckets or objects, `-o json`), `cat`, `rm` (object or prefix, `--dry-run`), and `presign` (`--expires`).
+- `--endpoint`, `--path-style`, and `--no-sign-request` flags plus `aws.endpoint`, `aws.path_style`, and `aws.no_sign_request` config keys for S3-compatible services.
+- An optional `s3://bucket[/prefix]` positional argument that starts the TUI directly at a bucket or prefix.
+- Hierarchical object browsing: common prefixes appear as folder rows, `Enter` descends, `Esc` ascends, and truncated listings offer a `Load more...` row.
+- `/` incremental filtering on every list.
+- Object preview (`p`) now shows full `HeadObject` metadata: Content-Type, storage class, version ID, and user metadata.
+- Presigned URL generation in the TUI (`P`) with a 1h/24h/7d expiry chooser and OSC52 clipboard copy.
+- Folder delete removes every object under the prefix via `DeletePrefix`; the confirmation prompt shows the dry-run object count.
+
+### Changed
+
+- The AWS connection flags moved to persistent flags so the subcommands share them.
+- The object list shows keys relative to the current prefix and reports the prefix in the context line.
+
 ## [3.0.0] - 2026-09-22
 
 ### Added
