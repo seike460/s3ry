@@ -48,7 +48,7 @@ brew install seike460/tap/s3ry
 Use Go 1.27 or later:
 
 ```sh
-make build   # writes bin/s3ry
+make build   # writes dist/s3ry
 ```
 
 ## Usage
@@ -160,7 +160,7 @@ go build ./...
 go test -race ./...
 go vet ./...
 make lint       # golangci-lint via the mise-pinned version
-make build      # stamped binary at bin/s3ry
+make build      # stamped binary at dist/s3ry
 ```
 
 Integration tests run against a local MinIO container; see

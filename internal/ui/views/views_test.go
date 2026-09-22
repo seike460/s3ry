@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +48,33 @@ func fakeS3(t *testing.T, objects []s3.Object) (*s3.Session, *httptest.Server) {
 			_, _ = w.Write([]byte(body.String()))
 		case r.Method == http.MethodHead:
 			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodPut:
+			w.Header().Set("ETag", `"e"`)
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && r.URL.Query().Has("delete"):
+			var body strings.Builder
+			body.WriteString(`<?xml version="1.0" encoding="UTF-8"?><DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`)
+			data, _ := io.ReadAll(r.Body)
+			for _, m := range regexp.MustCompile(`<Key>([^<]+)</Key>`).FindAllStringSubmatch(string(data), -1) {
+				fmt.Fprintf(&body, "<Deleted><Key>%s</Key></Deleted>", m[1])
+			}
+			body.WriteString("</DeleteResult>")
+			_, _ = w.Write([]byte(body.String()))
+		case r.Method == http.MethodGet && r.URL.Path != "/":
+			body := []byte("hello world")
+			var start, end int
+			if _, err := fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &start, &end); err == nil {
+				if end == 0 || end >= len(body) {
+					end = len(body) - 1
+				}
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, len(body)))
+				w.WriteHeader(http.StatusPartialContent)
+				_, _ = w.Write(body[start : end+1])
+				return
+			}
+			_, _ = w.Write(body)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

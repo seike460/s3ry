@@ -8,7 +8,7 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -trimpath -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
 build:
-	go build $(LDFLAGS) -o bin/s3ry ./cmd/s3ry
+	go build $(LDFLAGS) -o dist/s3ry ./cmd/s3ry
 
 test:
 	go test -race ./...
