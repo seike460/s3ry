@@ -4,6 +4,8 @@
 
 s3ry is an interactive terminal client for Amazon S3. It is written in Go and uses Bubble Tea.
 
+[日本語](README.ja.md)
+
 ## Status
 
 This project is being rebuilt on AWS SDK for Go v2. The v2.0.0 release notes were corrected on 2026-09-03.
