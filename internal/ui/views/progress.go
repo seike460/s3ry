@@ -13,20 +13,28 @@ import (
 )
 
 // transferProgressMsg delivers one progress event to the update loop.
-type transferProgressMsg struct{ event s3.Progress }
+// broker identifies the transfer so messages for a superseded or aborted
+// transfer can be dropped instead of driving the wrong progress bar.
+type transferProgressMsg struct {
+	event  s3.Progress
+	broker *progressBroker
+}
 
 // transferDoneMsg reports that a transfer goroutine returned.
 type transferDoneMsg struct {
 	err     error
 	summary string
+	broker  *progressBroker
 }
 
 // brokerClosedMsg is emitted when a view stops listening to a broker.
 type brokerClosedMsg struct{}
 
 // backToOperationMsg asks a view to return to the operation menu after a
-// finished operation has been shown briefly.
-type backToOperationMsg struct{}
+// finished operation has been shown briefly. broker identifies the finished
+// transfer so a delayed tick from an earlier run cannot force navigation in
+// a view that has already moved on.
+type backToOperationMsg struct{ broker *progressBroker }
 
 // progressBroker adapts concurrent s3.ProgressFunc callbacks to the
 // Bubble Tea message loop. Intermediate events may be dropped when the UI
@@ -66,7 +74,7 @@ func (b *progressBroker) wait() tea.Cmd {
 	return func() tea.Msg {
 		select {
 		case event := <-b.ch:
-			return transferProgressMsg{event: event}
+			return transferProgressMsg{event: event, broker: b}
 		case <-b.done:
 			return brokerClosedMsg{}
 		}
@@ -86,6 +94,10 @@ type transferState struct {
 	cancel   context.CancelFunc
 	progress *components.Progress
 	active   bool
+	// lastBroker is the most recently finished broker. The delayed
+	// back-to-operation tick is accepted only while it still refers to this
+	// broker, so stale ticks cannot hijack a view that started new work.
+	lastBroker *progressBroker
 	// doneDelay customizes how long the outcome stays visible before the
 	// view returns to the operation menu. Zero uses two seconds.
 	doneDelay time.Duration
@@ -103,30 +115,31 @@ func (t *transferState) begin(title string, total int64) (context.Context, tea.C
 	return ctx, t.broker.wait()
 }
 
-// callback returns the progress function to pass to s3 transfer options.
-func (t *transferState) callback() s3.ProgressFunc {
-	return t.broker.callback
-}
-
 // onProgress forwards one broker event to the progress widget and returns
-// the command that waits for the next event.
-func (t *transferState) onProgress(event s3.Progress, message string) tea.Cmd {
-	if t.broker == nil || t.progress == nil {
+// the command that waits for the next event. Events tagged with a different
+// broker belong to a superseded transfer and are dropped.
+func (t *transferState) onProgress(msg transferProgressMsg, message string) tea.Cmd {
+	if t.broker == nil || t.progress == nil || msg.broker != t.broker {
 		return nil
 	}
 	t.progress, _ = t.progress.Update(components.ProgressMsg{
-		Current: event.Transferred,
-		Total:   event.Total,
+		Current: msg.event.Transferred,
+		Total:   msg.event.Total,
 		Message: message,
 	})
 	return t.broker.wait()
 }
 
 // finish ends the transfer, renders the outcome, and schedules the return
-// to the operation view after a short pause.
+// to the operation view after a short pause. Completions tagged with a
+// different broker belong to a superseded transfer and are dropped.
 func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
+	if msg.broker != t.broker {
+		return nil
+	}
 	if t.broker != nil {
 		t.broker.close()
+		t.lastBroker = t.broker
 		t.broker = nil
 	}
 	t.cancel = nil
@@ -136,8 +149,11 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	success := msg.err == nil
 	if msg.err != nil {
 		text = msg.err.Error()
-		if errors.Is(msg.err, s3.ErrCanceled) {
+		switch {
+		case errors.Is(msg.err, s3.ErrCanceled):
 			text = T("Canceled")
+		case errors.Is(msg.err, s3.ErrTimeout):
+			text = T("Timed out")
 		}
 	}
 	if t.progress == nil {
@@ -148,15 +164,35 @@ func (t *transferState) finish(msg transferDoneMsg) tea.Cmd {
 	if delay <= 0 {
 		delay = 2 * time.Second
 	}
+	finishedBroker := t.lastBroker
 	return tea.Tick(delay, func(time.Time) tea.Msg {
-		return backToOperationMsg{}
+		return backToOperationMsg{broker: finishedBroker}
 	})
+}
+
+// backToOperation reports whether a delayed navigation tick is still valid:
+// it must name the most recently finished broker while no transfer is active.
+func (t *transferState) backToOperation(msg backToOperationMsg) bool {
+	return msg.broker != nil && msg.broker == t.lastBroker && !t.active
 }
 
 // cancelTransfer aborts the running transfer, if any.
 func (t *transferState) cancelTransfer() {
 	if t.cancel != nil {
 		t.cancel()
+	}
+}
+
+// abort cancels the transfer and closes the broker so blocked waiters and
+// Done callbacks are released. It is used when the owning view is being
+// replaced or the program is quitting.
+func (t *transferState) abort() {
+	t.cancelTransfer()
+	t.cancel = nil
+	t.active = false
+	if t.broker != nil {
+		t.broker.close()
+		t.broker = nil
 	}
 }
 

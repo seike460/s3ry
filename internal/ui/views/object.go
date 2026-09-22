@@ -89,7 +89,7 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v.onObjectsLoaded(msg)
 
 	case transferProgressMsg:
-		if cmd := v.transfer.onProgress(msg.event, progressMessage(msg.event)); cmd != nil {
+		if cmd := v.transfer.onProgress(msg, progressMessage(msg.event)); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -99,7 +99,9 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case backToOperationMsg:
-		return NewOperationView(v.deps, v.bucket), nil
+		if v.transfer.backToOperation(msg) {
+			return NewOperationView(v.deps, v.bucket), nil
+		}
 
 	case brokerClosedMsg:
 		// The broker was closed while a read was in flight; nothing to do.
@@ -184,6 +186,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.confirm = nil
 			return v, nil
 		case "ctrl+c", "q":
+			v.transfer.abort()
 			return v, tea.Quit
 		}
 		return v, nil
@@ -192,6 +195,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if v.transfer.active {
 		switch key {
 		case "ctrl+c", "q":
+			v.transfer.abort()
 			return v, tea.Quit
 		case "esc":
 			v.transfer.cancelTransfer()
@@ -201,6 +205,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if v.loading {
 		if key == "ctrl+c" || key == "q" {
+			v.transfer.abort()
 			return v, tea.Quit
 		}
 		return v, nil
@@ -209,6 +214,7 @@ func (v *ObjectView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch key {
 	case "ctrl+c", "q":
+		v.transfer.abort()
 		return v, tea.Quit
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
@@ -323,6 +329,12 @@ func (v *ObjectView) currentObject() *s3.Object {
 		return nil
 	}
 	return &obj
+}
+
+// AbortTransfer cancels any in-flight transfer and releases the progress
+// broker. The app calls it when replacing the view or quitting.
+func (v *ObjectView) AbortTransfer() {
+	v.transfer.abort()
 }
 
 // loadObjects walks the bucket sequentially, preserving lexical order.

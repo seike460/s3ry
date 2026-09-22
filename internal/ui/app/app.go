@@ -34,27 +34,46 @@ func (a *App) Init() tea.Cmd {
 	return a.view.Init()
 }
 
+// abortableView is implemented by views that own a background transfer.
+// The app aborts the transfer before replacing or quitting the view so the
+// worker goroutine and its progress broker are released.
+type abortableView interface {
+	AbortTransfer()
+}
+
+// abortView cancels any in-flight transfer owned by view.
+func abortView(view tea.Model) {
+	if v, ok := view.(abortableView); ok {
+		v.AbortTransfer()
+	}
+}
+
 // Update handles global shortcuts and delegates to the current view.
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch keyMsg.String() {
 		case "ctrl+c":
+			abortView(a.view)
 			return a, tea.Quit
 		case "ctrl+h", "f1":
+			abortView(a.view)
 			a.view = views.NewHelpView(a.deps)
 			return a, a.view.Init()
 		case "ctrl+s":
+			abortView(a.view)
 			a.view = views.NewSettingsView(a.deps)
 			return a, a.view.Init()
 		}
 	}
 
 	var cmd tea.Cmd
+	oldView := a.view
 	oldViewType := fmt.Sprintf("%T", a.view)
 	a.view, cmd = a.view.Update(msg)
 	newViewType := fmt.Sprintf("%T", a.view)
 
 	if oldViewType != newViewType {
+		abortView(oldView)
 		if initCmd := a.view.Init(); initCmd != nil {
 			cmd = tea.Batch(cmd, initCmd)
 		}

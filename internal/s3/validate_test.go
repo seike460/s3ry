@@ -102,6 +102,7 @@ func TestLocalPath(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "parent", key: "../x", wantErr: true},
+		{name: "dotdot-like segment", key: "..backup/x", want: "..backup/x"},
 		{name: "nested parent", key: "a/../../x", wantErr: true},
 		{name: "dot segment", key: "a/./b", wantErr: true},
 		{name: "empty segment", key: "a//b", want: "a/b"},

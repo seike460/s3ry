@@ -172,6 +172,24 @@ func TestProgressUpdateAndComplete(t *testing.T) {
 	}
 }
 
+func TestProgressNarrowWidthAndOverflowDoNotPanic(t *testing.T) {
+	// A very narrow terminal must still render a bar instead of feeding a
+	// negative count to strings.Repeat.
+	p := NewProgress("job", 100)
+	p, _ = p.Update(tea.WindowSizeMsg{Width: 10, Height: 5})
+	p.SetProgress(50, 100, "half")
+	if p.View() == "" {
+		t.Fatal("narrow progress rendered nothing")
+	}
+
+	// Overshooting the total must clamp at 100% instead of panicking.
+	q := NewProgress("job", 100)
+	q, _ = q.Update(ProgressMsg{Current: 250, Total: 100, Message: "over"})
+	if !strings.Contains(q.View(), "100.0%") {
+		t.Fatalf("overflowing progress not clamped: %q", q.View())
+	}
+}
+
 func TestProgressSpeedSampling(t *testing.T) {
 	p := NewProgress("job", 1000)
 	p.SetProgress(10, 1000, "")

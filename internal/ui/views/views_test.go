@@ -412,6 +412,93 @@ func TestListGeneratorCancelOnEsc(t *testing.T) {
 	}
 }
 
+func TestTransferFinishDropsStaleBroker(t *testing.T) {
+	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
+	view.transfer.begin("job", 1)
+	defer view.transfer.abort()
+
+	// A completion tagged with a foreign broker must be ignored.
+	if cmd := view.transfer.finish(transferDoneMsg{broker: newProgressBroker()}); cmd != nil {
+		t.Fatal("stale done message was not dropped")
+	}
+	if !view.transfer.active {
+		t.Fatal("stale done message ended the active transfer")
+	}
+}
+
+func TestBackToOperationRejectsStaleTick(t *testing.T) {
+	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
+
+	// A tick that does not name the last finished broker must not navigate.
+	model, _ := view.Update(backToOperationMsg{broker: newProgressBroker()})
+	if model != view {
+		t.Fatal("stale tick navigated away")
+	}
+}
+
+func TestBackToOperationAcceptsMatchingTick(t *testing.T) {
+	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
+	view.transfer.begin("job", 1)
+	finished := view.transfer.broker
+	cmd := view.transfer.finish(transferDoneMsg{broker: finished})
+	if cmd == nil {
+		t.Fatal("legitimate done message was dropped")
+	}
+	if view.transfer.active {
+		t.Fatal("transfer still active after finish")
+	}
+	model, _ := view.Update(backToOperationMsg{broker: finished})
+	if got := fmt.Sprintf("%T", model); got != "*views.OperationView" {
+		t.Fatalf("matching tick navigated to %s, want *views.OperationView", got)
+	}
+}
+
+func TestTransferAbortReleasesBlockedDone(t *testing.T) {
+	view := NewListGeneratorView(testDeps(t, nil), "test-bucket")
+	view.transfer.begin("job", 1)
+	broker := view.transfer.broker
+
+	// Saturate the channel so the final Done send blocks, then prove abort
+	// releases it via broker.close.
+	for i := 0; i < 64; i++ {
+		broker.callback(s3.Progress{Transferred: int64(i)})
+	}
+	released := make(chan struct{})
+	go func() {
+		broker.callback(s3.Progress{Done: true})
+		close(released)
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	view.transfer.abort()
+	select {
+	case <-released:
+	case <-time.After(2 * time.Second):
+		t.Fatal("abort did not release a blocked Done callback")
+	}
+	if view.transfer.active || view.transfer.broker != nil {
+		t.Fatal("abort left the transfer marked active")
+	}
+}
+
+func TestObjectViewQuitAbortsTransfer(t *testing.T) {
+	view := NewObjectView(testDeps(t, nil), "test-bucket", ModeDownload)
+	view.transfer.begin("job", 1)
+	broker := view.transfer.broker
+
+	model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if model != view || cmd == nil {
+		t.Fatal("q during transfer did not quit")
+	}
+	if view.transfer.broker != nil || view.transfer.active {
+		t.Fatal("quit did not abort the transfer")
+	}
+	// The closed broker must answer waiters with brokerClosedMsg.
+	if _, ok := broker.wait()().(brokerClosedMsg); !ok {
+		t.Fatal("aborted broker did not close")
+	}
+}
+
 func TestSettingsViewMasksSecrets(t *testing.T) {
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "AKIAEXAMPLESECRET123")
 	view := NewSettingsView(Deps{Config: config.Default()})

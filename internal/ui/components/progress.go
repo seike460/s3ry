@@ -146,14 +146,23 @@ func (p *Progress) View() string {
 		barWidth := 40
 		if p.width > 0 && p.width < 60 {
 			barWidth = p.width - 20
+			if barWidth < 1 {
+				barWidth = 1
+			}
 		}
 
 		var percentage float64
 		if p.total > 0 {
 			percentage = float64(p.current) / float64(p.total)
+			if percentage > 1 {
+				percentage = 1
+			}
 		}
 
 		filled := int(percentage * float64(barWidth))
+		if filled > barWidth {
+			filled = barWidth
+		}
 		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
 		s.WriteString(p.progressStyle.Render(fmt.Sprintf("[%s] %.1f%%", bar, percentage*100)))

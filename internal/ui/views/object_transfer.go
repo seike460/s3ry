@@ -50,7 +50,7 @@ func (v *ObjectView) selectObject(obj s3.Object) (tea.Model, tea.Cmd) {
 // progress through the broker.
 func (v *ObjectView) startDownload(obj s3.Object, overwrite s3.OverwriteMode) (tea.Model, tea.Cmd) {
 	ctx, wait := v.transfer.begin(T("Downloading %s", obj.Key), obj.Size)
-	progressFn := v.transfer.callback()
+	broker := v.transfer.broker
 
 	session, bucket, key := v.deps.Session, v.bucket, obj.Key
 	localPath := filepath.Base(key)
@@ -58,11 +58,12 @@ func (v *ObjectView) startDownload(obj s3.Object, overwrite s3.OverwriteMode) (t
 		func() tea.Msg {
 			err := session.Download(ctx, bucket, key, localPath, s3.DownloadOptions{
 				Overwrite: overwrite,
-				Progress:  progressFn,
+				Progress:  broker.callback,
 			})
 			return transferDoneMsg{
 				err:     err,
 				summary: T("Downloaded %s (%s)", localPath, formatBytes(obj.Size)),
+				broker:  broker,
 			}
 		},
 		wait,
@@ -72,18 +73,18 @@ func (v *ObjectView) startDownload(obj s3.Object, overwrite s3.OverwriteMode) (t
 // startDelete runs Session.DeleteKeys on a command goroutine.
 func (v *ObjectView) startDelete(obj s3.Object) (tea.Model, tea.Cmd) {
 	ctx, wait := v.transfer.begin(T("Deleting %s", obj.Key), 1)
-	progressFn := v.transfer.callback()
+	broker := v.transfer.broker
 
 	session, bucket, key := v.deps.Session, v.bucket, obj.Key
 	return v, tea.Batch(
 		func() tea.Msg {
 			result, err := session.DeleteKeys(ctx, bucket, []string{key}, s3.DeleteOptions{
-				Progress: progressFn,
+				Progress: broker.callback,
 			})
 			if err == nil && len(result.Failed) > 0 {
 				err = result.Failed[0].Err
 			}
-			return transferDoneMsg{err: err, summary: T("Deleted %s", key)}
+			return transferDoneMsg{err: err, summary: T("Deleted %s", key), broker: broker}
 		},
 		wait,
 	)

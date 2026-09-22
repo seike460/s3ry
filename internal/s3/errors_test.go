@@ -26,6 +26,7 @@ func TestKindString(t *testing.T) {
 		{KindNoCredentials, "no_credentials"},
 		{KindThrottled, "throttled"},
 		{KindCanceled, "canceled"},
+		{KindTimeout, "timeout"},
 		{KindInvalid, "invalid"},
 		{KindExists, "exists"},
 		{KindUnsupported, "unsupported"},
@@ -140,8 +141,11 @@ func TestClassify(t *testing.T) {
 	if got := Classify("download", "other", "key", existing); got != existing {
 		t.Fatal("existing *Error was not passed through")
 	}
-	if got := Classify("download", "bucket", "key", context.DeadlineExceeded).(*Error).Kind; got != KindCanceled {
-		t.Fatalf("deadline exceeded kind = %v, want canceled", got)
+	if got := Classify("download", "bucket", "key", context.DeadlineExceeded).(*Error).Kind; got != KindTimeout {
+		t.Fatalf("deadline exceeded kind = %v, want timeout", got)
+	}
+	if !errors.Is(Classify("download", "bucket", "key", context.DeadlineExceeded), ErrTimeout) {
+		t.Fatal("deadline exceeded should match ErrTimeout")
 	}
 	if !errors.Is(Classify("download", "bucket", "key", &s3types.NoSuchKey{}), ErrNotFound) {
 		t.Fatal("NoSuchKey classification should match ErrNotFound")
@@ -228,6 +232,14 @@ func TestClassifyCredentialOperationErrors(t *testing.T) {
 	unknownService := &smithy.OperationError{ServiceID: "S3", OperationName: "GetObject", Err: errors.New("failure")}
 	if got := Classify("op", "bucket", "key", unknownService).(*Error).Kind; got != KindUnknown {
 		t.Fatalf("unknown service classified as %v, want unknown", got)
+	}
+}
+
+func TestClassifyJoinedCredentialError(t *testing.T) {
+	cause := &smithy.OperationError{ServiceID: "SSO", OperationName: "GetRoleCredentials", Err: errors.New("expired")}
+	joined := errors.Join(errors.New("config load failed"), cause)
+	if got := Classify("op", "bucket", "key", joined).(*Error).Kind; got != KindNoCredentials {
+		t.Fatalf("joined credential error classified as %v, want no_credentials", got)
 	}
 }
 

@@ -46,7 +46,7 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case transferProgressMsg:
 		message := fmt.Sprintf(T("%d objects written"), msg.event.Transferred)
-		if cmd := v.transfer.onProgress(msg.event, message); cmd != nil {
+		if cmd := v.transfer.onProgress(msg, message); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -57,7 +57,9 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case backToOperationMsg:
-		return NewOperationView(v.deps, v.bucket), nil
+		if v.transfer.backToOperation(msg) {
+			return NewOperationView(v.deps, v.bucket), nil
+		}
 
 	case brokerClosedMsg:
 		// The broker was closed while a read was in flight; nothing to do.
@@ -71,6 +73,7 @@ func (v *ListGeneratorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			v.transfer.abort()
 			return v, tea.Quit
 		case "esc":
 			if v.transfer.active {
@@ -111,7 +114,7 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 	}
 
 	ctx, wait := v.transfer.begin(T("Generating object list"), -1)
-	progressFn := v.transfer.callback()
+	broker := v.transfer.broker
 
 	session, bucket := v.deps.Session, v.bucket
 	concurrency := session.Options().Concurrency
@@ -121,7 +124,7 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 			filename := fmt.Sprintf("ObjectList-%s.txt", time.Now().Format("2006-01-02-15-04-05"))
 			file, err := os.Create(filename)
 			if err != nil {
-				return transferDoneMsg{err: err}
+				return transferDoneMsg{err: err, broker: broker}
 			}
 			defer func() { _ = file.Close() }()
 
@@ -133,19 +136,26 @@ func (v *ListGeneratorView) generateList() tea.Cmd {
 				}
 				count++
 				if count%100 == 0 {
-					progressFn(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: -1})
+					broker.callback(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: -1})
 				}
 				return nil
 			})
 			if walkErr == nil {
 				walkErr = writer.Flush()
 			}
-			progressFn(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: count, Done: true, Err: walkErr})
+			broker.callback(s3.Progress{Op: s3.OpDownload, Bucket: bucket, Transferred: count, Total: count, Done: true, Err: walkErr})
 			return transferDoneMsg{
 				err:     walkErr,
 				summary: T("Object list created: %s (%d objects)", filename, count),
+				broker:  broker,
 			}
 		},
 		wait,
 	)
+}
+
+// AbortTransfer cancels the running list generation and releases the
+// progress broker. The app calls it when replacing the view or quitting.
+func (v *ListGeneratorView) AbortTransfer() {
+	v.transfer.abort()
 }

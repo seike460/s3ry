@@ -38,6 +38,9 @@ func (m *meter) add(delta int64) {
 	}
 
 	m.n.Add(delta)
+	if m.base.Total >= 0 && m.n.Load() > m.base.Total {
+		m.n.Store(m.base.Total)
+	}
 	m.reportLocked()
 }
 

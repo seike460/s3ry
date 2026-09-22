@@ -59,6 +59,35 @@ func TestUpdateInitsOnViewTransition(t *testing.T) {
 	}
 }
 
+// fakeAbortView records AbortTransfer calls to verify the app releases
+// in-flight transfers before replacing or quitting a view.
+type fakeAbortView struct{ aborted bool }
+
+func (f *fakeAbortView) Init() tea.Cmd                       { return nil }
+func (f *fakeAbortView) Update(tea.Msg) (tea.Model, tea.Cmd) { return f, nil }
+func (f *fakeAbortView) View() string                        { return "" }
+func (f *fakeAbortView) AbortTransfer()                      { f.aborted = true }
+
+func TestGlobalKeysAbortActiveTransfer(t *testing.T) {
+	app := New(testDeps())
+	fake := &fakeAbortView{}
+	app.view = fake
+
+	app.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	if !fake.aborted {
+		t.Fatal("ctrl+s replaced the view without aborting its transfer")
+	}
+	if got := fmt.Sprintf("%T", app.view); got != "*views.SettingsView" {
+		t.Fatalf("ctrl+s view = %s, want *views.SettingsView", got)
+	}
+
+	fake2 := &fakeAbortView{}
+	app.view = fake2
+	if _, cmd := app.Update(tea.KeyMsg{Type: tea.KeyCtrlC}); !fake2.aborted || cmd == nil {
+		t.Fatal("ctrl+c did not abort the transfer and quit")
+	}
+}
+
 func TestViewDelegates(t *testing.T) {
 	app := New(testDeps())
 	if app.View() == "" {

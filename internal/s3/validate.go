@@ -130,7 +130,9 @@ func localPath(destDir, prefix, key string, windows bool) (string, error) {
 	pathParts = append(pathParts, segments...)
 	path := filepath.Join(pathParts...)
 	relative, err := filepath.Rel(destDir, path)
-	if err != nil || relative == "." || strings.HasPrefix(relative, "..") {
+	if err != nil || relative == "." || relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) ||
+		strings.HasPrefix(relative, "../") {
 		return "", newInvalidError("local_path", "", key, "resolved path escapes the destination directory")
 	}
 	return path, nil

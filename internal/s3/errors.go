@@ -32,6 +32,8 @@ const (
 	KindThrottled
 	// KindCanceled means the caller canceled the operation.
 	KindCanceled
+	// KindTimeout means the operation exceeded its deadline.
+	KindTimeout
 	// KindInvalid means the request arguments failed validation.
 	KindInvalid
 	// KindExists means the local destination already exists.
@@ -52,6 +54,8 @@ func (k Kind) String() string {
 		return "throttled"
 	case KindCanceled:
 		return "canceled"
+	case KindTimeout:
+		return "timeout"
 	case KindInvalid:
 		return "invalid"
 	case KindExists:
@@ -75,6 +79,8 @@ func (k Kind) sentence() string {
 		return "throttled by S3"
 	case KindCanceled:
 		return "canceled"
+	case KindTimeout:
+		return "timed out"
 	case KindInvalid:
 		return "invalid input"
 	case KindExists:
@@ -146,6 +152,7 @@ var (
 	ErrNoCredentials = &Error{Kind: KindNoCredentials}
 	ErrThrottled     = &Error{Kind: KindThrottled}
 	ErrCanceled      = &Error{Kind: KindCanceled}
+	ErrTimeout       = &Error{Kind: KindTimeout}
 	ErrInvalid       = &Error{Kind: KindInvalid}
 	ErrExists        = &Error{Kind: KindExists}
 	ErrUnsupported   = &Error{Kind: KindUnsupported}
@@ -162,7 +169,10 @@ func Classify(op, bucket, key string, err error) error {
 		return e
 	}
 
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &Error{Kind: KindTimeout, Op: op, Bucket: bucket, Key: key, Err: err}
+	}
+	if errors.Is(err, context.Canceled) {
 		return &Error{Kind: KindCanceled, Op: op, Bucket: bucket, Key: key, Err: err}
 	}
 
@@ -209,11 +219,9 @@ func Classify(op, bucket, key string, err error) error {
 		}
 	}
 
-	for current := err; current != nil; current = errors.Unwrap(current) {
-		operationErr, ok := current.(*smithy.OperationError)
-		if ok && isCredentialService(operationErr.ServiceID) {
-			return &Error{Kind: KindNoCredentials, Op: op, Bucket: bucket, Key: key, Err: err}
-		}
+	var operationErr *smithy.OperationError
+	if errors.As(err, &operationErr) && operationErr != nil && isCredentialService(operationErr.ServiceID) {
+		return &Error{Kind: KindNoCredentials, Op: op, Bucket: bucket, Key: key, Err: err}
 	}
 
 	return &Error{Kind: KindUnknown, Op: op, Bucket: bucket, Key: key, Err: err}

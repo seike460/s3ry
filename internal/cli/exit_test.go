@@ -22,6 +22,7 @@ func TestExitCode(t *testing.T) {
 		{name: "no credentials", err: &s3.Error{Kind: s3.KindNoCredentials}, want: 4},
 		{name: "throttled", err: &s3.Error{Kind: s3.KindThrottled}, want: 1},
 		{name: "canceled", err: &s3.Error{Kind: s3.KindCanceled}, want: 130},
+		{name: "timeout", err: &s3.Error{Kind: s3.KindTimeout, Err: context.DeadlineExceeded}, want: 1},
 		{name: "invalid", err: &s3.Error{Kind: s3.KindInvalid}, want: 1},
 		{name: "exists", err: &s3.Error{Kind: s3.KindExists}, want: 1},
 		{name: "unsupported", err: &s3.Error{Kind: s3.KindUnsupported}, want: 1},

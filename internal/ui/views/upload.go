@@ -69,7 +69,7 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v.onFilesLoaded(msg)
 
 	case transferProgressMsg:
-		if cmd := v.transfer.onProgress(msg.event, progressMessage(msg.event)); cmd != nil {
+		if cmd := v.transfer.onProgress(msg, progressMessage(msg.event)); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -79,7 +79,9 @@ func (v *UploadView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case backToOperationMsg:
-		return NewOperationView(v.deps, v.bucket), nil
+		if v.transfer.backToOperation(msg) {
+			return NewOperationView(v.deps, v.bucket), nil
+		}
 
 	case brokerClosedMsg:
 
@@ -131,6 +133,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if v.transfer.active {
 		switch key {
 		case "ctrl+c", "q":
+			v.transfer.abort()
 			return v, tea.Quit
 		case "esc":
 			v.transfer.cancelTransfer()
@@ -140,6 +143,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if v.loading {
 		if key == "ctrl+c" || key == "q" {
+			v.transfer.abort()
 			return v, tea.Quit
 		}
 		return v, nil
@@ -147,6 +151,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "ctrl+c", "q":
+		v.transfer.abort()
 		return v, tea.Quit
 	case "esc":
 		return NewOperationView(v.deps, v.bucket), nil
@@ -182,7 +187,7 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // file's slash-separated path relative to the working directory.
 func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
 	ctx, wait := v.transfer.begin(T("Uploading %s", file.RelativePath), file.Size)
-	progressFn := v.transfer.callback()
+	broker := v.transfer.broker
 
 	session, bucket := v.deps.Session, v.bucket
 	key := filepath.ToSlash(file.RelativePath)
@@ -190,11 +195,12 @@ func (v *UploadView) startUpload(file FileInfo) (tea.Model, tea.Cmd) {
 	return v, tea.Batch(
 		func() tea.Msg {
 			err := session.Upload(ctx, localPath, bucket, key, s3.UploadOptions{
-				Progress: progressFn,
+				Progress: broker.callback,
 			})
 			return transferDoneMsg{
 				err:     err,
 				summary: T("Uploaded %s (%s)", file.RelativePath, formatBytes(file.Size)),
+				broker:  broker,
 			}
 		},
 		wait,
@@ -224,6 +230,12 @@ func (v *UploadView) View() string {
 		result += "\n\n" + v.errors.View()
 	}
 	return result + "\n\n" + footer
+}
+
+// AbortTransfer cancels any in-flight transfer and releases the progress
+// broker. The app calls it when replacing the view or quitting.
+func (v *UploadView) AbortTransfer() {
+	v.transfer.abort()
 }
 
 func (v *UploadView) currentItem() *components.ListItem {
