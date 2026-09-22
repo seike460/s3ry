@@ -67,23 +67,13 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		v.width = msg.Width
-		v.state.resize(msg)
-		v.transfer.resize(msg)
-		if v.preview != nil {
-			v.preview, _ = v.preview.Update(msg)
-		}
+		v.onResize(msg)
 
 	case ObjectsLoadedMsg:
 		return v.onObjectsLoaded(msg)
 
-	case transferProgressMsg:
-		if cmd := v.transfer.onProgress(msg, progressMessage(msg.event)); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-
-	case transferDoneMsg:
-		if cmd := v.transfer.finish(msg); cmd != nil {
+	case transferProgressMsg, transferDoneMsg:
+		if cmd := v.onTransfer(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 
@@ -95,12 +85,9 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case brokerClosedMsg:
 		// The broker was closed while a read was in flight; nothing to do.
 
-	case components.SpinnerTickMsg:
-		cmds = append(cmds, v.state.onTick(msg))
-
-	case components.PreviewMsg:
-		if v.preview != nil {
-			v.preview, _ = v.preview.Update(msg)
+	case components.SpinnerTickMsg, components.PreviewMsg:
+		if cmd := v.onPassive(msg); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
 	case tea.KeyMsg:
@@ -108,6 +95,41 @@ func (v *ObjectView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onResize propagates the new terminal width to the list, transfer, and
+// preview sub-components.
+func (v *ObjectView) onResize(msg tea.WindowSizeMsg) {
+	v.width = msg.Width
+	v.state.resize(msg)
+	v.transfer.resize(msg)
+	if v.preview != nil {
+		v.preview, _ = v.preview.Update(msg)
+	}
+}
+
+// onTransfer feeds progress and completion events into the transfer state.
+func (v *ObjectView) onTransfer(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case transferProgressMsg:
+		return v.transfer.onProgress(msg, progressMessage(msg.event))
+	case transferDoneMsg:
+		return v.transfer.finish(msg)
+	}
+	return nil
+}
+
+// onPassive forwards spinner and preview messages to their components.
+func (v *ObjectView) onPassive(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case components.SpinnerTickMsg:
+		return v.state.onTick(msg)
+	case components.PreviewMsg:
+		if v.preview != nil {
+			v.preview, _ = v.preview.Update(msg)
+		}
+	}
+	return nil
 }
 
 // onKey handles keyboard input across the ready, confirm, and processing

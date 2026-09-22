@@ -55,47 +55,17 @@ const (
 
 // NewSession loads the AWS configuration and prepares the client caches.
 func NewSession(ctx context.Context, opts Options) (*Session, error) {
-	if opts.Concurrency <= 0 {
-		opts.Concurrency = defaultConcurrency
-	}
-	if opts.PartSize <= 0 {
-		opts.PartSize = defaultPartSize
-	}
-	if opts.PartSize < minimumPartSize {
-		return nil, &Error{
-			Kind: KindInvalid,
-			Op:   "session",
-			Err:  errors.New("part size must be at least 5 MiB"),
-		}
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	httpClient := opts.HTTPClient
 	if httpClient == nil {
-		maxIdleConns := max(baselineIdleConns, 2*opts.Concurrency+idleConnHeadroom)
-		httpClient = awshttp.NewBuildableClient().WithTransportOptions(func(tr *stdhttp.Transport) {
-			tr.MaxIdleConns = maxIdleConns
-			tr.MaxIdleConnsPerHost = maxIdleConns
-			tr.IdleConnTimeout = idleConnTimeout
-		})
+		httpClient = defaultHTTPClient(opts.Concurrency)
 	}
 
-	loadOptions := []func(*config.LoadOptions) error{
-		config.WithHTTPClient(httpClient),
-	}
-	if opts.Profile != "" {
-		loadOptions = append(loadOptions, config.WithSharedConfigProfile(opts.Profile))
-	}
-	if opts.Region != "" {
-		loadOptions = append(loadOptions, config.WithRegion(opts.Region))
-	}
-	if opts.EndpointURL != "" {
-		loadOptions = append(loadOptions, config.WithBaseEndpoint(opts.EndpointURL))
-	}
-	if opts.NoSignRequest {
-		loadOptions = append(loadOptions, config.WithCredentialsProvider(aws.AnonymousCredentials{}))
-	}
-
-	cfg, err := config.LoadDefaultConfig(ctx, loadOptions...)
+	cfg, err := config.LoadDefaultConfig(ctx, awsLoadOptions(opts, httpClient)...)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +89,55 @@ func NewSession(ctx context.Context, opts Options) (*Session, error) {
 			effectivePathStyle(pathStyleOpts), endpointMode,
 			opts.PartSize, opts.Concurrency),
 	}, nil
+}
+
+// normalizeOptions applies defaults and rejects an undersized part size.
+func normalizeOptions(opts Options) (Options, error) {
+	if opts.Concurrency <= 0 {
+		opts.Concurrency = defaultConcurrency
+	}
+	if opts.PartSize <= 0 {
+		opts.PartSize = defaultPartSize
+	}
+	if opts.PartSize < minimumPartSize {
+		return opts, &Error{
+			Kind: KindInvalid,
+			Op:   "session",
+			Err:  errors.New("part size must be at least 5 MiB"),
+		}
+	}
+	return opts, nil
+}
+
+// defaultHTTPClient tunes the transport so the idle connection pool scales
+// with the configured concurrency and parallel transfers reuse connections.
+func defaultHTTPClient(concurrency int) config.HTTPClient {
+	maxIdleConns := max(baselineIdleConns, 2*concurrency+idleConnHeadroom)
+	return awshttp.NewBuildableClient().WithTransportOptions(func(tr *stdhttp.Transport) {
+		tr.MaxIdleConns = maxIdleConns
+		tr.MaxIdleConnsPerHost = maxIdleConns
+		tr.IdleConnTimeout = idleConnTimeout
+	})
+}
+
+// awsLoadOptions maps session options onto AWS config load options.
+func awsLoadOptions(opts Options, httpClient config.HTTPClient) []func(*config.LoadOptions) error {
+	loadOptions := []func(*config.LoadOptions) error{
+		config.WithHTTPClient(httpClient),
+	}
+	if opts.Profile != "" {
+		loadOptions = append(loadOptions, config.WithSharedConfigProfile(opts.Profile))
+	}
+	if opts.Region != "" {
+		loadOptions = append(loadOptions, config.WithRegion(opts.Region))
+	}
+	if opts.EndpointURL != "" {
+		loadOptions = append(loadOptions, config.WithBaseEndpoint(opts.EndpointURL))
+	}
+	if opts.NoSignRequest {
+		loadOptions = append(loadOptions, config.WithCredentialsProvider(aws.AnonymousCredentials{}))
+	}
+	return loadOptions
 }
 
 // effectivePathStyle enables path-style addressing for an explicitly
