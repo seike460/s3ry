@@ -100,39 +100,9 @@ func (s *Session) UploadDir(ctx context.Context, srcDir, bucket, prefix string, 
 		return 0, err
 	}
 
-	info, err := os.Lstat(srcDir)
+	walkRoot, err := resolveWalkRoot(srcDir)
 	if err != nil {
-		return 0, &Error{
-			Kind: KindInvalid,
-			Op:   "upload_dir",
-			Err:  fmt.Errorf("source path %q: %w", srcDir, err),
-		}
-	}
-	walkRoot := srcDir
-	if info.Mode()&fs.ModeSymlink != 0 {
-		walkRoot, err = filepath.EvalSymlinks(srcDir)
-		if err != nil {
-			return 0, &Error{
-				Kind: KindInvalid,
-				Op:   "upload_dir",
-				Err:  fmt.Errorf("source path %q: %w", srcDir, err),
-			}
-		}
-		info, err = os.Stat(walkRoot)
-		if err != nil {
-			return 0, &Error{
-				Kind: KindInvalid,
-				Op:   "upload_dir",
-				Err:  fmt.Errorf("source path %q: %w", srcDir, err),
-			}
-		}
-	}
-	if !info.IsDir() {
-		return 0, &Error{
-			Kind: KindInvalid,
-			Op:   "upload_dir",
-			Err:  fmt.Errorf("source path %q is not a directory", srcDir),
-		}
+		return 0, err
 	}
 
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
@@ -142,36 +112,79 @@ func (s *Session) UploadDir(ctx context.Context, srcDir, bucket, prefix string, 
 	bulk := newBulkTransfers(ctx, parallel, o.ContinueOnError)
 
 	walkErr := filepath.WalkDir(walkRoot, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.Type()&fs.ModeSymlink != 0 {
-			return nil
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if err := bulk.ctx.Err(); err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(walkRoot, path)
-		if err != nil {
-			return err
-		}
-		key := prefix + filepath.ToSlash(rel)
-		if err := ValidateKey(key); err != nil {
-			return bulk.callbackError(key, err)
-		}
-
-		bulk.goTransfer(key, func(transferCtx context.Context) (bool, error) {
-			return true, s.Upload(transferCtx, path, bucket, key, UploadOptions{
-				Progress:         o.Progress,
-				ProgressInterval: o.ProgressInterval,
-			})
-		})
-		return nil
+		return s.visitUploadEntry(bulk, walkRoot, bucket, prefix, path, entry, walkErr, o)
 	})
 	walkErr = classifyBulkWalkError("upload_dir", bucket, "", walkErr)
 	return bulk.finish(walkErr)
+}
+
+// resolveWalkRoot returns the directory to walk for srcDir. A symlinked root
+// itself is resolved, while symlinks inside the tree are never followed.
+func resolveWalkRoot(srcDir string) (string, error) {
+	info, err := os.Lstat(srcDir)
+	if err != nil {
+		return "", &Error{
+			Kind: KindInvalid,
+			Op:   "upload_dir",
+			Err:  fmt.Errorf("source path %q: %w", srcDir, err),
+		}
+	}
+	root := srcDir
+	if info.Mode()&fs.ModeSymlink != 0 {
+		root, err = filepath.EvalSymlinks(srcDir)
+		if err != nil {
+			return "", &Error{
+				Kind: KindInvalid,
+				Op:   "upload_dir",
+				Err:  fmt.Errorf("source path %q: %w", srcDir, err),
+			}
+		}
+		info, err = os.Stat(root)
+		if err != nil {
+			return "", &Error{
+				Kind: KindInvalid,
+				Op:   "upload_dir",
+				Err:  fmt.Errorf("source path %q: %w", srcDir, err),
+			}
+		}
+	}
+	if !info.IsDir() {
+		return "", &Error{
+			Kind: KindInvalid,
+			Op:   "upload_dir",
+			Err:  fmt.Errorf("source path %q is not a directory", srcDir),
+		}
+	}
+	return root, nil
+}
+
+// visitUploadEntry enqueues one filesystem entry for upload, skipping
+// directories and symlinks.
+func (s *Session) visitUploadEntry(bulk *bulkTransfers, walkRoot, bucket, prefix, path string, entry fs.DirEntry, walkErr error, o BulkOptions) error {
+	if walkErr != nil {
+		return walkErr
+	}
+	if entry.Type()&fs.ModeSymlink != 0 || entry.IsDir() {
+		return nil
+	}
+	if err := bulk.ctx.Err(); err != nil {
+		return err
+	}
+
+	rel, err := filepath.Rel(walkRoot, path)
+	if err != nil {
+		return err
+	}
+	key := prefix + filepath.ToSlash(rel)
+	if err := ValidateKey(key); err != nil {
+		return bulk.callbackError(key, err)
+	}
+
+	bulk.goTransfer(key, func(transferCtx context.Context) (bool, error) {
+		return true, s.Upload(transferCtx, path, bucket, key, UploadOptions{
+			Progress:         o.Progress,
+			ProgressInterval: o.ProgressInterval,
+		})
+	})
+	return nil
 }

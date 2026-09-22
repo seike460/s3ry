@@ -47,144 +47,191 @@ func (s *Session) Download(ctx context.Context, bucket, key, localPath string, o
 		err = finishTransfer(m, "download", bucket, key, err)
 	}()
 
-	if err := ValidateBucketName(bucket); err != nil {
-		return err
-	}
-	if err := ValidateKey(key); err != nil {
-		return err
-	}
-
-	info, statErr := os.Stat(localPath)
-	if statErr == nil {
-		if info.IsDir() {
-			return newInvalidError("download", bucket, key, "local path is a directory")
-		}
-		if o.Overwrite != OverwriteAlways {
-			if o.Overwrite == OverwriteSkip {
-				m.finishSkipped()
-				return nil
-			}
-			return &Error{
-				Kind:   KindExists,
-				Op:     "download",
-				Bucket: bucket,
-				Key:    key,
-			}
-		}
-	} else if !errors.Is(statErr, fs.ErrNotExist) {
-		return statErr
-	}
-
-	if err := os.MkdirAll(filepath.Dir(localPath), 0o750); err != nil {
+	skipped, err := checkDownloadTarget(bucket, key, localPath, o.Overwrite, m)
+	if err != nil || skipped {
 		return err
 	}
 
-	tmpFile, err := os.CreateTemp(filepath.Dir(localPath), filepath.Base(localPath)+".s3ry-tmp-*")
+	tmp, err := newDownloadTemp(localPath)
 	if err != nil {
 		return err
 	}
-	tmpPath := tmpFile.Name()
+	defer func() { err = tmp.cleanup(err) }()
 
-	closed := false
-	tmpGone := false
-	appendCleanupError := func(primary, cleanupErr error) error {
-		if cleanupErr == nil || errors.Is(cleanupErr, fs.ErrNotExist) {
-			return primary
-		}
-		if primary == nil {
-			return cleanupErr
-		}
-		if classified, ok := primary.(*Error); ok {
-			cloned := *classified
-			if cloned.Err == nil {
-				cloned.Err = cleanupErr
-			} else {
-				cloned.Err = errors.Join(cloned.Err, cleanupErr)
-			}
-			return &cloned
-		}
-		return errors.Join(primary, cleanupErr)
-	}
-	cleanup := func() {
-		if !closed {
-			closeErr := tmpFile.Close()
-			closed = true
-			if closeErr != nil {
-				err = appendCleanupError(err, fmt.Errorf("close temporary file %q: %w", tmpPath, closeErr))
-			}
-		}
-		if !tmpGone {
-			removeErr := os.Remove(tmpPath)
-			if removeErr == nil || errors.Is(removeErr, fs.ErrNotExist) {
-				tmpGone = true
-			} else {
-				err = appendCleanupError(err, fmt.Errorf("remove temporary file %q: %w", tmpPath, removeErr))
-			}
-		}
-	}
-	defer cleanup()
-	if err := tmpFile.Chmod(0o644); err != nil {
+	if err := s.fetchToTemp(ctx, bucket, key, tmp, m); err != nil {
 		return err
 	}
-
-	tm, err := s.transfer(ctx, bucket)
-	if err != nil {
+	if err := tmp.close(); err != nil {
 		return err
-	}
-
-	_, err = tm.DownloadObject(ctx, &transfermanager.DownloadObjectInput{
-		Bucket:   aws.String(bucket),
-		Key:      aws.String(key),
-		WriterAt: &countingFile{File: tmpFile, m: m},
-	}, func(opts *transfermanager.Options) {
-		opts.ObjectProgressListeners.Register(&downloadProgressListener{m: m})
-	})
-	if err == nil && ctx.Err() != nil {
-		err = ctx.Err()
-	}
-	if err != nil {
-		return err
-	}
-
-	closeErr := tmpFile.Close()
-	closed = true
-	if closeErr != nil {
-		return fmt.Errorf("close temporary file %q: %w", tmpPath, closeErr)
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	exists, err := publishDownload(tmpPath, localPath, o.Overwrite)
+	return tmp.publish(localPath, bucket, key, o.Overwrite, m)
+}
+
+// checkDownloadTarget validates the inputs and resolves the overwrite
+// decision for an existing localPath.
+func checkDownloadTarget(bucket, key, localPath string, overwrite OverwriteMode, m *meter) (skipped bool, err error) {
+	if err := ValidateBucketName(bucket); err != nil {
+		return false, err
+	}
+	if err := ValidateKey(key); err != nil {
+		return false, err
+	}
+
+	info, statErr := os.Stat(localPath)
+	switch {
+	case statErr == nil && info.IsDir():
+		return false, newInvalidError("download", bucket, key, "local path is a directory")
+	case statErr == nil && overwrite == OverwriteSkip:
+		m.finishSkipped()
+		return true, nil
+	case statErr == nil && overwrite != OverwriteAlways:
+		return false, &Error{
+			Kind:   KindExists,
+			Op:     "download",
+			Bucket: bucket,
+			Key:    key,
+		}
+	case statErr == nil:
+		return false, nil
+	case errors.Is(statErr, fs.ErrNotExist):
+		return false, nil
+	default:
+		return false, statErr
+	}
+}
+
+// downloadTemp stages a download in a sibling temporary file until the
+// transfer completes and the file is published at the target path.
+type downloadTemp struct {
+	file    *os.File
+	path    string
+	closed  bool
+	removed bool
+}
+
+// newDownloadTemp creates the staging file in the target directory.
+func newDownloadTemp(localPath string) (*downloadTemp, error) {
+	dir := filepath.Dir(localPath)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return nil, err
+	}
+	file, err := os.CreateTemp(dir, filepath.Base(localPath)+".s3ry-tmp-*")
+	if err != nil {
+		return nil, err
+	}
+	tmp := &downloadTemp{file: file, path: file.Name()}
+	if err := file.Chmod(0o644); err != nil {
+		return nil, tmp.cleanup(err)
+	}
+	return tmp, nil
+}
+
+// close seals the staged file exactly once.
+func (t *downloadTemp) close() error {
+	if t.closed {
+		return nil
+	}
+	t.closed = true
+	if err := t.file.Close(); err != nil {
+		return fmt.Errorf("close temporary file %q: %w", t.path, err)
+	}
+	return nil
+}
+
+// remove deletes the staged file exactly once.
+func (t *downloadTemp) remove() error {
+	if t.removed {
+		return nil
+	}
+	if err := os.Remove(t.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("remove temporary file %q: %w", t.path, err)
+	}
+	t.removed = true
+	return nil
+}
+
+// cleanup closes and removes the staging file, appending any failure to err.
+func (t *downloadTemp) cleanup(err error) error {
+	err = appendCleanupError(err, t.close())
+	err = appendCleanupError(err, t.remove())
+	return err
+}
+
+// publish installs the staged file at localPath honoring the overwrite mode.
+func (t *downloadTemp) publish(localPath, bucket, key string, overwrite OverwriteMode, m *meter) error {
+	exists, err := publishDownload(t.path, localPath, overwrite)
 	if err != nil {
 		return err
 	}
-	if exists {
-		var existsErr error
-		if o.Overwrite != OverwriteSkip {
-			existsErr = &Error{
-				Kind:   KindExists,
-				Op:     "download",
-				Bucket: bucket,
-				Key:    key,
-			}
-		}
-		removeErr := os.Remove(tmpPath)
-		if removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
-			cleanupErr := fmt.Errorf("remove temporary file %q: %w", tmpPath, removeErr)
-			if existsErr != nil {
-				return appendCleanupError(existsErr, cleanupErr)
-			}
-			return cleanupErr
-		}
-		tmpGone = true
-		if o.Overwrite == OverwriteSkip {
-			m.finishSkipped()
-			return nil
-		}
-		return existsErr
+	if !exists {
+		t.removed = true
+		return nil
 	}
-	tmpGone = true
-	return nil
+	return t.resolveExisting(bucket, key, overwrite, m)
+}
+
+// resolveExisting resolves the case where localPath appeared during the
+// transfer: the staging file is removed and the caller learns whether the
+// download was skipped or refused.
+func (t *downloadTemp) resolveExisting(bucket, key string, overwrite OverwriteMode, m *meter) error {
+	var existsErr error
+	if overwrite != OverwriteSkip {
+		existsErr = &Error{
+			Kind:   KindExists,
+			Op:     "download",
+			Bucket: bucket,
+			Key:    key,
+		}
+	}
+	if err := t.remove(); err != nil {
+		return appendCleanupError(existsErr, err)
+	}
+	if overwrite == OverwriteSkip {
+		m.finishSkipped()
+		return nil
+	}
+	return existsErr
+}
+
+// fetchToTemp streams the object into tmp through the transfer manager.
+func (s *Session) fetchToTemp(ctx context.Context, bucket, key string, tmp *downloadTemp, m *meter) error {
+	tm, err := s.transfer(ctx, bucket)
+	if err != nil {
+		return err
+	}
+	_, err = tm.DownloadObject(ctx, &transfermanager.DownloadObjectInput{
+		Bucket:   aws.String(bucket),
+		Key:      aws.String(key),
+		WriterAt: &countingFile{File: tmp.file, m: m},
+	}, func(opts *transfermanager.Options) {
+		opts.ObjectProgressListeners.Register(&downloadProgressListener{m: m})
+	})
+	if err == nil {
+		err = ctx.Err()
+	}
+	return err
+}
+
+func appendCleanupError(primary, cleanupErr error) error {
+	if cleanupErr == nil || errors.Is(cleanupErr, fs.ErrNotExist) {
+		return primary
+	}
+	if primary == nil {
+		return cleanupErr
+	}
+	if classified, ok := primary.(*Error); ok {
+		cloned := *classified
+		if cloned.Err == nil {
+			cloned.Err = cleanupErr
+		} else {
+			cloned.Err = errors.Join(cloned.Err, cleanupErr)
+		}
+		return &cloned
+	}
+	return errors.Join(primary, cleanupErr)
 }
 
 func publishDownload(tmpPath, localPath string, overwrite OverwriteMode) (exists bool, err error) {

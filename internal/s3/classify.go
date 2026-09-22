@@ -19,67 +19,122 @@ func Classify(op, bucket, key string, err error) error {
 	if err == nil {
 		return nil
 	}
-
 	if e, ok := err.(*Error); ok {
 		return e
 	}
+	return &Error{Kind: classifyKind(err), Op: op, Bucket: bucket, Key: key, Err: err}
+}
 
-	if errors.Is(err, context.DeadlineExceeded) {
-		return &Error{Kind: KindTimeout, Op: op, Bucket: bucket, Key: key, Err: err}
+// classifyKind maps err to the most specific Kind it recognises.
+func classifyKind(err error) Kind {
+	for _, match := range kindMatchers {
+		if kind, ok := match(err); ok {
+			return kind
+		}
 	}
-	if errors.Is(err, context.Canceled) {
-		return &Error{Kind: KindCanceled, Op: op, Bucket: bucket, Key: key, Err: err}
-	}
+	return KindUnknown
+}
 
+// kindMatchers runs in order; the first match wins.
+var kindMatchers = []func(error) (Kind, bool){
+	classifyContext,
+	classifyToken,
+	classifyNotFoundType,
+	classifyAPICode,
+	classifyThrottle,
+	classifyStatus,
+	classifyCredentialService,
+}
+
+func classifyContext(err error) (Kind, bool) {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return KindTimeout, true
+	case errors.Is(err, context.Canceled):
+		return KindCanceled, true
+	default:
+		return 0, false
+	}
+}
+
+func classifyToken(err error) (Kind, bool) {
 	var invalidToken *ssocreds.InvalidTokenError
 	if errors.As(err, &invalidToken) && invalidToken != nil {
-		return &Error{Kind: KindNoCredentials, Op: op, Bucket: bucket, Key: key, Err: err}
+		return KindNoCredentials, true
 	}
+	return 0, false
+}
 
+func classifyNotFoundType(err error) (Kind, bool) {
 	var noSuchKey *s3types.NoSuchKey
 	var noSuchBucket *s3types.NoSuchBucket
 	var notFound *s3types.NotFound
 	if (errors.As(err, &noSuchKey) && noSuchKey != nil) ||
 		(errors.As(err, &noSuchBucket) && noSuchBucket != nil) ||
 		(errors.As(err, &notFound) && notFound != nil) {
-		return &Error{Kind: KindNotFound, Op: op, Bucket: bucket, Key: key, Err: err}
+		return KindNotFound, true
 	}
+	return 0, false
+}
 
+// apiErrorCodes maps S3 error codes to their Kind.
+var apiErrorCodes = map[string]Kind{
+	"AccessDenied":          KindAccessDenied,
+	"AllAccessDisabled":     KindAccessDenied,
+	"InvalidAccessKeyId":    KindAccessDenied,
+	"SignatureDoesNotMatch": KindAccessDenied,
+	"ExpiredToken":          KindAccessDenied,
+	"InvalidToken":          KindAccessDenied,
+	"AccountProblem":        KindAccessDenied,
+	"NotImplemented":        KindUnsupported,
+	"MethodNotAllowed":      KindUnsupported,
+	"NoSuchBucket":          KindNotFound,
+	"NoSuchKey":             KindNotFound,
+	"NotFound":              KindNotFound,
+}
+
+func classifyAPICode(err error) (Kind, bool) {
 	var apiErr smithy.APIError
 	if errors.As(err, &apiErr) && apiErr != nil {
-		switch apiErr.ErrorCode() {
-		case "AccessDenied", "AllAccessDisabled", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken", "InvalidToken", "AccountProblem":
-			return &Error{Kind: KindAccessDenied, Op: op, Bucket: bucket, Key: key, Err: err}
-		case "NotImplemented", "MethodNotAllowed":
-			return &Error{Kind: KindUnsupported, Op: op, Bucket: bucket, Key: key, Err: err}
-		case "NoSuchBucket", "NoSuchKey", "NotFound":
-			return &Error{Kind: KindNotFound, Op: op, Bucket: bucket, Key: key, Err: err}
+		if kind, ok := apiErrorCodes[apiErr.ErrorCode()]; ok {
+			return kind, true
 		}
 	}
+	return 0, false
+}
 
+func classifyThrottle(err error) (Kind, bool) {
 	if retry.IsErrorThrottles(retry.DefaultThrottles).IsErrorThrottle(err) == aws.TrueTernary {
-		return &Error{Kind: KindThrottled, Op: op, Bucket: bucket, Key: key, Err: err}
+		return KindThrottled, true
 	}
+	return 0, false
+}
 
-	if status, ok := responseStatus(err); ok {
-		switch status {
-		case http.StatusNotFound:
-			return &Error{Kind: KindNotFound, Op: op, Bucket: bucket, Key: key, Err: err}
-		case http.StatusUnauthorized, http.StatusForbidden:
-			return &Error{Kind: KindAccessDenied, Op: op, Bucket: bucket, Key: key, Err: err}
-		case http.StatusTooManyRequests, http.StatusServiceUnavailable:
-			return &Error{Kind: KindThrottled, Op: op, Bucket: bucket, Key: key, Err: err}
-		case http.StatusNotImplemented:
-			return &Error{Kind: KindUnsupported, Op: op, Bucket: bucket, Key: key, Err: err}
-		}
+// statusCodes maps HTTP statuses to their Kind.
+var statusCodes = map[int]Kind{
+	http.StatusNotFound:           KindNotFound,
+	http.StatusUnauthorized:       KindAccessDenied,
+	http.StatusForbidden:          KindAccessDenied,
+	http.StatusTooManyRequests:    KindThrottled,
+	http.StatusServiceUnavailable: KindThrottled,
+	http.StatusNotImplemented:     KindUnsupported,
+}
+
+func classifyStatus(err error) (Kind, bool) {
+	status, ok := responseStatus(err)
+	if !ok {
+		return 0, false
 	}
+	kind, ok := statusCodes[status]
+	return kind, ok
+}
 
+func classifyCredentialService(err error) (Kind, bool) {
 	var operationErr *smithy.OperationError
 	if errors.As(err, &operationErr) && operationErr != nil && isCredentialService(operationErr.ServiceID) {
-		return &Error{Kind: KindNoCredentials, Op: op, Bucket: bucket, Key: key, Err: err}
+		return KindNoCredentials, true
 	}
-
-	return &Error{Kind: KindUnknown, Op: op, Bucket: bucket, Key: key, Err: err}
+	return 0, false
 }
 
 func deleteNotImplemented(err error) bool {

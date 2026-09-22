@@ -47,66 +47,84 @@ func (v *BucketView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case BucketsLoadedMsg:
-		if msg.Err != nil {
-			v.state.fail(v.deps, v.deps.T("Error Loading Buckets"), v.deps.T("Failed to load S3 buckets"), msg.Err)
-			return v, nil
-		}
-
-		fallbackRegion := v.deps.region()
-		items := make([]components.ListItem, len(msg.Buckets))
-		for i, bucket := range msg.Buckets {
-			region := bucket.Region
-			if region == "" {
-				region = fallbackRegion
-			}
-			items[i] = components.ListItem{
-				Title:       bucket.Name,
-				Description: fmt.Sprintf("%s %s", v.deps.T("Region:"), region),
-				Tag:         "Bucket",
-				Data:        bucket,
-			}
-		}
-		v.state.loaded(v.deps.T("Select S3 Bucket"), items)
-		return v, nil
+		return v.onBucketsLoaded(msg)
 
 	case tea.KeyMsg:
-		if v.state.loading {
-			break
-		}
-
-		if v.state.retryRequested(msg.String()) {
-			return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
-		}
-
-		if quitKey(msg.String()) {
-			return v, tea.Quit
-		}
-		switch msg.String() {
-		case "?":
-			return NewHelpView(v.deps), nil
-		case "s":
-			return NewSettingsView(v.deps), nil
-		case "enter", " ":
-			item := v.state.currentItem()
-			if item == nil {
-				break
-			}
-			bucket, ok := item.Data.(s3.Bucket)
-			if !ok {
-				break
-			}
-			return NewOperationView(v.deps, bucket.Name), nil
-		}
-
-		if v.state.list != nil {
-			v.state.list, _ = v.state.list.Update(msg)
-		}
+		return v.onKey(msg)
 
 	case components.SpinnerTickMsg:
 		cmds = append(cmds, v.state.onTick(msg))
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// onBucketsLoaded fills the list with the fetched buckets.
+func (v *BucketView) onBucketsLoaded(msg BucketsLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.Err != nil {
+		v.state.fail(v.deps, v.deps.T("Error Loading Buckets"), v.deps.T("Failed to load S3 buckets"), msg.Err)
+		return v, nil
+	}
+
+	fallbackRegion := v.deps.region()
+	items := make([]components.ListItem, len(msg.Buckets))
+	for i, bucket := range msg.Buckets {
+		region := bucket.Region
+		if region == "" {
+			region = fallbackRegion
+		}
+		items[i] = components.ListItem{
+			Title:       bucket.Name,
+			Description: fmt.Sprintf("%s %s", v.deps.T("Region:"), region),
+			Tag:         "Bucket",
+			Data:        bucket,
+		}
+	}
+	v.state.loaded(v.deps.T("Select S3 Bucket"), items)
+	return v, nil
+}
+
+// onKey handles keyboard input on the bucket list.
+func (v *BucketView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.state.loading {
+		return v, nil
+	}
+
+	if v.state.retryRequested(msg.String()) {
+		return v, v.state.startLoading(v.deps.T("Retrying to load S3 buckets..."), v.loadBuckets())
+	}
+
+	if quitKey(msg.String()) {
+		return v, tea.Quit
+	}
+	switch msg.String() {
+	case "?":
+		return NewHelpView(v.deps), nil
+	case "s":
+		return NewSettingsView(v.deps), nil
+	case "enter", " ":
+		if bucket := v.selectedBucket(); bucket != nil {
+			return NewOperationView(v.deps, bucket.Name), nil
+		}
+	}
+
+	if v.state.list != nil {
+		v.state.list, _ = v.state.list.Update(msg)
+	}
+	return v, nil
+}
+
+// selectedBucket returns the s3.Bucket under the cursor, if any.
+func (v *BucketView) selectedBucket() *s3.Bucket {
+	item := v.state.currentItem()
+	if item == nil {
+		return nil
+	}
+	bucket, ok := item.Data.(s3.Bucket)
+	if !ok {
+		return nil
+	}
+	return &bucket
 }
 
 // View renders the bucket view.
