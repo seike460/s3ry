@@ -159,6 +159,16 @@ func (s *listState) retryRequested(key string) bool {
 	return item != nil && item.Tag == "Error"
 }
 
+// filterActive reports whether the list is capturing filter keystrokes.
+func (s *listState) filterActive() bool {
+	return s.list != nil && s.list.Filtering()
+}
+
+// routeFilterKey forwards a keystroke to the list's filter input.
+func (s *listState) routeFilterKey(msg tea.KeyMsg) {
+	s.list, _ = s.list.Update(msg)
+}
+
 func (s *listState) currentItem() *components.ListItem {
 	if s.list == nil {
 		return nil

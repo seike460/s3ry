@@ -44,6 +44,10 @@ func (v *SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		if v.list != nil && v.list.Filtering() {
+			v.list, _ = v.list.Update(msg)
+			return v, nil
+		}
 		if quitKey(msg.String()) {
 			return v, tea.Quit
 		}

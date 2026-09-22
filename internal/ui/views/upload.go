@@ -147,6 +147,10 @@ func (v *UploadView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onReadyKey handles input on the file list.
 func (v *UploadView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
 	if v.transfer.quitRequested(msg.String()) {
 		return v, tea.Quit
 	}

@@ -338,3 +338,57 @@ func BenchmarkList_View(b *testing.B) {
 		list.View()
 	}
 }
+
+func TestList_Filter(t *testing.T) {
+	items := []ListItem{
+		{Title: "logs/2026/app.log"},
+		{Title: "images/photo.png"},
+		{Title: "logs/2026/error.log"},
+	}
+	list := NewList("Objects", items)
+
+	// "/" opens the filter input.
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	if !list.Filtering() {
+		t.Fatal("expected filtering mode after /")
+	}
+
+	// Typing narrows the visible items.
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if list.Filter() != "log" {
+		t.Fatalf("filter = %q, want log", list.Filter())
+	}
+	if item := list.GetCurrentItem(); item == nil || item.Title == "images/photo.png" {
+		t.Fatalf("current item = %v, want a log item", item)
+	}
+
+	// Backspace edits the filter.
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if list.Filter() != "lo" {
+		t.Fatalf("filter after backspace = %q, want lo", list.Filter())
+	}
+
+	// Enter keeps the filter and leaves input mode.
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if list.Filtering() {
+		t.Fatal("expected filtering to end after enter")
+	}
+	if list.Filter() != "lo" {
+		t.Fatalf("filter = %q, want lo", list.Filter())
+	}
+}
+
+func TestList_FilterEscapeClears(t *testing.T) {
+	list := NewList("Objects", []ListItem{{Title: "a"}, {Title: "b"}})
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	list, _ = list.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if list.Filtering() || list.Filter() != "" {
+		t.Fatalf("after esc: filtering=%v filter=%q", list.Filtering(), list.Filter())
+	}
+	if list.GetCurrentItem() == nil {
+		t.Fatal("expected items restored after clearing filter")
+	}
+}

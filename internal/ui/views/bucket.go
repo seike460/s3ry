@@ -99,6 +99,10 @@ func (v *BucketView) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onListKey handles keys on the loaded bucket list.
 func (v *BucketView) onListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
 	if quitKey(msg.String()) {
 		return v, tea.Quit
 	}

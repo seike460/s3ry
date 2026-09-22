@@ -195,6 +195,10 @@ func (v *ObjectView) onConfirmKey(key string) (tea.Model, tea.Cmd) {
 
 // onReadyKey handles input on the object list.
 func (v *ObjectView) onReadyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.state.filterActive() {
+		v.state.routeFilterKey(msg)
+		return v, nil
+	}
 	key := msg.String()
 	if v.transfer.quitRequested(key) {
 		return v, tea.Quit

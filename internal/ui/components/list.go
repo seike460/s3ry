@@ -28,12 +28,17 @@ type ListItem struct {
 // List represents a selectable list component with virtual scrolling
 type List struct {
 	title    string
-	items    []ListItem
+	items    []ListItem // filtered view of allItems
+	allItems []ListItem
 	cursor   int
 	selected int
 	width    int
 	height   int
 	showHelp bool
+
+	// "/" opens the filter input; filtering narrows items by substring.
+	filter    string
+	filtering bool
 
 	// Virtual scrolling for performance
 	viewportTop int
@@ -54,6 +59,7 @@ func NewList(title string, items []ListItem) *List {
 	l := &List{
 		title:    title,
 		items:    items,
+		allItems: items,
 		cursor:   0,
 		selected: -1,
 		showHelp: true,
@@ -118,10 +124,73 @@ func (l *List) Update(msg tea.Msg) (*List, tea.Cmd) {
 		l.updateViewport()
 
 	case tea.KeyMsg:
-		l.onKey(msg.String())
+		if l.filtering {
+			l.onFilterKey(msg)
+		} else {
+			l.onKey(msg.String())
+		}
 	}
 
 	return l, nil
+}
+
+// Filtering reports whether the filter input is capturing keystrokes.
+// Views route every key to the list while this is true.
+func (l *List) Filtering() bool {
+	return l.filtering
+}
+
+// Filter returns the active filter text.
+func (l *List) Filter() string {
+	return l.filter
+}
+
+// onFilterKey edits the filter while input capture is active.
+func (l *List) onFilterKey(msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		l.filtering = false
+	case tea.KeyEscape:
+		l.filtering = false
+		l.filter = ""
+		l.applyFilter()
+	case tea.KeyBackspace:
+		if r := []rune(l.filter); len(r) > 0 {
+			l.filter = string(r[:len(r)-1])
+		}
+		l.applyFilter()
+	case tea.KeySpace:
+		l.filter += " "
+		l.applyFilter()
+	case tea.KeyRunes:
+		l.filter += string(msg.Runes)
+		l.applyFilter()
+	}
+}
+
+// applyFilter rebuilds the visible items from the filter text.
+func (l *List) applyFilter() {
+	l.items = filterItems(l.allItems, l.filter)
+	l.cursor = 0
+	l.selected = -1
+	l.viewportTop = 0
+	l.updateViewport()
+}
+
+// filterItems returns items whose title or description contains filter.
+func filterItems(items []ListItem, filter string) []ListItem {
+	if filter == "" {
+		return items
+	}
+	needle := strings.ToLower(filter)
+	var out []ListItem
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item.Title), needle) ||
+			strings.Contains(strings.ToLower(item.Description), needle) {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 // onKey moves the cursor or selects for navigation keys.
@@ -143,6 +212,8 @@ func (l *List) onKey(key string) {
 	case "end":
 		l.cursor = len(l.items) - 1
 		l.updateViewport()
+	case "/":
+		l.filtering = true
 	}
 }
 
@@ -168,6 +239,10 @@ func (l *List) View() string {
 
 	// Title
 	s.WriteString(l.titleStyle.Render(l.title))
+	if l.filtering || l.filter != "" {
+		s.WriteString(" ")
+		s.WriteString(l.helpStyle.Render("filter: " + l.filter + "▏"))
+	}
 	s.WriteString("\n\n")
 
 	// Early return for empty lists
@@ -199,9 +274,9 @@ func (l *List) View() string {
 	if l.showHelp {
 		s.WriteString("\n")
 		if len(l.items) > l.maxVisible {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • enter/space: select"))
+			s.WriteString(l.helpStyle.Render("↑/↓: navigate • PgUp/PgDn: page • Home/End: jump • /: filter • enter/space: select"))
 		} else {
-			s.WriteString(l.helpStyle.Render("↑/↓: navigate • enter/space: select • q: quit"))
+			s.WriteString(l.helpStyle.Render("↑/↓: navigate • /: filter • enter/space: select • q: quit"))
 		}
 	}
 
@@ -243,11 +318,8 @@ func (l *List) GetCurrentItem() *ListItem {
 
 // SetItems updates the list items
 func (l *List) SetItems(items []ListItem) {
-	l.items = items
-	l.cursor = 0
-	l.selected = -1
-	l.viewportTop = 0
-	l.updateViewport()
+	l.allItems = items
+	l.applyFilter()
 }
 
 // SetShowHelp sets whether to show help text
@@ -260,5 +332,7 @@ func (l *List) Reset() {
 	l.cursor = 0
 	l.selected = -1
 	l.viewportTop = 0
-	l.updateViewport()
+	l.filter = ""
+	l.filtering = false
+	l.applyFilter()
 }
